@@ -1,0 +1,40 @@
+name: lint
+# Required check on main. YAML everywhere; ansible-lint, shellcheck and PSScriptAnalyzer once the
+# files they check exist, so the job is meaningful from the first commit.
+on:
+  pull_request:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  lint:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: yamllint
+        run: |
+          pipx install yamllint
+          yamllint --strict .
+      - name: ansible-lint
+        if: hashFiles('ansible/site.yml') != ''
+        working-directory: ansible
+        run: |
+          pipx install ansible-lint
+          pipx inject ansible-lint ansible-core
+          if [ -f requirements.yml ]; then ansible-galaxy collection install -r requirements.yml; fi
+          ansible-lint --strict
+      - name: shellcheck
+        run: |
+          files=$(git ls-files '*.sh')
+          if [ -n "$files" ]; then shellcheck $files; else echo "no shell scripts yet"; fi
+      - name: PSScriptAnalyzer
+        shell: pwsh
+        run: |
+          $files = git ls-files '*.ps1' '*.psm1'
+          if (-not $files) { "no PowerShell scripts yet"; exit 0 }
+          Install-Module PSScriptAnalyzer -Scope CurrentUser -Force
+          $r = $files | ForEach-Object { Invoke-ScriptAnalyzer -Path $_ -Severity Error,Warning }
+          $r | Format-Table -AutoSize
+          if ($r) { exit 1 }

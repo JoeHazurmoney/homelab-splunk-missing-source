@@ -1,0 +1,38 @@
+name: pr-issue-link
+# Required check on main: every PR closes an open issue in this repository ("Closes #N" in the
+# body), and its title is a Conventional Commit (a squash merge lands the title on main).
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+permissions:
+  contents: read
+  issues: read
+jobs:
+  pr-issue-link:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Title is a Conventional Commit
+        env:
+          # PR text is data: passed in the environment, never pasted into the script.
+          TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          re='^(feat|fix|docs|test|refactor|chore|ci|build|perf|style|revert)(\([a-z0-9._/-]+\))?!?: .+'
+          if [[ "$TITLE" =~ $re ]]; then echo "ok: $TITLE"; else echo "::error::PR title is not a Conventional Commit: $TITLE"; exit 1; fi
+      - name: Body closes an open issue
+        env:
+          BODY: ${{ github.event.pull_request.body }}
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          nums=$(printf '%s' "$BODY" | grep -oiE '(close[sd]?|fix(e[sd])?|resolve[sd]?) #[0-9]+' | grep -oE '[0-9]+' | sort -u || true)
+          if [ -z "$nums" ]; then echo "::error::The PR body must say 'Closes #<issue>'"; exit 1; fi
+          ok=0
+          for n in $nums; do
+            json=$(gh api "repos/$REPO/issues/$n" 2>/dev/null) || { echo "::warning::#$n not found"; continue; }
+            if [ "$(jq -r 'has("pull_request")' <<<"$json")" = "true" ]; then echo "::warning::#$n is a PR, not an issue"; continue; fi
+            state=$(jq -r .state <<<"$json")
+            echo "#$n: $state"
+            [ "$state" = "open" ] && ok=1
+          done
+          if [ "$ok" -ne 1 ]; then echo "::error::No linked issue is an open issue in $REPO"; exit 1; fi

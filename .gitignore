@@ -1,0 +1,13 @@
+# Splunk packages and TAs: large, licensed, fetched or copied locally (checksums are pinned in the role)
+ansible/files/packages/
+# Vault password files never go in git (the vault itself is encrypted and may)
+.vault-pass*
+*.vault-pass
+# Subagent-driven-development scratch
+.superpowers/
+# Tooling
+__pycache__/
+*.pyc
+.venv/
+*.retry
+.ansible/
