@@ -1,0 +1,12 @@
+#!/bin/sh
+# Main-branch guard. GitHub refuses branch protection and rulesets on this private repository
+# without GitHub Pro, so this hook keeps the rule locally: changes reach main only through a PR
+# merged with `gh pr merge` (server side). Enable once per clone: git config core.hooksPath .githooks
+# Override (only with Taylor's explicit OK): HL_ALLOW_MAIN_PUSH=1 git push ...
+while read -r local_ref local_sha remote_ref remote_sha; do
+  if [ "$remote_ref" = "refs/heads/main" ] && [ "${HL_ALLOW_MAIN_PUSH:-0}" != "1" ]; then
+    echo "pre-push: direct pushes to main are blocked; open a PR that closes an issue." >&2
+    exit 1
+  fi
+done
+exit 0
