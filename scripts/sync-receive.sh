@@ -10,6 +10,18 @@ set -euo pipefail
 cd "$HOME"
 stage=$1
 dest=$2
+# Both get rm -rf / mv below, so accept only the shapes sync-to-pi.ps1 sends: dest a plain name
+# under $HOME starting with a letter or digit (never empty, ., .. or a path), stage under ~/.cache.
+case $dest in
+  '' | [!A-Za-z0-9]* | *[!A-Za-z0-9._-]*) echo "refusing destination '$dest'" >&2; exit 2 ;;
+esac
+case $stage in
+  .cache/[A-Za-z0-9]*) ;;
+  *) echo "refusing staging dir '$stage'" >&2; exit 2 ;;
+esac
+case $stage in
+  */.* | *[!A-Za-z0-9./_-]*) echo "refusing staging dir '$stage'" >&2; exit 2 ;;
+esac
 keep=ansible/inventory/group_vars/all/vault.yml
 merge=ansible/files/packages
 

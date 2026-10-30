@@ -17,8 +17,8 @@
 param(
     # ssh host (alias in ~/.ssh/config) of the Pi
     [string]$PiHost = 'pi5',
-    # Target directory on the Pi, relative to the home directory
-    [ValidatePattern('^[A-Za-z0-9._-]+$')]
+    # Target directory on the Pi: a plain name directly under the home directory (no ., .., / or leading dot)
+    [ValidatePattern('^[A-Za-z0-9][A-Za-z0-9._-]*$')]
     [string]$Destination = 'homelab-splunk-missing-source',
     # Also send ansible/files/packages/ (UF packages, TAs); large, so off by default
     [switch]$IncludePackages

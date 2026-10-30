@@ -9,8 +9,10 @@
       2. Appends it to ~/.ssh/authorized_keys of taylorb on each VM, logging in with this PC's
          existing key ~/.ssh/id_ecdsa_wd2l_lab. The VMs must be running.
       3. Adds it to C:\ProgramData\ssh\administrators_authorized_keys through
-         bootstrap-windows-sshd.ps1 -AuthorizedKeyFile. That needs elevation: run this script
-         from an elevated PowerShell, or accept the UAC prompt it opens.
+         bootstrap-windows-sshd.ps1 -AuthorizedKey (the key text, not a file). That needs
+         elevation: run this script from an elevated PowerShell, or accept the UAC prompt it
+         opens; that window stays open on failure, and the log is
+         C:\ProgramData\hl_bootstrap\bootstrap-sshd.log.
 .EXAMPLE
     .\scripts\add-ansible-key.ps1
 .EXAMPLE
@@ -68,26 +70,24 @@ if (-not $SkipVm) {
 
 # 3. HOMEPC (administrators_authorized_keys, needs elevation)
 if (-not $SkipWindows) {
+    # The key travels as a parameter, never through a file another process could swap before the
+    # elevated run reads it; the bootstrap validates it again.
     $bootstrap = Join-Path $PSScriptRoot 'bootstrap-windows-sshd.ps1'
-    $keyFile = Join-Path ([IO.Path]::GetTempPath()) ('hl-pi-key-{0}.pub' -f [guid]::NewGuid())
-    [IO.File]::WriteAllText($keyFile, "$key`n", (New-Object System.Text.ASCIIEncoding))
-    try {
-        $principal = New-Object Security.Principal.WindowsPrincipal([Security.Principal.WindowsIdentity]::GetCurrent())
-        if ($principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
-            Write-Step 'Authorizing the key on HOMEPC'
-            & $bootstrap -AuthorizedKeyFile $keyFile
-        }
-        else {
-            Write-Step 'Authorizing the key on HOMEPC in an elevated window (accept the UAC prompt)'
-            $argList = '-NoProfile -ExecutionPolicy Bypass -File "{0}" -AuthorizedKeyFile "{1}"' -f $bootstrap, $keyFile
-            $proc = Start-Process -FilePath powershell.exe -Verb RunAs -Wait -PassThru -ArgumentList $argList
-            if ($proc.ExitCode -ne 0) {
-                throw "bootstrap-windows-sshd.ps1 failed (exit $($proc.ExitCode)); run it from an elevated PowerShell: $bootstrap -AuthorizedKeyFile <file with the key>"
-            }
-        }
+    $log = Join-Path $env:ProgramData 'hl_bootstrap\bootstrap-sshd.log'
+    $principal = New-Object Security.Principal.WindowsPrincipal([Security.Principal.WindowsIdentity]::GetCurrent())
+    if ($principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
+        Write-Step 'Authorizing the key on HOMEPC'
+        & $bootstrap -AuthorizedKey $key
+        $exitCode = $LASTEXITCODE
     }
-    finally {
-        Remove-Item -LiteralPath $keyFile -ErrorAction SilentlyContinue
+    else {
+        Write-Step 'Authorizing the key on HOMEPC in an elevated window (accept the UAC prompt)'
+        # -PauseOnError keeps that window open if it fails, so the error can be read
+        $argList = '-NoProfile -ExecutionPolicy Bypass -File "{0}" -AuthorizedKey "{1}" -PauseOnError' -f $bootstrap, $key
+        $exitCode = (Start-Process -FilePath powershell.exe -Verb RunAs -Wait -PassThru -ArgumentList $argList).ExitCode
+    }
+    if ($exitCode -ne 0) {
+        throw "bootstrap-windows-sshd.ps1 failed (exit $exitCode); see $log"
     }
 }
 
