@@ -11,7 +11,7 @@
       3. makes Windows PowerShell the default shell of SSH sessions,
       4. sets sshd to start automatically and starts it,
       5. turns off password logins (PasswordAuthentication no in sshd_config; only keys are used),
-         checks the config with sshd -t and restarts sshd,
+         checks the config with sshd -t, restarts sshd, and confirms the effective value with sshd -T,
       6. with -AuthorizedKey or -AuthorizedKeyFile, adds the public key(s) to
          C:\ProgramData\ssh\administrators_authorized_keys (the file sshd uses for members of
          Administrators, so the session is elevated) and locks the file to Administrators and
@@ -67,6 +67,7 @@ $PowerShellExe = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powe
 $KeyPattern = '\A(ssh-ed25519|ecdsa-sha2-nistp(256|384|521)|ssh-rsa) [A-Za-z0-9+/]+={0,3}( [!-~]+)?\z'
 $PasswordMarker = '# hl_bootstrap: keys only. scripts/bootstrap-windows-sshd.ps1 -Remove restores the previous setting.'
 $PasswordLine = 'PasswordAuthentication no'
+$SshdFileTimeout = 15   # seconds to wait for sshd_config and the host keys after sshd first starts
 
 function Write-Step([string]$Message) {
     Write-Information "==> $Message" -InformationAction Continue
@@ -144,10 +145,48 @@ function Test-SshdConfig {
     if ($LASTEXITCODE -ne 0) { throw "sshd -t rejected $SshdConfig (exit $LASTEXITCODE): $out" }
 }
 
+function Test-SshdFileReady {
+    (Test-Path -LiteralPath $SshdConfig) -and [bool](Get-ChildItem -LiteralPath $SshDir -Filter 'ssh_host_*_key' -ErrorAction SilentlyContinue)
+}
+
+function Wait-SshdFile {
+    # sshd writes sshd_config (from sshd_config_default) and generates its host keys on its first
+    # start; sshd -t and -T fail with "no hostkeys available" until the keys exist
+    for ($i = 0; ($i -lt $SshdFileTimeout) -and -not (Test-SshdFileReady); $i++) { Start-Sleep -Seconds 1 }
+    if (-not (Test-SshdFileReady)) {
+        throw "$SshdConfig and a host key ($SshDir\ssh_host_*_key) did not both appear within $SshdFileTimeout s of sshd starting"
+    }
+}
+
+function Get-SshdEffectiveSetting([string]$Keyword) {
+    # sshd -T prints the effective configuration (Include files applied), keywords in lower case
+    $ErrorActionPreference = 'Continue'
+    $out = @(& $SshdExe -T 2>&1 | ForEach-Object { "$_" })
+    if ($LASTEXITCODE -ne 0) { throw "sshd -T failed (exit $LASTEXITCODE): $out" }
+    return (Select-SshdSetting $out $Keyword)
+}
+
+function Select-SshdSetting([string[]]$Line, [string]$Keyword) {
+    $hit = @($Line | Where-Object { $_ -match ('^{0}\s' -f [regex]::Escape($Keyword.ToLowerInvariant())) } | Select-Object -First 1)
+    if ($hit) { return ($hit[0] -split '\s+', 2)[1].Trim() }
+    return $null
+}
+
+function Assert-PasswordLoginOff {
+    $value = Get-SshdEffectiveSetting 'passwordauthentication'
+    if ($value -ne 'no') {
+        throw "sshd's effective PasswordAuthentication is '$value', not 'no' (sshd -T). An Include or drop-in config re-enables it; remove that, then run this script again."
+    }
+    Write-Step 'Checked with sshd -T: passwordauthentication no'
+}
+
 function Disable-PasswordLogin([hashtable]$State) {
-    # sshd writes sshd_config from sshd_config_default on its first start
-    for ($i = 0; ($i -lt 15) -and -not (Test-Path -LiteralPath $SshdConfig); $i++) { Start-Sleep -Seconds 1 }
-    if (-not (Test-Path -LiteralPath $SshdConfig)) { throw "$SshdConfig did not appear after sshd started" }
+    Wait-SshdFile
+    Edit-PasswordLine $State
+    Assert-PasswordLoginOff
+}
+
+function Edit-PasswordLine([hashtable]$State) {
     $lines = @(Read-RawLine $SshdConfig)
     $marker = [array]::IndexOf([string[]]$lines, $PasswordMarker)
     if ($marker -ge 0 -and $marker + 1 -lt $lines.Count -and $lines[$marker + 1].Trim() -eq $PasswordLine) {
@@ -274,8 +313,10 @@ function Install-HlSshd([string]$AllowFrom, [string[]]$AuthorizedKey, [string]$A
     if ("$($svc.StartType)" -ne 'Automatic') { Set-Service -Name sshd -StartupType Automatic }
     if ("$($svc.Status)" -ne 'Running') { Start-Service -Name sshd }
     Write-Step 'sshd is running and starts automatically'
+    # At once: if a later step fails, 22/tcp must already be limited to the Pi
+    Disable-BuiltinRule $state
 
-    # 5. Keys only
+    # 5. Keys only (then the rule once more, in case the restart recreated it)
     Disable-PasswordLogin $state
     Disable-BuiltinRule $state
 
