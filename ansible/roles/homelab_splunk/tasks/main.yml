@@ -1,0 +1,159 @@
+# Dispatch by group and tag (spec 5.3). Static imports, so every task inherits its import's tags and
+# --list-tags / --list-tasks show the real selection. Order is the deploy order:
+# server -> install -> apps -> audit_rules -> audit_policy -> syslog_relay -> expected.
+# Everything that is not part of a deploy (removing, stopping, restarting, one-time or read-only
+# actions) carries `never`, so it runs only when its own tag is asked for.
+
+# --- splunk_server: one-time port change, then the server apps ---
+- name: Recreate the Splunk container with the new ports
+  ansible.builtin.import_tasks: server_ports.yml
+  when: "'splunk_server' in group_names"
+  tags: [never, server_ports]
+
+- name: Deploy the server apps
+  ansible.builtin.import_tasks: server.yml
+  when: "'splunk_server' in group_names"
+  tags: [deploy, server]
+
+# --- UF hosts: install, then the forwarder apps ---
+- name: Install the Linux UF
+  ansible.builtin.import_tasks: uf_linux_install.yml
+  when: "'uf_linux' in group_names"
+  tags: [deploy, install]
+
+- name: Install the Windows UF
+  ansible.builtin.import_tasks: uf_windows_install.yml
+  when: "'uf_windows' in group_names"
+  tags: [deploy, install]
+
+- name: Sync the Linux forwarder apps
+  ansible.builtin.import_tasks: uf_linux_apps.yml
+  when: "'uf_linux' in group_names"
+  tags: [deploy, apps]
+
+- name: Sync the Windows forwarder apps
+  ansible.builtin.import_tasks: uf_windows_apps.yml
+  when: "'uf_windows' in group_names"
+  tags: [deploy, apps]
+
+# --- Auditing ---
+- name: Load the STIG audit rules
+  ansible.builtin.import_tasks: audit_rules.yml
+  when: "'uf_linux' in group_names"
+  tags: [deploy, audit_rules]
+
+- name: Apply the Windows audit policy
+  ansible.builtin.import_tasks: audit_policy.yml
+  when: "'uf_windows' in group_names"
+  tags: [deploy, audit_policy]
+
+# --- Syslog relay and device probe ---
+- name: Configure the syslog relay
+  ansible.builtin.import_tasks: syslog_relay.yml
+  when: "'syslog_relay' in group_names"
+  tags: [deploy, syslog_relay]
+
+# --- The expected list, last, from everything above ---
+- name: Push the expected list
+  ansible.builtin.import_tasks: expected.yml
+  when: "'splunk_server' in group_names"
+  tags: [deploy, expected]
+
+# --- Service control (UF hosts), one import per action ---
+- name: Start the Linux UF
+  ansible.builtin.import_tasks: uf_linux_service.yml
+  vars: {hl_service_action: start}
+  when: "'uf_linux' in group_names"
+  tags: [never, start]
+
+- name: Stop the Linux UF
+  ansible.builtin.import_tasks: uf_linux_service.yml
+  vars: {hl_service_action: stop}
+  when: "'uf_linux' in group_names"
+  tags: [never, stop]
+
+- name: Restart the Linux UF
+  ansible.builtin.import_tasks: uf_linux_service.yml
+  vars: {hl_service_action: restart}
+  when: "'uf_linux' in group_names"
+  tags: [never, restart]
+
+- name: Report the Linux UF status
+  ansible.builtin.import_tasks: uf_linux_service.yml
+  vars: {hl_service_action: status}
+  when: "'uf_linux' in group_names"
+  tags: [never, status]
+
+- name: Start the Windows UF
+  ansible.builtin.import_tasks: uf_windows_service.yml
+  vars: {hl_service_action: start}
+  when: "'uf_windows' in group_names"
+  tags: [never, start]
+
+- name: Stop the Windows UF
+  ansible.builtin.import_tasks: uf_windows_service.yml
+  vars: {hl_service_action: stop}
+  when: "'uf_windows' in group_names"
+  tags: [never, stop]
+
+- name: Restart the Windows UF
+  ansible.builtin.import_tasks: uf_windows_service.yml
+  vars: {hl_service_action: restart}
+  when: "'uf_windows' in group_names"
+  tags: [never, restart]
+
+- name: Report the Windows UF status
+  ansible.builtin.import_tasks: uf_windows_service.yml
+  vars: {hl_service_action: status}
+  when: "'uf_windows' in group_names"
+  tags: [never, status]
+
+# --- Read-only checks and package download ---
+- name: Verify collection end to end
+  ansible.builtin.import_tasks: verify.yml
+  tags: [never, verify]
+
+- name: Download the UF packages
+  ansible.builtin.import_tasks: download.yml
+  tags: [never, download]
+
+# --- Removal, in reverse deploy order ---
+- name: Remove the Windows audit policy
+  ansible.builtin.import_tasks: audit_policy_remove.yml
+  when: "'uf_windows' in group_names"
+  tags: [never, audit_policy_remove]
+
+- name: Remove the STIG audit rules
+  ansible.builtin.import_tasks: audit_rules_remove.yml
+  when: "'uf_linux' in group_names"
+  tags: [never, audit_rules_remove]
+
+- name: Remove the syslog relay
+  ansible.builtin.import_tasks: syslog_relay_remove.yml
+  when: "'syslog_relay' in group_names"
+  tags: [never, syslog_relay_remove]
+
+- name: Remove the Linux forwarder apps
+  ansible.builtin.import_tasks: uf_linux_apps_remove.yml
+  when: "'uf_linux' in group_names"
+  tags: [never, apps_remove]
+
+- name: Remove the Windows forwarder apps
+  ansible.builtin.import_tasks: uf_windows_apps_remove.yml
+  when: "'uf_windows' in group_names"
+  tags: [never, apps_remove]
+
+- name: Uninstall the Linux UF
+  ansible.builtin.import_tasks: uf_linux_uninstall.yml
+  when: "'uf_linux' in group_names"
+  tags: [never, uninstall]
+
+- name: Uninstall the Windows UF
+  ansible.builtin.import_tasks: uf_windows_uninstall.yml
+  when: "'uf_windows' in group_names"
+  tags: [never, uninstall]
+
+- name: Remove the server apps
+  ansible.builtin.import_tasks: server_remove.yml
+  when: "'splunk_server' in group_names"
+  tags: [never, server_remove]

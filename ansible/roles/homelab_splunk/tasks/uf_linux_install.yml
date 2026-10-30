@@ -1,0 +1,5 @@
+# install (uf_linux): check sha256, install the UF rpm, configure before first start, boot-start, tamper rules, start, marker
+# Placeholder until task 4 (spec 11) fills it in.
+- name: Placeholder for install
+  ansible.builtin.debug:
+    msg: "install on {{ inventory_hostname }}: not implemented yet (task 4)"

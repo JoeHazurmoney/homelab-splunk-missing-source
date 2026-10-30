@@ -1,0 +1,5 @@
+# expected (splunk_server, once): render dh_expected_ansible.csv from hostvars and syslog_devices, push it, run the sync search
+# Placeholder until task 10 (spec 11) fills it in.
+- name: Placeholder for expected
+  ansible.builtin.debug:
+    msg: "expected on {{ inventory_hostname }}: not implemented yet (task 10)"

@@ -1,0 +1,113 @@
+# homelab_splunk defaults. meta/argument_specs.yml documents and validates every variable here.
+
+# --- Where forwarders send (spec 4, 5.5). uf_windows overrides the indexer with 127.0.0.1. ---
+splunk_indexer: 192.168.1.27
+hl_s2s_port: 9997
+
+# --- Expectation metadata (spec 7.2 dh_expected). Set per group or host. ---
+hl_owner: taylorb
+hl_site: home
+hl_host_criticality: 2        # 1 = most critical ... 4; DH Alert missing fires for <= 2
+
+# --- Input toggles (spec 5.3 "turn off receipt" and 5.2 host/group overrides) ---
+# Stanzas listed here are neither rendered nor expected, e.g.
+#   -e '{"hl_disabled_inputs":["monitor:///var/log/secure"]}' --tags apps
+hl_disabled_inputs: []
+# Per-stanza overrides merged over a row below: any of profile, criticality, enabled, track_source,
+# plus max_gap_secs (a declared threshold, spec 7.4), e.g.
+#   hl_input_overrides: {"monitor:///var/log/cron": {profile: sporadic, criticality: 4}}
+hl_input_overrides: {}
+
+# --- Syslog devices on the relay (set in group_vars/syslog_relay.yml) ---
+syslog_devices: []
+
+# --- The shared input schema (spec 4). Forwarder apps (task 6) and the expected list (task 10)
+# are both rendered from these rows, so an enabled input always has an expectation.
+#   stanza        inputs.conf stanza, exactly as written in the app's local/inputs.conf
+#   app           the app whose local/inputs.conf carries the stanza
+#   index, sourcetype, source   what the events carry; source is the normalized form (dh_source_norm)
+#   interval      seconds, scripted and perfmon inputs only (periodic threshold = 2 x interval + 60)
+#   profile       heartbeat | periodic | continuous | sporadic | info (spec 7.4)
+#   criticality   1 (most critical) .. 4
+#   enabled       false keeps the row documented but neither rendered nor expected
+#   track_source  also expect each source (level=source), not only the sourcetype
+
+# wd2l's audit sourcetype differs per host (host_vars); hosts without wd2l disable its stanza.
+hl_wd2l_audit_sourcetype: "wd2l:audit"
+
+hl_linux_inputs:
+  # File monitors (app hl_uf_linux_inputs)
+  - {stanza: "monitor:///var/log/messages", app: hl_uf_linux_inputs, index: linux, sourcetype: syslog,
+     source: /var/log/messages, profile: continuous, criticality: 2, enabled: true, track_source: true}
+  - {stanza: "monitor:///var/log/cron", app: hl_uf_linux_inputs, index: linux, sourcetype: syslog,
+     source: /var/log/cron, profile: continuous, criticality: 3, enabled: true, track_source: true}
+  - {stanza: "monitor:///var/log/secure", app: hl_uf_linux_inputs, index: linux, sourcetype: linux_secure,
+     source: /var/log/secure, profile: sporadic, criticality: 1, enabled: true, track_source: false}
+  - {stanza: "monitor:///var/log/audit/audit.log", app: hl_uf_linux_inputs, index: linux, sourcetype: linux_audit,
+     source: /var/log/audit/audit.log, profile: continuous, criticality: 1, enabled: true, track_source: false}
+  # wd2l's own audit trail (app hl_uf_wd2l_inputs); readable by wd2l_auditor + admin only
+  - {stanza: "monitor:///var/log/wd2l/audit-*.jsonl", app: hl_uf_wd2l_inputs, index: wd2l_uf_audit,
+     sourcetype: "{{ hl_wd2l_audit_sourcetype }}", source: "/var/log/wd2l/audit-*.jsonl", profile: sporadic,
+     criticality: 2, enabled: true, track_source: false}
+  # Splunk_TA_nix 10.3.4 scripted inputs (event versions, not *_metric); sourcetype, source and
+  # interval as the TA's default/inputs.conf sets them
+  - {stanza: "script://./bin/cpu.sh", app: Splunk_TA_nix, index: linux, sourcetype: cpu,
+     source: cpu, interval: 30, profile: periodic, criticality: 3, enabled: true, track_source: false}
+  - {stanza: "script://./bin/ps.sh", app: Splunk_TA_nix, index: linux, sourcetype: ps,
+     source: ps, interval: 30, profile: periodic, criticality: 3, enabled: true, track_source: false}
+  - {stanza: "script://./bin/vmstat.sh", app: Splunk_TA_nix, index: linux, sourcetype: vmstat,
+     source: vmstat, interval: 60, profile: periodic, criticality: 3, enabled: true, track_source: false}
+  - {stanza: "script://./bin/top.sh", app: Splunk_TA_nix, index: linux, sourcetype: top,
+     source: top, interval: 60, profile: periodic, criticality: 3, enabled: true, track_source: false}
+  - {stanza: "script://./bin/interfaces.sh", app: Splunk_TA_nix, index: linux, sourcetype: interfaces,
+     source: interfaces, interval: 60, profile: periodic, criticality: 3, enabled: true, track_source: false}
+  - {stanza: "script://./bin/netstat.sh", app: Splunk_TA_nix, index: linux, sourcetype: netstat,
+     source: netstat, interval: 60, profile: periodic, criticality: 3, enabled: true, track_source: false}
+  - {stanza: "script://./bin/df.sh", app: Splunk_TA_nix, index: linux, sourcetype: df,
+     source: df, interval: 300, profile: periodic, criticality: 3, enabled: true, track_source: false}
+  - {stanza: "script://./bin/openPorts.sh", app: Splunk_TA_nix, index: linux, sourcetype: openPorts,
+     source: openPorts, interval: 300, profile: periodic, criticality: 3, enabled: true, track_source: false}
+  - {stanza: "script://./bin/lastlog.sh", app: Splunk_TA_nix, index: linux, sourcetype: lastlog,
+     source: lastlog, interval: 300, profile: periodic, criticality: 3, enabled: true, track_source: false}
+  - {stanza: "script://./bin/package.sh", app: Splunk_TA_nix, index: linux, sourcetype: package,
+     source: package, interval: 3600, profile: periodic, criticality: 4, enabled: true, track_source: false}
+  - {stanza: "script://./bin/service.sh", app: Splunk_TA_nix, index: linux, sourcetype: "Unix:Service",
+     source: "Unix:Service", interval: 3600, profile: periodic, criticality: 4, enabled: true, track_source: false}
+  - {stanza: "script://./bin/selinuxChecker.sh", app: Splunk_TA_nix, index: linux, sourcetype: "Linux:SELinuxConfig",
+     source: "Linux:SELinuxConfig", interval: 3600, profile: periodic, criticality: 4, enabled: true, track_source: false}
+  - {stanza: "script://./bin/sshdChecker.sh", app: Splunk_TA_nix, index: linux, sourcetype: "Unix:SSHDConfig",
+     source: "Unix:SSHDConfig", interval: 3600, profile: periodic, criticality: 4, enabled: true, track_source: false}
+  - {stanza: "script://./bin/passwd.sh", app: Splunk_TA_nix, index: linux, sourcetype: "Unix:UserAccounts",
+     source: "Unix:UserAccounts", interval: 3600, profile: periodic, criticality: 4, enabled: true, track_source: false}
+  - {stanza: "script://./bin/uptime.sh", app: Splunk_TA_nix, index: linux, sourcetype: "Unix:Uptime",
+     source: "Unix:Uptime", interval: 86400, profile: periodic, criticality: 4, enabled: true, track_source: false}
+  - {stanza: "script://./bin/version.sh", app: Splunk_TA_nix, index: linux, sourcetype: "Unix:Version",
+     source: "Unix:Version", interval: 86400, profile: periodic, criticality: 4, enabled: true, track_source: false}
+
+hl_windows_inputs:
+  # Event log channels (app hl_uf_windows_inputs), renderXml=true, so sourcetype XmlWinEventLog and
+  # source XmlWinEventLog:<channel>; all channels share the sourcetype, so each is tracked by source.
+  # Channel names as listed by `wevtutil el` on HOMEPC (2026-10-30).
+  - {stanza: "WinEventLog://Security", app: hl_uf_windows_inputs, index: windows, sourcetype: XmlWinEventLog,
+     source: "XmlWinEventLog:Security", profile: continuous, criticality: 1, enabled: true, track_source: true}
+  - {stanza: "WinEventLog://System", app: hl_uf_windows_inputs, index: windows, sourcetype: XmlWinEventLog,
+     source: "XmlWinEventLog:System", profile: sporadic, criticality: 2, enabled: true, track_source: true}
+  - {stanza: "WinEventLog://Application", app: hl_uf_windows_inputs, index: windows, sourcetype: XmlWinEventLog,
+     source: "XmlWinEventLog:Application", profile: sporadic, criticality: 3, enabled: true, track_source: true}
+  - {stanza: "WinEventLog://Microsoft-Windows-PowerShell/Operational", app: hl_uf_windows_inputs, index: windows,
+     sourcetype: XmlWinEventLog, source: "XmlWinEventLog:Microsoft-Windows-PowerShell/Operational",
+     profile: sporadic, criticality: 2, enabled: true, track_source: true}
+  - {stanza: "WinEventLog://Microsoft-Windows-Windows Defender/Operational", app: hl_uf_windows_inputs, index: windows,
+     sourcetype: XmlWinEventLog, source: "XmlWinEventLog:Microsoft-Windows-Windows Defender/Operational",
+     profile: sporadic, criticality: 2, enabled: true, track_source: true}
+  - {stanza: "WinEventLog://Microsoft-Windows-Hyper-V-VMMS-Admin", app: hl_uf_windows_inputs, index: windows,
+     sourcetype: XmlWinEventLog, source: "XmlWinEventLog:Microsoft-Windows-Hyper-V-VMMS-Admin",
+     profile: sporadic, criticality: 3, enabled: true, track_source: true}
+  - {stanza: "WinEventLog://Microsoft-Windows-Hyper-V-Worker-Admin", app: hl_uf_windows_inputs, index: windows,
+     sourcetype: XmlWinEventLog, source: "XmlWinEventLog:Microsoft-Windows-Hyper-V-Worker-Admin",
+     profile: sporadic, criticality: 3, enabled: true, track_source: true}
+  # Splunk_TA_windows 11.0.3 perfmon stanzas, enabled in its local/inputs.conf at 60 s
+  - {stanza: "perfmon://CPU", app: Splunk_TA_windows, index: windows, sourcetype: "Perfmon:CPU",
+     source: "Perfmon:CPU", interval: 60, profile: periodic, criticality: 3, enabled: true, track_source: false}
+  - {stanza: "perfmon://Memory", app: Splunk_TA_windows, index: windows, sourcetype: "Perfmon:Memory",
+     source: "Perfmon:Memory", interval: 60, profile: periodic, criticality: 3, enabled: true, track_source: false}

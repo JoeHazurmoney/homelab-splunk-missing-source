@@ -1,0 +1,5 @@
+# uninstall (uf_linux): marker, stop, remove tamper rules, remove the UF, verify the clean-uninstall contract
+# Placeholder until task 4 (spec 11) fills it in.
+- name: Placeholder for uninstall
+  ansible.builtin.debug:
+    msg: "uninstall on {{ inventory_hostname }}: not implemented yet (task 4)"

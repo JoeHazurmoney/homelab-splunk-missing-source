@@ -1,8 +1,10 @@
 # Splunk packages and TAs: large, licensed, fetched or copied locally (checksums are pinned in the role)
 ansible/files/packages/
-# Vault password files never go in git (the vault itself is encrypted and may)
+# Vault: the password file and the vault itself exist only on the Pi (scripts/bootstrap-pi.sh);
+# only group_vars/all/vault.yml.example is committed
 .vault-pass*
 *.vault-pass
+ansible/inventory/group_vars/all/vault.yml
 # Subagent-driven-development scratch
 .superpowers/
 # Tooling

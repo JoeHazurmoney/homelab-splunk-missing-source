@@ -1,0 +1,6 @@
+# HOMEPC: Windows 11, reached over OpenSSH Server (scripts/bootstrap-windows-sshd.ps1). The key is in
+# C:\ProgramData\ssh\administrators_authorized_keys, so the session is elevated.
+ansible_host: 192.168.1.27
+ansible_user: taylo
+ansible_connection: ssh
+ansible_shell_type: powershell

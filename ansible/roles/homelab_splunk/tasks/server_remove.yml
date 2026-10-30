@@ -1,0 +1,5 @@
+# server_remove (splunk_server): remove the server apps and their KV collections; index data stays unless hl_purge_index_data
+# Placeholder until task 3 (spec 11) fills it in.
+- name: Placeholder for server_remove
+  ansible.builtin.debug:
+    msg: "server_remove on {{ inventory_hostname }}: not implemented yet (task 3)"

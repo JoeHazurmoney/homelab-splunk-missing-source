@@ -1,0 +1,5 @@
+# audit_policy (uf_windows): auditpol /backup, then the focused subcategory subset
+# Placeholder until task 5 (spec 11) fills it in.
+- name: Placeholder for audit_policy
+  ansible.builtin.debug:
+    msg: "audit_policy on {{ inventory_hostname }}: not implemented yet (task 5)"
