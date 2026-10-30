@@ -1,0 +1,4 @@
+index,host,sourcetype,source,first_seen,last_indextime,last_eventtime,last_count,lag
+linux,pi5,syslog,tcp:10514,NOW-86400,NOW-5000,NOW-5000,1,0
+network,udm,unifi:syslog,tcp:20514,NOW-999999,NOW-200000,NOW-200000,1,0
+network,udm,hl:devprobe,tcp:20514,NOW-999999,NOW-5000,NOW-5000,1,0

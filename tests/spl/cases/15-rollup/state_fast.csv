@@ -1,0 +1,4 @@
+index,host,sourcetype,source,first_seen,last_indextime,last_eventtime,last_count,lag
+linux,h15ok,syslog,/var/log/messages,NOW-86400,NOW-60,NOW-60,1,0
+linux,h15deg,syslog,/var/log/messages,NOW-86400,NOW-1000,NOW-1000,1,0
+linux,pi5,syslog,tcp:10514,NOW-86400,NOW-5000,NOW-5000,1,0

@@ -1,0 +1,6 @@
+entity_id,status,clock_skew
+host|*|h26|*|*,OK,1
+sourcetype|linux|h26|behind|*,OK,1
+sourcetype|linux|h26|ahead|*,OK,1
+sourcetype|linux|h26|fine|*,OK,0
+sourcetype|linux|h26|slowskew|*,OK,1

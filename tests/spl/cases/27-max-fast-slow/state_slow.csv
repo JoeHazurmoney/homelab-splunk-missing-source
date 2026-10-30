@@ -1,0 +1,4 @@
+index,host,sourcetype,source,first_seen,last_indextime,last_eventtime,last_count,lag
+linux,h27,st_a,a,NOW-90000,NOW-100,NOW-100,1,0
+linux,h27,st_b,b,NOW-70000,NOW-5000,NOW-5000,1,0
+linux,h27,st_c,c,NOW-60000,NOW-100,NOW-100,1,0

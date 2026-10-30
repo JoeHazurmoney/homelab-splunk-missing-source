@@ -1,0 +1,4 @@
+entity_id,status,cause_code,threshold_secs,threshold_origin,learning,host_rollup,liveness,age_secs
+host|*|wd2l-recv|*|*,OK,,90,default,0,OK,heartbeat,20
+sourcetype|linux|wd2l-recv|syslog|*,OK,,900,default,1,OK,,100
+source|linux|wd2l-recv|cpu|cpu,OK,,120,default,0,OK,,10

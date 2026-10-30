@@ -1,0 +1,7 @@
+level,index,host,sourcetype,source,collection,via,profile,interval_secs,max_gap_secs,criticality,enabled,expected_since
+host,,pi5,,,syslog,,continuous,,,1,,
+sourcetype,linux,pi5,syslog,,syslog,,continuous,,,1,,
+host,,udm,,,syslog,pi5,periodic,60,,2,,
+sourcetype,network,udm,unifi:syslog,,syslog,pi5,sporadic,,,2,,
+sourcetype,network,udm,hl:devprobe,,syslog,pi5,periodic,60,,2,,
+host,,udm2,,,syslog,pi5,periodic,60,,2,,

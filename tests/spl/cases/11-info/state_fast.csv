@@ -1,0 +1,2 @@
+index,host,sourcetype,source,first_seen,last_indextime,last_eventtime,last_count,lag
+linux,wd2l-recv,info_old,x,NOW-999999,NOW-999999,NOW-999999,1,0

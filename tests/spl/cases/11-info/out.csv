@@ -1,0 +1,4 @@
+entity_id,status,cause_code,threshold_secs,threshold_origin,host_rollup
+host|*|wd2l-recv|*|*,OK,,90,default,OK
+sourcetype|linux|wd2l-recv|info_nodata|*,INFO,,,none,OK
+sourcetype|linux|wd2l-recv|info_old|*,INFO,,,none,OK

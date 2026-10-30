@@ -1,0 +1,11 @@
+index,host,sourcetype,source,first_seen,last_indextime,last_eventtime,last_count,lag
+linux,h12,st_a,src_a,NOW-86400,NOW-10,NOW-10,1,0
+linux,h12,st_b,src_b,NOW-86400,NOW-10,NOW-10,1,0
+linux,h12,st_c,src_c,NOW-86400,NOW-10,NOW-10,1,0
+linux,h12,st_d,src_d,NOW-86400,NOW-10,NOW-10,1,0
+linux,h12,st_e,src_e,NOW-86400,NOW-10,NOW-10,1,0
+linux,h12,st_f,src_f,NOW-86400,NOW-10,NOW-10,1,0
+linux,h12,st_g,src_g,NOW-86400,NOW-10,NOW-10,1,0
+linux,h12,st_h,src_h,NOW-86400,NOW-10,NOW-10,1,0
+linux,h12,st_i,src_i,NOW-86400,NOW-10,NOW-10,1,0
+linux,h12,st_j,src_j,NOW-86400,NOW-10,NOW-10,1,0

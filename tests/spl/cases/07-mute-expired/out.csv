@@ -1,0 +1,4 @@
+entity_id,status,cause_code,muted_until,host_rollup
+host|*|wd2l-recv|*|*,OK,,,DEGRADED
+sourcetype|linux|wd2l-recv|syslog|*,MISSING,hb_ok_input_missing,,DEGRADED
+source|linux|wd2l-recv|cpu|cpu,OK,,,DEGRADED

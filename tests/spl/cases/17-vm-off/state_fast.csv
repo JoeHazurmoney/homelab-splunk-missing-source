@@ -1,0 +1,4 @@
+index,host,sourcetype,source,first_seen,last_indextime,last_eventtime,last_count,lag
+linux,h17a,syslog,/var/log/messages,NOW-86400,NOW-100,NOW-100,1,0
+linux,h17b,syslog,/var/log/messages,NOW-86400,NOW-100,NOW-100,1,0
+linux,h17c,syslog,/var/log/messages,NOW-86400,NOW-100,NOW-100,1,0

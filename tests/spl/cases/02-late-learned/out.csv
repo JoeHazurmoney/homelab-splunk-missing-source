@@ -1,0 +1,4 @@
+entity_id,status,cause_code,threshold_secs,threshold_origin,learning,host_rollup
+host|*|wd2l-recv|*|*,OK,,90,default,0,DEGRADED
+sourcetype|linux|wd2l-recv|syslog|*,LATE,hb_ok_input_missing,600,learned,0,DEGRADED
+source|linux|wd2l-recv|cpu|cpu,OK,,120,default,0,DEGRADED

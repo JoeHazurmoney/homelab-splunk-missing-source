@@ -1,0 +1,4 @@
+level,index,host,sourcetype,source,collection,via,profile,interval_secs,max_gap_secs,criticality,enabled,expected_since
+host,,h22a,,,uf,,heartbeat,,,1,,
+host,,h22b,,,uf,,heartbeat,,,1,,
+host,,h22c,,,uf,,heartbeat,,,1,,

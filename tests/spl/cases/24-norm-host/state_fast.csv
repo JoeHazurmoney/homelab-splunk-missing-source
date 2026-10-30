@@ -1,0 +1,4 @@
+index,host,sourcetype,source,first_seen,last_indextime,last_eventtime,last_count,lag
+linux,WD2L-RECV.mshome.net,syslog,/var/log/messages,NOW-86400,NOW-100,NOW-100,1,0
+linux,wd2l-recv.mshome.net,syslog,/var/log/cron,NOW-86400,NOW-50,NOW-50,1,0
+windows,homepc,XmlWinEventLog,XmlWinEventLog:Security,NOW-86400,NOW-30,NOW-30,1,0

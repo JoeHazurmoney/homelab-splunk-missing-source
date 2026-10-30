@@ -1,0 +1,4 @@
+entity_id,prev_status,status,since,cause_code,host_rollup
+sourcetype|linux|h28|st_a|*,OK,MISSING,NOW,hb_ok_input_missing,DEGRADED
+sourcetype|linux|h28|st_d|*,,MISSING,NOW,hb_ok_input_missing,DEGRADED
+sourcetype|linux|h28|st_g|*,MISSING,OK,NOW,,DEGRADED

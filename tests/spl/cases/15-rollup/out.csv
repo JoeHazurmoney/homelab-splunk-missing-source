@@ -1,0 +1,7 @@
+entity_id,status,cause_code,host_rollup,liveness
+host|*|h15ok|*|*,OK,,OK,heartbeat
+sourcetype|linux|h15ok|syslog|*,OK,,OK,
+host|*|h15deg|*|*,OK,,DEGRADED,heartbeat
+sourcetype|linux|h15deg|syslog|*,LATE,hb_ok_input_missing,DEGRADED,
+host|*|pi5|*|*,MISSING,host_no_data,DOWN,data
+sourcetype|linux|pi5|syslog|*,MISSING,host_no_data,DOWN,

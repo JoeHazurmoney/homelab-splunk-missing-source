@@ -1,0 +1,3 @@
+entity_id,status,cause_code,host_rollup
+host|*|wd2l-recv|*|*,PENDING,gate_resume,PENDING
+sourcetype|linux|wd2l-recv|syslog|*,PENDING,gate_resume,PENDING

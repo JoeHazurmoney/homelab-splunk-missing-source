@@ -1,0 +1,4 @@
+host,last_heartbeat,last_marker_action,last_marker_time,last_marker_by,last_vm_event,last_vm_event_time,last_probe_time,last_probe_up,last_probe_reachable
+h17a,NOW-500,,,,18502,NOW-510,,,
+h17b,NOW-400,,,,18500,NOW-450,,,
+h17c,NOW-500,,,,18510,NOW-505,,,

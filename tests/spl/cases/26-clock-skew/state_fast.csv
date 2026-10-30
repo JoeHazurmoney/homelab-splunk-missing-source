@@ -1,0 +1,5 @@
+index,host,sourcetype,source,first_seen,last_indextime,last_eventtime,last_count,lag
+linux,h26,behind,b,NOW-86400,NOW-10,NOW-7210,1,7200
+linux,h26,ahead,a,NOW-86400,NOW-10,NOW+1190,1,-1200
+linux,h26,fine,f,NOW-86400,NOW-10,NOW-15,1,5
+linux,h26,slowskew,s,NOW-86400,NOW-10,NOW-15,1,5

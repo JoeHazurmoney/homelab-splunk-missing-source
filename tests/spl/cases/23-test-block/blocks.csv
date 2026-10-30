@@ -1,0 +1,6 @@
+k,until,reason,set_by
+h23a|*|*,NOW+600,host test,admin
+h23b|linux_secure|*,NOW+600,sourcetype test,admin
+h23c|linux_audit|/var/log/audit/audit.log,NOW+600,source test,admin
+h23d|*|*,NOW-60,expired test,admin
+h23e|*|*,NOW+600,just set,admin

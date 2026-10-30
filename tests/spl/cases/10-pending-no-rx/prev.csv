@@ -1,0 +1,2 @@
+entity_id,status,since,real_status,real_since
+host|*|wd2l-recv|*|*,PENDING,NOW-120,OK,NOW-7200

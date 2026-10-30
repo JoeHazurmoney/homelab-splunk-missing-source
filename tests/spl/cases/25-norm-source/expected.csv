@@ -1,0 +1,6 @@
+level,index,host,sourcetype,source,collection,via,profile,interval_secs,max_gap_secs,criticality,enabled,expected_since
+host,,wd2l-recv,,,uf,,heartbeat,,,1,,
+source,wd2l_uf_audit,wd2l-recv,wd2l:audit,/var/log/wd2l/audit-*.jsonl,uf,,sporadic,,,2,,
+source,linux,wd2l-recv,linux_secure,/var/log/secure.*,uf,,sporadic,,,2,,
+source,linux,wd2l-recv,syslog,/var/log/messages-*,uf,,continuous,,,2,,
+source,linux,wd2l-recv,syslog,/var/log/cron,uf,,continuous,,,2,,

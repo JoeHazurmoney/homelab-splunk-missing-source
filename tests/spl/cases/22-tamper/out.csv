@@ -1,0 +1,4 @@
+entity_id,status,cause_code,action,host_rollup
+host|*|h22a|*|*,MISSING,tamper,escalate: possible deliberate blinding,DOWN
+host|*|h22b|*|*,MISSING,hb_missing,ping/ssh h22b; ansible-playbook site.yml --tags status --limit h22b,DOWN
+host|*|h22c|*|*,MISSING,hb_missing,ping/ssh h22c; ansible-playbook site.yml --tags status --limit h22c,DOWN

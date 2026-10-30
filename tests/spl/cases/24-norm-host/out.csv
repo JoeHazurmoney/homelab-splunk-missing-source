@@ -1,0 +1,4 @@
+entity_id,host,status,last_indextime,host_rollup
+host|*|wd2l-recv|*|*,wd2l-recv,OK,NOW-20,OK
+sourcetype|linux|wd2l-recv|syslog|*,wd2l-recv,OK,NOW-50,OK
+sourcetype|windows|homepc|XmlWinEventLog|*,homepc,OK,NOW-30,OK

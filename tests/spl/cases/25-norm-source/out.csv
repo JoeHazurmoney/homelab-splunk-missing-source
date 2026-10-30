@@ -1,0 +1,6 @@
+entity_id,status,last_indextime,first_seen
+host|*|wd2l-recv|*|*,OK,NOW-20,NOW-172800
+source|wd2l_uf_audit|wd2l-recv|wd2l:audit|/var/log/wd2l/audit-*.jsonl,OK,NOW-100,NOW-172800
+source|linux|wd2l-recv|linux_secure|/var/log/secure.*,OK,NOW-200,NOW-86400
+source|linux|wd2l-recv|syslog|/var/log/messages-*,OK,NOW-300,NOW-86400
+source|linux|wd2l-recv|syslog|/var/log/cron,OK,NOW-400,NOW-86400

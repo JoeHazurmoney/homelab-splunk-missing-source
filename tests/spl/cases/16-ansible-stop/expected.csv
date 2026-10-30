@@ -1,0 +1,5 @@
+level,index,host,sourcetype,source,collection,via,profile,interval_secs,max_gap_secs,criticality,enabled,expected_since
+host,,h16a,,,uf,,heartbeat,,,1,,
+sourcetype,linux,h16a,syslog,,uf,,continuous,,,2,,
+host,,h16b,,,uf,,heartbeat,,,1,,
+sourcetype,linux,h16b,syslog,,uf,,continuous,,,2,,
