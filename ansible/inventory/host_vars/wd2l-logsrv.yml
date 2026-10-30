@@ -1,0 +1,3 @@
+ansible_host: wd2l-logsrv.mshome.net
+# wd2l sender: its audit trail is /var/log/wd2l/audit-*.jsonl with this sourcetype (spec 4)
+hl_wd2l_audit_sourcetype: "wd2l:sender:audit"

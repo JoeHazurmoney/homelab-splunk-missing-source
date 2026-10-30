@@ -1,0 +1,6 @@
+# verify (all): UF running; connected (tcpin by hostname/guid); every expected sourcetype seen in
+# the last N minutes (REST search through the container).
+# Placeholder until a later task (spec 11) fills it in.
+- name: Placeholder for verify
+  ansible.builtin.debug:
+    msg: "verify on {{ inventory_hostname }}: not implemented yet"

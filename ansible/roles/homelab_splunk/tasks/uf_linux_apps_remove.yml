@@ -1,0 +1,5 @@
+# apps_remove (uf_linux): remove the role-owned apps (or hl_apps_only)
+# Placeholder until task 6 (spec 11) fills it in.
+- name: Placeholder for apps_remove
+  ansible.builtin.debug:
+    msg: "apps_remove on {{ inventory_hostname }}: not implemented yet (task 6)"

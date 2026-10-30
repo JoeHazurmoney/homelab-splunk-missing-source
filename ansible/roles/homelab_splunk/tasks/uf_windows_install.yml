@@ -1,0 +1,5 @@
+# install (uf_windows): check sha256, install the UF msi (LAUNCHSPLUNK=0), configure before first start, start, marker
+# Placeholder until task 5 (spec 11) fills it in.
+- name: Placeholder for install
+  ansible.builtin.debug:
+    msg: "install on {{ inventory_hostname }}: not implemented yet (task 5)"

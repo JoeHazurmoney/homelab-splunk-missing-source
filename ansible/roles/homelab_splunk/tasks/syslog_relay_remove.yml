@@ -1,0 +1,5 @@
+# syslog_relay_remove (syslog_relay): undo every item syslog_relay added
+# Placeholder until task 8 (spec 11) fills it in.
+- name: Placeholder for syslog_relay_remove
+  ansible.builtin.debug:
+    msg: "syslog_relay_remove on {{ inventory_hostname }}: not implemented yet (task 8)"

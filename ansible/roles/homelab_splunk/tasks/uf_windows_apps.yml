@@ -1,0 +1,5 @@
+# apps (uf_windows): sync the role-owned apps; restart only on change; marker
+# Placeholder until task 6 (spec 11) fills it in.
+- name: Placeholder for apps
+  ansible.builtin.debug:
+    msg: "apps on {{ inventory_hostname }}: not implemented yet (task 6)"

@@ -1,0 +1,5 @@
+# audit_rules (uf_linux): STIG sample rules into /etc/audit/rules.d/50-hl-stig.rules, augenrules --load; never touches wd2l.rules
+# Placeholder until task 7 (spec 11) fills it in.
+- name: Placeholder for audit_rules
+  ansible.builtin.debug:
+    msg: "audit_rules on {{ inventory_hostname }}: not implemented yet (task 7)"

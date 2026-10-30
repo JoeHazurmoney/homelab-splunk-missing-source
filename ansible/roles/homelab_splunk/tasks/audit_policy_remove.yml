@@ -1,0 +1,5 @@
+# audit_policy_remove (uf_windows): auditpol /restore from the backup
+# Placeholder until task 5 (spec 11) fills it in.
+- name: Placeholder for audit_policy_remove
+  ansible.builtin.debug:
+    msg: "audit_policy_remove on {{ inventory_hostname }}: not implemented yet (task 5)"

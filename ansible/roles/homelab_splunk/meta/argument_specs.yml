@@ -1,0 +1,140 @@
+argument_specs:
+  main:
+    short_description: Splunk UFs, TAs, auditing, the syslog relay and the data-health apps for the homelab
+    description:
+      - One role for every managed group (uf_linux, uf_windows, splunk_server, syslog_relay); tags select the
+        component (spec 5.3). A bare run deploys; removing, stopping and restarting need their tag.
+      - Defaults are in defaults/main.yml. Ansible validates the provided values against this spec before the role runs.
+    options:
+      splunk_indexer:
+        type: str
+        default: 192.168.1.27
+        description: Address the forwarders send S2S to (127.0.0.1 on HOMEPC itself).
+      hl_s2s_port:
+        type: int
+        default: 9997
+        description: S2S receiving port on the Splunk container.
+      hl_owner:
+        type: str
+        default: taylorb
+        description: Owner column of the host's expected rows.
+      hl_site:
+        type: str
+        default: home
+        description: Site column of the host's expected rows.
+      hl_host_criticality:
+        type: int
+        choices: [1, 2, 3, 4]
+        default: 2
+        description: Criticality of the host-level (heartbeat) row; 1 is the most critical.
+      hl_disabled_inputs:
+        type: list
+        elements: str
+        default: []
+        description: Input stanzas to leave out of the forwarder apps and the expected list.
+      hl_input_overrides:
+        type: dict
+        default: {}
+        description:
+          - Per-stanza overrides merged over the matching row of hl_linux_inputs or hl_windows_inputs.
+          - Keys are stanzas; values may set profile, criticality, enabled, track_source and max_gap_secs.
+      hl_wd2l_audit_sourcetype:
+        type: str
+        default: "wd2l:audit"
+        description: Sourcetype of the host's /var/log/wd2l/audit-*.jsonl (wd2l:sender:audit on wd2l-logsrv).
+      syslog_devices:
+        type: list
+        elements: dict
+        default: []
+        description: Agentless devices relayed by the Pi (group_vars/syslog_relay.yml).
+        options:
+          name:
+            type: str
+            required: true
+            description: Device name, written as the host in the relayed header.
+          ip:
+            type: str
+            required: true
+            description: Source IP the relay maps to the name (fromhost-ip) and allows through firewalld.
+          index:
+            type: str
+            required: true
+            description: Destination index.
+          sourcetype:
+            type: str
+            required: true
+            description: Sourcetype set on the server for this device.
+          profile:
+            type: str
+            required: true
+            choices: [heartbeat, periodic, continuous, sporadic, info]
+            description: Cadence profile (spec 7.4).
+          criticality:
+            type: int
+            required: true
+            choices: [1, 2, 3, 4]
+            description: 1 is the most critical.
+      hl_linux_inputs:
+        type: list
+        elements: dict
+        description: The shared input schema for uf_linux (spec 4); see the comments in defaults/main.yml.
+        options: &hl_input_options
+          stanza:
+            type: str
+            required: true
+            description: inputs.conf stanza, e.g. monitor:///var/log/secure or script://./bin/cpu.sh.
+          app:
+            type: str
+            required: true
+            choices: [hl_uf_linux_inputs, hl_uf_wd2l_inputs, hl_uf_windows_inputs, Splunk_TA_nix, Splunk_TA_windows]
+            description: App whose local/inputs.conf carries the stanza.
+          index:
+            type: str
+            required: true
+            description: Destination index.
+          sourcetype:
+            type: str
+            required: true
+            description: Sourcetype the events carry.
+          source:
+            type: str
+            required: true
+            description: Source the events carry, normalized (rotation parts as *).
+          interval:
+            type: int
+            description: Seconds between runs; scripted and perfmon inputs only.
+          profile:
+            type: str
+            required: true
+            choices: [heartbeat, periodic, continuous, sporadic, info]
+            description: Cadence profile (spec 7.4); periodic needs interval.
+          criticality:
+            type: int
+            required: true
+            choices: [1, 2, 3, 4]
+            description: 1 is the most critical.
+          enabled:
+            type: bool
+            required: true
+            description: false keeps the row but renders and expects nothing for it.
+          track_source:
+            type: bool
+            required: true
+            description: Also expect each source (level=source), not only the sourcetype.
+      hl_windows_inputs:
+        type: list
+        elements: dict
+        description: The shared input schema for uf_windows (spec 4); same fields as hl_linux_inputs.
+        options: *hl_input_options
+      vault_hl_uf_admin_password:
+        type: str
+        no_log: true
+        description: UF local admin password (group_vars/all/vault.yml, encrypted on the Pi).
+      vault_hl_s2s_token:
+        type: str
+        no_log: true
+        description: S2S token (splunktcptoken) the forwarders present on 9997.
+      vault_hl_markers_token:
+        type: str
+        no_log: true
+        description: HEC token hl_markers, used for the Ansible maintenance markers.

@@ -1,0 +1,6 @@
+# Structure of group_vars/all/vault.yml. Placeholders only: the real file is generated with random
+# values and encrypted with ansible-vault on the Pi by scripts/bootstrap-pi.sh, and never committed.
+# Its password file is ~/.config/hl_splunk/vault-pass on the Pi only.
+vault_hl_uf_admin_password: "CHANGE-ME-uf-admin-password"   # UF local admin (user-seed.conf)
+vault_hl_s2s_token: "00000000-0000-0000-0000-000000000000"   # splunktcptoken for 9997 (S2S)
+vault_hl_markers_token: "00000000-0000-0000-0000-000000000000" # HEC token hl_markers (Ansible markers)

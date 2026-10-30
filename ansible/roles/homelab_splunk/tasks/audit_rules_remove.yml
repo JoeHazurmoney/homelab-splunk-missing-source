@@ -1,0 +1,5 @@
+# audit_rules_remove (uf_linux): remove 50-hl-stig.rules and reload; auditctl -l back to the pre-install set
+# Placeholder until task 7 (spec 11) fills it in.
+- name: Placeholder for audit_rules_remove
+  ansible.builtin.debug:
+    msg: "audit_rules_remove on {{ inventory_hostname }}: not implemented yet (task 7)"

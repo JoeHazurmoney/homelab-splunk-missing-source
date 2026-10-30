@@ -1,0 +1,6 @@
+# start / stop / restart / status (uf_linux): service control + marker; status = state, version,
+# apps, outputs connection. main.yml imports this file once per action, with hl_service_action set.
+# Placeholder until task 4 (spec 11) fills it in.
+- name: Placeholder for the service action
+  ansible.builtin.debug:
+    msg: "{{ hl_service_action }} on {{ inventory_hostname }}: not implemented yet (task 4)"

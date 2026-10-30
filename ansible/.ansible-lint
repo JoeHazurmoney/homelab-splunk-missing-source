@@ -1,0 +1,8 @@
+# CI runs `ansible-lint --strict` from this directory (.github/workflows/lint.yml).
+profile: production
+skip_list:
+  # The spec names the role's variables hl_* (plus splunk_indexer and syslog_devices), shared with
+  # the inventory, rather than homelab_splunk_*.
+  - var-naming[no-role-prefix]
+exclude_paths:
+  - files/packages/

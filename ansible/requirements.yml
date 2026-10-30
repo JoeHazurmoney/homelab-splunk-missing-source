@@ -1,0 +1,8 @@
+# Collections for the role, installed on the Pi by scripts/bootstrap-pi.sh (and in CI for ansible-lint).
+collections:
+  - name: ansible.posix          # firewalld rich rules (syslog relay)
+    version: ">=2.2.0,<3.0.0"
+  - name: ansible.windows        # Windows over SSH: win_copy, win_package, win_service, win_user_right
+    version: ">=3.9.0,<4.0.0"
+  - name: community.general      # seport (SELinux port labels), ini_file
+    version: ">=13.0.0,<14.0.0"

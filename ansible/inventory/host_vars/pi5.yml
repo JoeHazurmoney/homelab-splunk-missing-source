@@ -1,0 +1,4 @@
+# The Ansible controller itself. Modules run with the system Python, which has the dnf, SELinux and
+# firewalld bindings that the Ansible venv lacks.
+ansible_connection: local
+ansible_python_interpreter: /usr/bin/python3

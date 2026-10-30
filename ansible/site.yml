@@ -1,0 +1,8 @@
+# One play over every managed group; the role dispatches by group and tag (spec 5.3).
+#   ansible-playbook site.yml                          deploy everything (nothing destructive)
+#   ansible-playbook site.yml --tags stop --limit wd2l-recv
+#   ansible-playbook site.yml --list-tags
+- name: Homelab Splunk
+  hosts: uf_linux:uf_windows:splunk_server:syslog_relay
+  roles:
+    - role: homelab_splunk

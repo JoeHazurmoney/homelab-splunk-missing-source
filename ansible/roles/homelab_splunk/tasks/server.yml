@@ -1,0 +1,5 @@
+# server (splunk_server): package and swap in hl_server_base, the TAs and hl_data_health
+# Placeholder until task 3 (spec 11) fills it in.
+- name: Placeholder for server
+  ansible.builtin.debug:
+    msg: "server on {{ inventory_hostname }}: not implemented yet (task 3)"
