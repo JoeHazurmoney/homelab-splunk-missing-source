@@ -1,0 +1,2 @@
+entity_id,mute_until,reason,ticket
+host|*|wd2l-recv|*|*,NOW+3600,maintenance,CHG-2

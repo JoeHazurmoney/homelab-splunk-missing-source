@@ -1,0 +1,3 @@
+index,host,sourcetype,source,first_seen,last_indextime,last_eventtime,last_count,lag
+linux,wd2l-recv,syslog,/var/log/messages,NOW-86400,NOW-2000,NOW-2000,10,0
+linux,wd2l-recv,cpu,cpu,NOW-86400,NOW-10,NOW-11,2,1

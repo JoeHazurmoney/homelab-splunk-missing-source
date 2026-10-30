@@ -1,0 +1,6 @@
+index,host,sourcetype,source,first_seen,last_indextime,last_eventtime,last_count,lag
+wd2l_uf_audit,wd2l-recv,wd2l:audit,/var/log/wd2l/audit-2026-10-29.jsonl,NOW-172800,NOW-90000,NOW-90000,1,0
+wd2l_uf_audit,wd2l-recv,wd2l:audit,/var/log/wd2l/audit-2026-10-30.jsonl,NOW-86400,NOW-100,NOW-100,1,0
+linux,wd2l-recv,linux_secure,/var/log/secure.1,NOW-86400,NOW-200,NOW-200,1,0
+linux,wd2l-recv,syslog,/var/log/messages-20261030,NOW-86400,NOW-300,NOW-300,1,0
+linux,wd2l-recv,syslog,/var/log/cron,NOW-86400,NOW-400,NOW-400,1,0

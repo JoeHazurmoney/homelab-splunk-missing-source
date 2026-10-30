@@ -1,0 +1,7 @@
+entity_id,status,cause_code,action,host_rollup
+host|*|h17a|*|*,MISSING,vm_off,start the VM h17a or mute it,DOWN
+sourcetype|linux|h17a|syslog|*,OK,,,DOWN
+host|*|h17b|*|*,MISSING,hb_missing,ping/ssh h17b; ansible-playbook site.yml --tags status --limit h17b,DOWN
+sourcetype|linux|h17b|syslog|*,OK,,,DOWN
+host|*|h17c|*|*,MISSING,vm_off,start the VM h17c or mute it,DOWN
+sourcetype|linux|h17c|syslog|*,OK,,,DOWN

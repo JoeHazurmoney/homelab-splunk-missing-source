@@ -1,0 +1,2 @@
+entity_id,mute_until,reason,ticket
+sourcetype|linux|wd2l-recv|syslog|*,NOW+3600,patching,CHG-1

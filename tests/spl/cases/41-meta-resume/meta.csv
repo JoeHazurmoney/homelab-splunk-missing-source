@@ -1,0 +1,5 @@
+name,last_run,prev_run,resumed_at,last_rx
+sc_ok,NOW-60,NOW-120,NOW-7200,NOW-70
+sc_edge,NOW-150,NOW-210,NOW-3600,NOW-160
+sc_gap,NOW-200,NOW-260,NOW-7200,NOW-210
+sc_quiet,NOW-60,NOW-120,NOW-7200,NOW-500

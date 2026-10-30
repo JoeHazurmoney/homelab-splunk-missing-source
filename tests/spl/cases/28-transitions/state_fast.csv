@@ -1,0 +1,8 @@
+index,host,sourcetype,source,first_seen,last_indextime,last_eventtime,last_count,lag
+linux,h28,st_a,a,NOW-86400,NOW-5000,NOW-5000,1,0
+linux,h28,st_b,b,NOW-86400,NOW-5000,NOW-5000,1,0
+linux,h28,st_c,c,NOW-86400,NOW-10,NOW-10,1,0
+linux,h28,st_d,d,NOW-86400,NOW-5000,NOW-5000,1,0
+linux,h28,st_e,e,NOW-86400,NOW-5000,NOW-5000,1,0
+linux,h28,st_f,f,NOW-86400,NOW-10,NOW-10,1,0
+linux,h28,st_g,g,NOW-86400,NOW-10,NOW-10,1,0

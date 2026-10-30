@@ -1,0 +1,3 @@
+entity_id,mute_until,reason,ticket
+host|*|wd2l-recv|*|*,NOW-60,old window,CHG-3
+sourcetype|linux|wd2l-recv|syslog|*,NOW-1,old entity window,CHG-4

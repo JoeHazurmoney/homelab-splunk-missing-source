@@ -1,0 +1,8 @@
+entity_id,status,profile,threshold_secs,threshold_origin,learning,threshold_note
+host|*|h29|*|*,OK,heartbeat,90,default,0,profile default (heartbeat)
+sourcetype|linux|h29|st_case|*,OK,continuous,900,default,1,profile default while learning (0 of 3 days)
+sourcetype|linux|h29|st_typo|*,MISSING,continuous,900,invalid_profile,0,invalid profile 'contnuous': treated as continuous
+sourcetype|linux|h29|st_empty|*,LATE,continuous,900,invalid_profile,0,invalid profile '': treated as continuous
+sourcetype|linux|h29|en_true|*,OK,continuous,900,default,1,profile default while learning (0 of 3 days)
+sourcetype|linux|h29|en_yes|*,OK,continuous,900,default,1,profile default while learning (0 of 3 days)
+sourcetype|linux|h29|en_maybe|*,OK,continuous,900,default,1,profile default while learning (0 of 3 days)

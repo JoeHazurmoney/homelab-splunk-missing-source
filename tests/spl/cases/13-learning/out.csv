@@ -1,0 +1,4 @@
+entity_id,status,cause_code,threshold_secs,threshold_origin,learning,threshold_note
+host|*|h13|*|*,OK,,90,default,0,profile default (heartbeat)
+sourcetype|linux|h13|sporadic_st|*,LATE,hb_ok_input_missing,86400,default,1,profile default while learning (0 of 3 days)
+sourcetype|linux|h13|continuous_st|*,MISSING,hb_ok_input_missing,900,default,1,profile default while learning (1 of 3 days)

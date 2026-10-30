@@ -1,0 +1,19 @@
+# Readers: admin and the data-health roles from hl_server_base (task 3). power/user see nothing.
+[]
+access = read : [ admin, dh_admin, dh_analyst ], write : [ admin ]
+export = none
+
+# Analysts mute (spec §6.3): they write overrides and the admin log.
+[collections/dh_overrides]
+access = read : [ admin, dh_admin, dh_analyst ], write : [ admin, dh_admin, dh_analyst ]
+
+[collections/dh_admin_log]
+access = read : [ admin, dh_admin, dh_analyst ], write : [ admin, dh_admin, dh_analyst ]
+
+# Admins edit expectations.
+[collections/dh_expected]
+access = read : [ admin, dh_admin, dh_analyst ], write : [ admin, dh_admin ]
+
+# Scheduled searches run as nobody (splunk-system-user), which can collect and write KV.
+[savedsearches]
+owner = nobody

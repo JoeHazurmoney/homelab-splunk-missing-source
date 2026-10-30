@@ -1,0 +1,2 @@
+entity_id,status,since,real_status,real_since,prev_status,expected_since
+sourcetype|linux|h31|st_old|*,PENDING,NOW-3700,PENDING,NOW-3700,,NOW-7200

@@ -1,0 +1,6 @@
+| inputlookup @fwd_in@ | where kind=="hb" | `dh_fwd_from_hb`
+| append [| inputlookup @fwd_in@ | where kind=="tcpin" | eval _time=tonumber(time) | `dh_fwd_from_tcpin`]
+| append [| inputlookup @fwd_in@ | where kind=="marker" | eval _time=tonumber(time) | `dh_fwd_from_markers`]
+| append [| inputlookup @fwd_in@ | where kind=="hyperv" | eval _time=tonumber(time), _raw=raw | `dh_fwd_from_hyperv`]
+| append [| inputlookup @fwd_in@ | where kind=="probe" | eval _time=tonumber(time) | `dh_fwd_from_probe`]
+| `dh_fwd_fold(@fwd@, @NOW@)`

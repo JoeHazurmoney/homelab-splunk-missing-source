@@ -1,0 +1,12 @@
+entity_id,status,threshold_secs,threshold_origin,learning
+host|*|h12|*|*,OK,90,default,0
+sourcetype|linux|h12|st_a|*,OK,5000,override,0
+sourcetype|linux|h12|st_b|*,OK,3000,max_gap_secs,0
+sourcetype|linux|h12|st_c|*,OK,1000,learned,0
+sourcetype|linux|h12|st_d|*,OK,900,default,1
+sourcetype|linux|h12|st_e|*,OK,300,learned,0
+sourcetype|linux|h12|st_f|*,OK,604800,learned,0
+sourcetype|linux|h12|st_g|*,OK,900,default,1
+sourcetype|linux|h12|st_h|*,OK,660,default,0
+sourcetype|linux|h12|st_i|*,OK,1000,max_gap_secs,0
+sourcetype|linux|h12|st_j|*,OK,86400,default,1

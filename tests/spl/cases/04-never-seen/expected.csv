@@ -1,0 +1,7 @@
+level,index,host,sourcetype,source,collection,via,profile,interval_secs,max_gap_secs,criticality,enabled,expected_since
+host,,wd2l-recv,,,uf,,heartbeat,,,1,,NOW-86400
+sourcetype,linux,wd2l-recv,linux_audit,,uf,,continuous,,,2,,NOW-7200
+sourcetype,linux,wd2l-recv,linux_secure,,uf,,sporadic,,,2,,NOW-600
+host,,pi5,,,syslog,,continuous,,,1,,NOW-86400
+sourcetype,linux,pi5,syslog,,syslog,,continuous,,,1,,NOW-86400
+sourcetype,network,pi5,hl:devprobe,,syslog,,periodic,60,,1,,NOW-7200

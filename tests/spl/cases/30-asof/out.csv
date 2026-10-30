@@ -1,0 +1,4 @@
+entity_id,status,age_secs,cause_code
+host|*|h30a|*|*,OK,40,
+host|*|h30b|*|*,LATE,100,hb_late
+sourcetype|linux|h30a|syslog|*,LATE,940,hb_ok_input_missing

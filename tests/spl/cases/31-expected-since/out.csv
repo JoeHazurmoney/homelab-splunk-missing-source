@@ -1,0 +1,4 @@
+entity_id,status,cause_code,expected_since
+host|*|h31|*|*,OK,,NOW
+sourcetype|linux|h31|st_new|*,PENDING,new_expected,NOW
+sourcetype|linux|h31|st_old|*,NEVER_SEEN,hb_ok_never_seen,NOW-7200

@@ -1,0 +1,15 @@
+entity_id,status,cause_code,test_block_until,test_block_reason
+host|*|h23a|*|*,OK,,NOW+600,host test
+sourcetype|linux|h23a|syslog|*,MISSING,test_block,NOW+600,host test
+sourcetype|enclave1|h23a|syslog|*,MISSING,hb_ok_all_missing,,
+host|*|h23b|*|*,OK,,,
+sourcetype|linux|h23b|linux_secure|*,MISSING,test_block,NOW+600,sourcetype test
+sourcetype|linux|h23b|syslog|*,OK,,,
+host|*|h23c|*|*,OK,,,
+source|linux|h23c|linux_audit|/var/log/audit/audit.log,MISSING,test_block,NOW+600,source test
+sourcetype|linux|h23c|syslog|*,OK,,,
+host|*|h23d|*|*,OK,,,
+sourcetype|linux|h23d|syslog|*,MISSING,hb_ok_input_missing,,
+sourcetype|linux|h23d|cpu|*,OK,,,
+host|*|h23e|*|*,OK,,NOW+600,just set
+sourcetype|linux|h23e|syslog|*,OK,,NOW+600,just set

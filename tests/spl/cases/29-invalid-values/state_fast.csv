@@ -1,0 +1,11 @@
+index,host,sourcetype,source,first_seen,last_indextime,last_eventtime,last_count,lag
+linux,h29,st_case,a,NOW-86400,NOW-10,NOW-10,1,0
+linux,h29,st_typo,b,NOW-86400,NOW-5000,NOW-5000,1,0
+linux,h29,st_empty,c,NOW-86400,NOW-1000,NOW-1000,1,0
+linux,h29,en_true,x,NOW-86400,NOW-10,NOW-10,1,0
+linux,h29,en_yes,x,NOW-86400,NOW-10,NOW-10,1,0
+linux,h29,en_maybe,x,NOW-86400,NOW-10,NOW-10,1,0
+linux,h29,en_false,x,NOW-86400,NOW-10,NOW-10,1,0
+linux,h29,en_off,x,NOW-86400,NOW-10,NOW-10,1,0
+linux,h29,en_no,x,NOW-86400,NOW-10,NOW-10,1,0
+linux,h29,en_zero,x,NOW-86400,NOW-10,NOW-10,1,0

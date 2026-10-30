@@ -1,0 +1,10 @@
+index,host,sourcetype,source,first_seen,last_indextime,last_eventtime,last_count,lag
+linux,h23a,syslog,/var/log/messages,NOW-86400,NOW-5000,NOW-5000,1,0
+enclave1,h23a,syslog,wd2l-sender,NOW-86400,NOW-5000,NOW-5000,1,0
+linux,h23b,linux_secure,/var/log/secure,NOW-86400,NOW-5000,NOW-5000,1,0
+linux,h23b,syslog,/var/log/messages,NOW-86400,NOW-10,NOW-10,1,0
+linux,h23c,linux_audit,/var/log/audit/audit.log,NOW-86400,NOW-5000,NOW-5000,1,0
+linux,h23c,syslog,/var/log/messages,NOW-86400,NOW-10,NOW-10,1,0
+linux,h23d,syslog,/var/log/messages,NOW-86400,NOW-5000,NOW-5000,1,0
+linux,h23d,cpu,cpu,NOW-86400,NOW-10,NOW-10,1,0
+linux,h23e,syslog,/var/log/messages,NOW-86400,NOW-10,NOW-10,1,0

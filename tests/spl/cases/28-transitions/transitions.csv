@@ -1,0 +1,4 @@
+entity_id,dh_index,dh_host,dh_sourcetype,dh_source,prev_status,status,since,cause_code,host_rollup,host,orig_host
+sourcetype|linux|h28|st_a|*,linux,h28,st_a,*,OK,MISSING,NOW,hb_ok_input_missing,DEGRADED,,
+sourcetype|linux|h28|st_d|*,linux,h28,st_d,*,,MISSING,NOW,hb_ok_input_missing,DEGRADED,,
+sourcetype|linux|h28|st_g|*,linux,h28,st_g,*,MISSING,OK,NOW,,DEGRADED,,

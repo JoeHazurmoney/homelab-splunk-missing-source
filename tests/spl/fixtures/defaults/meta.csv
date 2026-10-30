@@ -1,0 +1,2 @@
+name,last_run,prev_run,resumed_at,last_rx
+tracker_fast,NOW,NOW-60,NOW-86400,NOW-10

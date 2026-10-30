@@ -1,0 +1,4 @@
+entity_id,status,cause_code,muted_until,mute_reason,host_rollup
+host|*|wd2l-recv|*|*,MUTED,muted,NOW+3600,maintenance,MUTED
+sourcetype|linux|wd2l-recv|syslog|*,MUTED,muted,NOW+3600,maintenance,MUTED
+source|linux|wd2l-recv|cpu|cpu,MUTED,muted,NOW+3600,maintenance,MUTED

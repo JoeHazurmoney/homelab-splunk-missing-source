@@ -1,0 +1,6 @@
+entity_id,status,cause_code,action,host_rollup
+host|*|h14a|*|*,MISSING,hb_missing,ping/ssh h14a; ansible-playbook site.yml --tags status --limit h14a,DOWN
+sourcetype|linux|h14a|syslog|*,MISSING,hb_missing,ping/ssh h14a; ansible-playbook site.yml --tags status --limit h14a,DOWN
+source|linux|h14a|cpu|cpu,MISSING,hb_missing,ping/ssh h14a; ansible-playbook site.yml --tags status --limit h14a,DOWN
+host|*|h14b|*|*,LATE,hb_late,ansible-playbook site.yml --tags status --limit h14b; check splunkd and the 9997 path on h14b,DEGRADED
+sourcetype|linux|h14b|syslog|*,OK,,,DEGRADED

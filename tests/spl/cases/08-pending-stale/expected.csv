@@ -1,0 +1,3 @@
+level,index,host,sourcetype,source,collection,via,profile,interval_secs,max_gap_secs,criticality,enabled,expected_since
+host,,wd2l-recv,,,uf,,heartbeat,,,1,,
+sourcetype,linux,wd2l-recv,syslog,,uf,,continuous,,,2,,

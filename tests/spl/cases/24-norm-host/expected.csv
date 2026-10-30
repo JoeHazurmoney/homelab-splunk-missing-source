@@ -1,0 +1,4 @@
+level,index,host,sourcetype,source,collection,via,profile,interval_secs,max_gap_secs,criticality,enabled,expected_since
+host,,WD2L-Recv.mshome.net,,,uf,,heartbeat,,,1,,
+sourcetype,linux,wd2l-recv,syslog,,uf,,continuous,,,2,,
+sourcetype,windows,HOMEPC.mshome.net,XmlWinEventLog,,uf,,continuous,,,2,,

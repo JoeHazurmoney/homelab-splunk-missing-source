@@ -1,0 +1,5 @@
+entity_id,status,cause_code,action,host_rollup
+host|*|h16a|*|*,MISSING,ansible_stop,ansible-playbook site.yml --tags start --limit h16a,DOWN
+sourcetype|linux|h16a|syslog|*,MISSING,ansible_stop,ansible-playbook site.yml --tags start --limit h16a,DOWN
+host|*|h16b|*|*,MISSING,hb_missing,ping/ssh h16b; ansible-playbook site.yml --tags status --limit h16b,DOWN
+sourcetype|linux|h16b|syslog|*,OK,,,DOWN

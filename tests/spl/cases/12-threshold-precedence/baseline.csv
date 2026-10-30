@@ -1,0 +1,7 @@
+entity_id,learned_gap_secs,days
+sourcetype|linux|h12|st_a|*,1000,10
+sourcetype|linux|h12|st_b|*,1000,10
+sourcetype|linux|h12|st_c|*,1000,10
+sourcetype|linux|h12|st_e|*,100,10
+sourcetype|linux|h12|st_f|*,10000000,10
+sourcetype|linux|h12|st_g|*,1000,2

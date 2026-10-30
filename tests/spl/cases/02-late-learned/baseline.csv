@@ -1,0 +1,2 @@
+entity_id,learned_gap_secs,days
+sourcetype|linux|wd2l-recv|syslog|*,600,14

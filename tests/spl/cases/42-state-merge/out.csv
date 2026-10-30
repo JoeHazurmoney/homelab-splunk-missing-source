@@ -1,0 +1,3 @@
+_key,index,host,sourcetype,source,first_seen,last_indextime,last_eventtime,last_count,lag,clock_skew,updated
+linux|wd2l-recv|syslog|/var/log/messages,linux,wd2l-recv,syslog,/var/log/messages,NOW-86400,NOW-10,NOW-12,50,2,0,NOW
+wd2l_uf_audit|wd2l-recv|wd2l:audit|/var/log/wd2l/audit-*.jsonl,wd2l_uf_audit,wd2l-recv,wd2l:audit,/var/log/wd2l/audit-*.jsonl,NOW-172800,NOW-5,NOW-7200,3,7195,1,NOW

@@ -1,0 +1,3 @@
+index,host,sourcetype,source,first_seen,last_indextime,last_eventtime,last_count,lag
+linux,h13,sporadic_st,s,NOW-999999,NOW-90000,NOW-90000,1,0
+linux,h13,continuous_st,c,NOW-999999,NOW-2000,NOW-2000,1,0

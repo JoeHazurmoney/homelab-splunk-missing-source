@@ -1,0 +1,2 @@
+entity_id,mute_until,reason,ticket,threshold_override_secs
+sourcetype|linux|h12|st_a|*,,noisy,CHG-5,5000

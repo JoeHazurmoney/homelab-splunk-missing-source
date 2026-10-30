@@ -1,0 +1,6 @@
+entity_id,status,last_indextime,first_seen
+host|*|h27|*|*,OK,NOW-20,NOW-90000
+sourcetype|linux|h27|st_a|*,OK,NOW-100,NOW-90000
+sourcetype|linux|h27|st_b|*,OK,NOW-50,NOW-80000
+sourcetype|linux|h27|st_c|*,OK,NOW-100,NOW-60000
+sourcetype|linux|h27|st_d|*,MISSING,NOW-5000,NOW-80000

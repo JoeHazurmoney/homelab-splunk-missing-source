@@ -1,0 +1,3 @@
+host,last_heartbeat,last_marker_action,last_marker_time,last_marker_by,last_vm_event,last_vm_event_time,last_probe_time,last_probe_up,last_probe_reachable
+udm,,,,,,,NOW-30,NOW-1000,0
+udm2,,,,,,,NOW-1000,NOW-1000,1
