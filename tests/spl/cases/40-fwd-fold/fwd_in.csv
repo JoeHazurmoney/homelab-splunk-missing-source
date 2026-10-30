@@ -1,0 +1,14 @@
+kind,time,host,splunk_server,hb,hostname,guid,version,os,fwdType,target_host,action,by,run_id,raw,device,reachable
+hb,,wd2l-recv.mshome.net,wd2l-splunk,NOW-20,,,,,,,,,,,,
+hb,,wd2l-splunk,wd2l-splunk,NOW-5,,,,,,,,,,,,
+tcpin,NOW-30,,,,HOMEPC.mshome.net,G-HOME,10.6.1.1,Windows,uf,,,,,,,
+marker,NOW-600,,,,,,,,,wd2l-logsrv,stop,taylorb,r1,,,
+marker,NOW-300,,,,,,,,,wd2l-logsrv.mshome.net,start,taylorb,r2,,,
+marker,NOW-100,,,,,,,,,h-mk,stop,ci,r3,,,
+hyperv,NOW-500,,,,,,,,,,,,,<Event><System><EventID>18504</EventID></System><UserData><VmlEventLog><VmName>wd2l-logsrv</VmName></VmlEventLog></UserData></Event>,,
+hyperv,NOW-200,,,,,,,,,,,,,<Event><System><EventID>18500</EventID></System><UserData><VmlEventLog><VmName>wd2l-logsrv</VmName></VmlEventLog></UserData></Event>,,
+hyperv,NOW-150,,,,,,,,,,,,,<Event><System><EventID>18502</EventID></System><UserData><VmlEventLog><VmName>VM-Off</VmName></VmlEventLog></UserData></Event>,,
+hyperv,NOW-100,,,,,,,,,,,,,<Event><System><EventID>12345</EventID></System><UserData><VmlEventLog><VmName>VM-Off</VmName></VmlEventLog></UserData></Event>,,
+probe,NOW-90,,,,,,,,,,,,,,udm,1
+probe,NOW-30,,,,,,,,,,,,,,udm,0
+probe,NOW-20,sw1,,,,,,,,,,,,,,1

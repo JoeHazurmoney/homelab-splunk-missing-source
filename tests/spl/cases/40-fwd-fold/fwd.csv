@@ -1,0 +1,5 @@
+host,guid,version,os,fwd_type,last_heartbeat,last_tcpin,last_marker_action,last_marker_time,last_marker_by,last_marker_run_id,last_vm_event,last_vm_event_time,last_probe_time,last_probe_up,last_probe_reachable
+wd2l-recv,G-RECV,10.6.1.1,Linux,uf,NOW-3000,NOW-3600,stop,NOW-7200,taylorb,r0,,,,,
+wd2l-logsrv,,,,,,,stop,NOW-900,taylorb,r00,18508,NOW-800,,,
+udm,,,,,,,,,,,,,NOW-600,NOW-600,1
+old-host,G-OLD,10.6.1.1,Linux,uf,NOW-90000,NOW-90000,,,,,,,,,

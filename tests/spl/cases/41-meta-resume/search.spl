@@ -1,0 +1,1 @@
+| inputlookup @meta_in@ | `dh_meta_fast(@meta@, @NOW@)`

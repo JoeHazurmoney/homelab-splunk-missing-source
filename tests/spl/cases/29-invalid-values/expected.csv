@@ -1,0 +1,12 @@
+level,index,host,sourcetype,source,collection,via,profile,interval_secs,max_gap_secs,criticality,enabled,expected_since
+host,,h29,,,uf,,heartbeat,,,1,,
+sourcetype,linux,h29,st_case,,uf,,Continuous ,,,2,,
+sourcetype,linux,h29,st_typo,,uf,,contnuous,,,2,,
+sourcetype,linux,h29,st_empty,,uf,,,,,2,,
+sourcetype,linux,h29,en_true,,uf,,continuous,,,2,true,
+sourcetype,linux,h29,en_yes,,uf,,continuous,,,2,yes,
+sourcetype,linux,h29,en_maybe,,uf,,continuous,,,2,maybe,
+sourcetype,linux,h29,en_false,,uf,,continuous,,,2,FALSE,
+sourcetype,linux,h29,en_off,,uf,,continuous,,,2,off,
+sourcetype,linux,h29,en_no,,uf,,continuous,,,2, No ,
+sourcetype,linux,h29,en_zero,,uf,,continuous,,,2,0,

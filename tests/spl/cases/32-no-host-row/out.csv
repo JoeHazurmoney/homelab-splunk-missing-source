@@ -1,0 +1,3 @@
+entity_id,status,cause_code,host_rollup
+sourcetype|linux|h32|syslog|*,LATE,stream_stopped,DEGRADED
+sourcetype|linux|h32|cpu|*,OK,,DEGRADED

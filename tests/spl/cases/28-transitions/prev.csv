@@ -1,7 +1,7 @@
-entity_id,status,since,real_status,real_since
-host|*|h28|*|*,OK,NOW-7200,OK,NOW-7200
-sourcetype|linux|h28|st_a|*,OK,NOW-7200,OK,NOW-7200
-sourcetype|linux|h28|st_b|*,MISSING,NOW-600,MISSING,NOW-600
-sourcetype|linux|h28|st_e|*,PENDING,NOW-120,MISSING,NOW-3000
-sourcetype|linux|h28|st_f|*,PENDING,NOW-1800,PENDING,NOW-1800
-sourcetype|linux|h28|st_g|*,MISSING,NOW-900,MISSING,NOW-900
+entity_id,status,since,real_status,real_since,prev_status
+host|*|h28|*|*,OK,NOW-7200,OK,NOW-7200,MISSING
+sourcetype|linux|h28|st_a|*,OK,NOW-7200,OK,NOW-7200,LATE
+sourcetype|linux|h28|st_b|*,MISSING,NOW-600,MISSING,NOW-600,OK
+sourcetype|linux|h28|st_e|*,PENDING,NOW-120,MISSING,NOW-3000,OK
+sourcetype|linux|h28|st_f|*,PENDING,NOW-1800,PENDING,NOW-1800,
+sourcetype|linux|h28|st_g|*,MISSING,NOW-900,MISSING,NOW-900,OK

@@ -1,0 +1,3 @@
+level,index,host,sourcetype,source,collection,via,profile,interval_secs,max_gap_secs,criticality,enabled,expected_since
+sourcetype,linux,h32,syslog,,uf,,continuous,,,2,,
+sourcetype,linux,h32,cpu,,uf,,continuous,,,2,,

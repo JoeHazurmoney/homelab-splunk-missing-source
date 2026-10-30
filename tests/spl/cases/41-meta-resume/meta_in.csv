@@ -1,0 +1,6 @@
+name,state_rows,rx_data,fwd_rows,rx_hb
+sc_ok,8,NOW-5,2,NOW-3
+sc_edge,8,NOW-5,0,
+sc_gap,8,NOW-5,0,
+sc_first,0,,0,
+sc_quiet,0,,0,

@@ -1,0 +1,6 @@
+_key,name,last_run,prev_run,resumed_at,last_rx,rows,fwd_rows
+sc_ok,sc_ok,NOW,NOW-60,NOW-7200,NOW-3,8,2
+sc_edge,sc_edge,NOW,NOW-150,NOW-3600,NOW-5,8,0
+sc_gap,sc_gap,NOW,NOW-200,NOW,NOW-5,8,0
+sc_first,sc_first,NOW,,NOW,,0,0
+sc_quiet,sc_quiet,NOW,NOW-60,NOW-7200,NOW-500,0,0

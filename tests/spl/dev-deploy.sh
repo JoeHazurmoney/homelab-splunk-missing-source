@@ -38,9 +38,12 @@ fail=0
 # apps/local first: it registers a new app (and its KV collections) without a restart.
 for ep in apps/local admin/conf-collections admin/macros admin/conf-macros saved/searches \
   admin/conf-savedsearches data/transforms/lookups admin/conf-transforms; do
-  code=$(dh_curl -o "$stage/reload.out" -w '%{http_code}' -X POST "$DH_MGMT/services/$ep/_reload")
+  code=$(dh_curl -o "$stage/reload.out" -w '%{http_code}' -X POST "$DH_MGMT/services/$ep/_reload") || true
   echo "reload $ep: $code"
   case $code in 200 | 201) ;; *) fail=1 ;; esac
 done
-if [ "$fail" -ne 0 ]; then echo "dev-deploy: some reloads failed (see above)" >&2; fi
+if [ "$fail" -ne 0 ]; then
+  echo "dev-deploy: some reloads failed (see above); splunkd may be running stale config" >&2
+  exit 1
+fi
 echo "deployed $DH_APP to $DH_CONTAINER"

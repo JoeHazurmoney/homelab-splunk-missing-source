@@ -1,0 +1,2 @@
+host,last_heartbeat,last_marker_action,last_marker_time,last_vm_event,last_vm_event_time
+h32,NOW-5000,stop,NOW-6000,18502,NOW-6000

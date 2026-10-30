@@ -1,0 +1,4 @@
+index,host,sourcetype,source,last_indextime,last_eventtime,first_seen,last_count
+linux,WD2L-RECV.mshome.net,syslog,/var/log/messages,NOW-10,NOW-12,NOW-200,40
+linux,wd2l-recv,syslog,/var/log/messages,NOW-30,NOW-31,NOW-250,10
+wd2l_uf_audit,wd2l-recv,wd2l:audit,/var/log/wd2l/audit-2026-10-30.jsonl,NOW-5,NOW-7200,NOW-100,3

@@ -1,9 +1,9 @@
 entity_id,status,since,real_since,changed,prev_status
-host|*|h28|*|*,OK,NOW-7200,NOW-7200,0,OK
+host|*|h28|*|*,OK,NOW-7200,NOW-7200,0,MISSING
 sourcetype|linux|h28|st_a|*,MISSING,NOW,NOW,1,OK
-sourcetype|linux|h28|st_b|*,MISSING,NOW-600,NOW-600,0,MISSING
+sourcetype|linux|h28|st_b|*,MISSING,NOW-600,NOW-600,0,OK
 sourcetype|linux|h28|st_c|*,OK,NOW,NOW,0,
 sourcetype|linux|h28|st_d|*,MISSING,NOW,NOW,1,
-sourcetype|linux|h28|st_e|*,MISSING,NOW-3000,NOW-3000,0,MISSING
+sourcetype|linux|h28|st_e|*,MISSING,NOW-3000,NOW-3000,0,OK
 sourcetype|linux|h28|st_f|*,OK,NOW,NOW,0,PENDING
 sourcetype|linux|h28|st_g|*,OK,NOW,NOW,1,MISSING
