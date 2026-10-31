@@ -1,0 +1,7 @@
+<nav search_view="search" color="#1E2A33">
+  <view name="dh_overview" default="true" />
+  <view name="dh_host" />
+  <view name="dh_manage" />
+  <view name="dh_soh" />
+  <view name="search" />
+</nav>
