@@ -91,6 +91,8 @@ flowchart LR
   P --> OUT
 ```
 
+*Superseded by spec §14.7 (spike 2b): `pl_test_block` is built (Splunk skips index-time rules on Cribl data, §14.7 c). Cribl metrics go to a metrics index `cribl_metrics`, and the audit log comes in through a File Monitor source (§14.7 f). The current diagram is spec §4.2.*
+
 - **The UDM gets its own port (5514/udp)** because Docker Desktop's NAT hides the sender's IP. Cribl names the host from the port, never from the source address.
 - **Cribl changes nothing in UF data:** the index, host, sourcetype and source pass through unchanged, so every rule in the data-health app keeps working.
 - **Cribl's own data** goes to a new index, `cribl`. That gives Cribl a heartbeat, and its audit log of config changes.
@@ -128,7 +130,7 @@ flowchart LR
 | UF heartbeat | UF `_internal` metrics, `tstats … by host` | Unchanged, **if** `_internal` passes through Cribl with host intact (spike 2b-b). |
 | Forwarder identity (version, OS, last connect) | Splunk's `tcpin_connections` metrics | Splunk now sees only Cribl's connection, so `dh_fwd_from_tcpin` is replaced by the UF's own `_internal` (`tcpout_connections` for the last connect; the version and OS per spike 2b-e). The Host detail forwarder panel follows. |
 | Tamper (§7.6) | Windows/Linux indicators, clock steps | **plus Cribl:** a config change in Cribl's audit log, above all a new Drop function or a route that sends to devnull, outside an Ansible `cribl` marker window → "possible deliberate blinding". |
-| Test block (§7.7) | `INGEST_EVAL` + nullQueue under `[default]` on Splunk | Splunk-side if spike 2b-c shows Splunk still applies it to Cribl data; otherwise `pl_test_block` in Cribl, with the block lookup written by the Ansible `cribl` tag, and the Manage form showing the command to run. |
+| Test block (§7.7) | `INGEST_EVAL` + nullQueue under `[default]` on Splunk | Splunk-side if spike 2b-c shows Splunk still applies it to Cribl data; otherwise `pl_test_block` in Cribl, with the block lookup written by the Ansible `cribl` tag, and the Manage form showing the command to run. *Superseded by spec §14.7 c: Splunk skips it, so the block is `pl_test_block` in Cribl; the Splunk-side follow-up is task 11b (spec §7.2).* |
 | Lag p95 | `_indextime − _time` | Unchanged; it now includes the Cribl hop, which is the point. |
 
 ## 6. What changes in the Ansible role
@@ -149,7 +151,7 @@ flowchart LR
 | `syslog_relay` / `_remove` | — | **removed** |
 | `server` | splunk_server | as approved, minus `tcp:10514`/`tcp:20514`; adds index `cribl` and the Cribl search-time props |
 
-- **New repo tree:** `cribl/local/cribl/{inputs,outputs,routes}.yml`, `cribl/local/cribl/pipelines/…`, `cribl/local/cribl/lookups/hl_ingest_block.csv` (if needed). Secrets, meaning the S2S token and the admin password, are templated from the vault, never committed.
+- **New repo tree:** `cribl/local/cribl/{inputs,outputs,routes}.yml`, `cribl/local/cribl/pipelines/…`, `cribl/local/cribl/lookups/hl_ingest_block.csv` (if needed). *Superseded by spec §14.7 / §5.2: routes are `local/cribl/pipelines/route.yml` (no `routes.yml`), and lookups live in `data/lookups/` and are pushed through the API.* Secrets, meaning the S2S token and the admin password, are templated from the vault, never committed.
 
 ## 7. Spike 2b (throwaway; findings go into spec §14)
 
