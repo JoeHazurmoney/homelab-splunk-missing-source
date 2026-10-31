@@ -1,4 +1,4 @@
 entity_id,status,cause_code,action,host_rollup
 host|*|h18|*|*,OK,,,DEGRADED
-sourcetype|linux|h18|syslog|*,MISSING,hb_ok_all_missing,ansible-playbook site.yml --tags apps --limit h18; check the test blocks,DEGRADED
-source|linux|h18|cpu|cpu,MISSING,hb_ok_all_missing,ansible-playbook site.yml --tags apps --limit h18; check the test blocks,DEGRADED
+sourcetype|linux|h18|syslog|*,MISSING,hb_ok_all_missing,Re-deploy the agent's apps with the role: ansible-playbook site.yml --tags apps --limit h18; and check Manage for test blocks,DEGRADED
+source|linux|h18|cpu|cpu,MISSING,hb_ok_all_missing,Re-deploy the agent's apps with the role: ansible-playbook site.yml --tags apps --limit h18; and check Manage for test blocks,DEGRADED

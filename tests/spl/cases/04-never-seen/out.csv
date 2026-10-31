@@ -1,7 +1,7 @@
 entity_id,status,cause_code,action,host_rollup
 host|*|wd2l-recv|*|*,OK,,,DEGRADED
-sourcetype|linux|wd2l-recv|linux_audit|*,NEVER_SEEN,hb_ok_never_seen,check the input on wd2l-recv: btool inputs list and splunkd errors,DEGRADED
-sourcetype|linux|wd2l-recv|linux_secure|*,PENDING,new_expected,none yet: wait up to 1 h for first data,DEGRADED
+sourcetype|linux|wd2l-recv|linux_audit|*,NEVER_SEEN,hb_ok_never_seen,Check the input on wd2l-recv: its settings (run splunk btool inputs list on the host) and the Splunk agent errors on Host detail,DEGRADED
+sourcetype|linux|wd2l-recv|linux_secure|*,PENDING,new_expected,None yet: wait up to 1 h for its first data,DEGRADED
 host|*|pi5|*|*,OK,,,DEGRADED
 sourcetype|linux|pi5|syslog|*,OK,,,DEGRADED
-sourcetype|network|pi5|hl:devprobe|*,NEVER_SEEN,never_seen,check that this input is deployed and sending on pi5,DEGRADED
+sourcetype|network|pi5|hl:devprobe|*,NEVER_SEEN,never_seen,Check that this input is deployed and sending on pi5,DEGRADED

@@ -249,7 +249,7 @@ def queries(app_dir, view, pairs, chains=False):
 # first cell of a row in a table whose first header cell is "Tile" or "Input". These headings group
 # entries and are not panels themselves.
 GROUP_HEADINGS = {"KPI tiles", "Filters", "Inputs"}
-GUIDE = re.compile(r"Guide: docs/data-health/dashboards\.md, ([^>]+?) > (.+?)\.$")
+GUIDE = re.compile(r"Guide: docs/data-health/dashboards\.md, ([^>]+?) > (.+)$")
 
 
 def doc_sections(text):
@@ -314,7 +314,7 @@ def docs(app_dir, docs_dir):
                 continue
             g = GUIDE.search(v.get("description", ""))
             if not g:
-                problems.append(f"{name}.{k}: its description has no 'Guide: docs/data-health/dashboards.md, <view> > <entry>.'")
+                problems.append(f"{name}.{k}: its description has no 'Guide: docs/data-health/dashboards.md, <view> > <entry>' at its end")
             elif g.group(1) != label or g.group(2) not in set(sec["headings"]):
                 problems.append(f"{name}.{k}: its guide pointer '{g.group(1)} > {g.group(2)}' is not a heading of '## {label}'")
     for msg in problems:

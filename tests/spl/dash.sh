@@ -81,7 +81,7 @@ panels() {
   unreg=$(first '| `dh_ui_unregistered(dh_expected, dh_state_fast, dh_state_slow, dh_baseline, now())` | table entity_id')
   echo "panels: host=$host unregistered=${unreg:-none}"
   # The drilldown sources and the field each passes to Host detail (dash_check prints them).
-  drill=$({ dash check "$DH_APP_DIR" || true; } | sed -n 's/^drilldown \([a-z_]*\)\.[a-z_]* -> .*=<\([a-z_]*\)> from \([a-z_]*\)$/\1.\3 \2/p')
+  drill=$({ dash check "$DH_APP_DIR" || true; } | sed -n 's/^drilldown \([a-z_]*\)\.[a-z_]* -> .*=<\([A-Za-z_]*\)> from \([a-z_]*\)$/\1.\3 \2/p')
   for view in dh_overview dh_host dh_manage dh_soh; do
     args=()
     case $view in
@@ -117,7 +117,7 @@ panels() {
       fi
       f=$(printf '%s\n' "$drill" | awk -v k="$view.$ds" '$1 == k { print $2 }')
       if [ -n "$f" ] && [ "${rows:-0}" -eq 0 ]; then
-        echo "  ($view.$ds has no rows here: its drilldown field is covered by the fixture cases)"
+        echo "  ($view.$ds has no rows here, so its drilldown field is not checked on this run)"
       elif [ -n "$f" ] && ! printf '%s\n' "$csv" | head -1 | tr -d '"' | tr ',' '\n' | grep -qx "$f"; then
         echo "FAIL $view.$ds: drilldown field '$f' is not in its results"
         fail=1
@@ -208,17 +208,17 @@ writes() {
   # Override: preview, then apply with the previewed token.
   tok=$(w_run ds_ov_plan "${ov[@]}" | col dh_token)
   expect "override preview gives a token" "$tok" '^[0-9a-f]{32}$'
-  res=$(w_run ds_ov_apply "${ov[@]}" "ov_confirm=$tok" | col result)
+  res=$(w_run ds_ov_apply "${ov[@]}" "ov_confirm=$tok" | col Result)
   expect "override applied" "$res" '^applied: override_mute host\|\*\|dhtest-w1\|\*\|\*$'
   res=$(kv_get dhtest_kv_overrides 'eval ok=if(mute_until>now()+3500 AND mute_until<=now()+3600, 1, 0) | table _key ok reason ticket set_by')
   expect "override row (key, expiry, reason, ticket, set_by)" "$(printf '%s' "$res" | sed -n 2p)" '^"host\|\*\|dhtest-w1\|\*\|\*",1,"writes test","CHG-12",admin$'
-  res=$(w_run ds_ov_apply "${ov[@]}" "ov_confirm=$tok" | col result)
+  res=$(w_run ds_ov_apply "${ov[@]}" "ov_confirm=$tok" | col Result)
   expect "override repeat (reload) applies nothing" "$res" '^nothing applied'
-  res=$(w_run ds_ov_apply "${ov[@]}" "ov_confirm=0123456789abcdef0123456789abcdef" | col result)
+  res=$(w_run ds_ov_apply "${ov[@]}" "ov_confirm=0123456789abcdef0123456789abcdef" | col Result)
   expect "override with a wrong confirmation applies nothing" "$res" '^nothing applied'
   ov[2]="ov_action=unmute"
   tok=$(w_run ds_ov_plan "${ov[@]}" | col dh_token)
-  res=$(w_run ds_ov_apply "${ov[@]}" "ov_confirm=$tok" | col result)
+  res=$(w_run ds_ov_apply "${ov[@]}" "ov_confirm=$tok" | col Result)
   expect "unmute applied" "$res" '^applied: override_unmute'
   res=$(kv_get dhtest_kv_overrides 'eval m=coalesce(mute_until, "none") | table m')
   expect "unmute cleared mute_until" "$(printf '%s' "$res" | sed -n 2p)" '^none$'
@@ -227,16 +227,16 @@ writes() {
   # Expected row: add, and a repeat.
   ex=("ex_level=sourcetype" "ex_index=linux" "ex_host=DHTEST-W2.mshome.net" "ex_sourcetype=syslog" "ex_profile=continuous" "m_reason=writes test")
   tok=$(w_run ds_ex_plan "${ex[@]}" | col dh_token)
-  res=$(w_run ds_ex_apply "${ex[@]}" "ex_confirm=$tok" | col result)
+  res=$(w_run ds_ex_apply "${ex[@]}" "ex_confirm=$tok" | col Result)
   expect "expected row applied" "$res" '^applied: expected_add sourcetype\|linux\|dhtest-w2\|syslog\|\*$'
   res=$(kv_get dhtest_kv_expected 'eval es=if(abs(expected_since-now())<120, "now", expected_since) | table _key host managed_by enabled profile collection criticality es')
   expect "expected row stored" "$(printf '%s' "$res" | sed -n 2p)" '^"sourcetype\|linux\|dhtest-w2\|syslog\|\*","?dhtest-w2"?,ui,1,continuous,uf,2,now$'
-  res=$(w_run ds_ex_apply "${ex[@]}" "ex_confirm=$tok" | col result)
+  res=$(w_run ds_ex_apply "${ex[@]}" "ex_confirm=$tok" | col Result)
   expect "expected row repeat applies nothing" "$res" '^nothing applied'
   # Adopt.
   ad=("ad_entity=sourcetype|linux|dhtest-w3|cpu|*" "ad_crit=3" "m_reason=writes test")
   tok=$(w_run ds_ad_plan "${ad[@]}" | col dh_token)
-  res=$(w_run ds_ad_apply "${ad[@]}" "ad_confirm=$tok" | col result)
+  res=$(w_run ds_ad_apply "${ad[@]}" "ad_confirm=$tok" | col Result)
   expect "adopt applied" "$res" '^applied: expected_adopt sourcetype\|linux\|dhtest-w3\|cpu\|\*$'
   res=$(kv_get dhtest_kv_expected 'search host=dhtest-w3 | table managed_by profile collection criticality')
   expect "adopted row stored" "$(printf '%s' "$res" | sed -n 2p)" '^ui,continuous,syslog,3$'
@@ -245,16 +245,16 @@ writes() {
   res=$(w_run ds_bk_plan "${bk[@]}" | col source_norm)
   expect "block preview shows the normalized source" "$res" '^/var/log/secure\.\*$'
   tok=$(w_run ds_bk_plan "${bk[@]}" | col dh_token)
-  res=$(w_run ds_bk_apply "${bk[@]}" "bk_confirm=$tok" | col result)
+  res=$(w_run ds_bk_apply "${bk[@]}" "bk_confirm=$tok" | col Result)
   expect "block applied" "$res" '^applied: block_add dhtest-w4\|linux_secure\|/var/log/secure\.1$'
   file=$(dh_docker exec -u root "$DH_CONTAINER" sh -c "cat $DH_APP_DIR/lookups/dhtest_w_blocks.csv" | tr -d '\r')
   expect "block file header is k first" "$(printf '%s\n' "$file" | sed -n 1p)" '^k,until,reason,"?set_by"?$'
   expect "block row keys the raw source" "$(printf '%s\n' "$file" | sed -n 2p)" '^"?dhtest-w4\|linux_secure\|/var/log/secure\.1"?,[0-9]+,"?writes test"?,"?admin"?$'
-  res=$(w_run ds_bk_apply "${bk[@]}" "bk_confirm=$tok" | col result)
+  res=$(w_run ds_bk_apply "${bk[@]}" "bk_confirm=$tok" | col Result)
   expect "block repeat applies nothing" "$res" '^nothing applied'
   bk[0]="bk_action=remove"
   tok=$(w_run ds_bk_plan "${bk[@]}" | col dh_token)
-  res=$(w_run ds_bk_apply "${bk[@]}" "bk_confirm=$tok" | col result)
+  res=$(w_run ds_bk_apply "${bk[@]}" "bk_confirm=$tok" | col Result)
   expect "block removed" "$res" '^applied: block_remove'
   res=$(kv_get dhtest_kv_admin_log 'search action=block_* | stats values(ticket) as t, count | eval t=mvjoin(t, " ") | table count t')
   expect "block admin-log rows carry the ticket" "$(printf '%s' "$res" | sed -n 2p)" '^2,"?CHG-B"?$'
