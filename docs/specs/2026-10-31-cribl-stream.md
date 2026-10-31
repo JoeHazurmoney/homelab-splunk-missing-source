@@ -1,6 +1,6 @@
 # Cribl Stream in the data path: design addendum
 
-Status: **draft for Taylor's review**, 2026-10-31. Amends [the approved spec](2026-10-30-design.md). Once Taylor approves it, its changes are folded into that spec in place (§3–§8, §11, §12, §14), and this file stays as the record of why.
+Status: **approved** by Taylor 2026-10-31, with the documentation additions in §11. Amends [the approved spec](2026-10-30-design.md). Once Taylor approves it, its changes are folded into that spec in place (§3–§8, §11, §12, §14), and this file stays as the record of why.
 
 ## 1. Context
 
@@ -177,6 +177,7 @@ flowchart LR
 | 6 | Forwarder apps + toggles | 4, 5 | every §4 row arrives with the right index/host/source/sourcetype |
 | 7 | `audit_rules` (STIG) | 4 | as approved |
 | 8 *(revised)* | UDM via Cribl + `probe` on pi5; the deferred UDM CEF sample | 3b, 4 | UDM events arrive as `host=udm`; probe lines arrive; wd2l `soak-check.sh` still green |
+| 12d *(new)* | The data-health reference docs (§11): `docs/data-health/macros.md`, `docs/data-health/dashboards.md`, plain-language on-screen wording, and the coverage check | 12 | every macro and every panel is documented; the coverage check runs in `tests/spl/run.sh`; Taylor can read the Overview with the guide alone |
 | 10 | `expected` + sync + discovery (rows carry `via=cribl`; the `cribl` host row) | 6, 8 | each enabled input has a row; removing one retires it |
 | 11b *(new)* | Data-health Cribl adaptation (§5) + fixture cases | 2b, 10 | fixtures pass; Host detail shows UF version/last connect again; the Cribl tamper finding fires |
 | 13 | Docs | all | someone can run the role from the docs alone |
@@ -197,3 +198,36 @@ flowchart LR
 1. **UniFi:** change the remote syslog target to `192.168.1.27:5514/udp` (done in the UniFi UI, during task 8).
 2. **Windows Firewall:** an inbound rule for 5514/udp from 192.168.1.1, only if Docker Desktop's existing rule doesn't cover it. It needs elevation.
 3. **Vault:** the Cribl admin password goes into the vault on pi5.
+
+## 11. Documentation for the data-health app (Taylor, 2026-10-31)
+
+The app's code was written for the people who build it. Two reference documents make it readable for the people who use it. Task 12d writes them right after task 12 merges. From then on, they are **living documents**: every later task that adds or changes a macro or a panel (3, 8, 10, 11b, …) updates them in the same PR, and the task review checks it.
+
+**`docs/data-health/macros.md`: what each macro is for.**
+- One entry per macro in `splunk/apps/hl_data_health/default/macros.conf`, grouped as the file is (lookup names, normalization, tunables, the evaluator steps, trackers, baselines/volume/tamper, the UI macros).
+- Each entry gives a sentence or two on what it does and why, its arguments, and what uses it (a saved search, a dashboard panel or another macro).
+- Tunables also give their value, its unit, and what changes if you raise or lower it.
+- It opens with a one-paragraph picture of the pipeline (trackers → evaluator → `dh_status` → dashboards and alerts), so each macro has a place to sit.
+
+**`docs/data-health/dashboards.md`: how to read each dashboard.**
+- One section per dashboard (Overview, Host detail, Manage, Daily state of health), and one entry per panel or widget, in screen order.
+- Each entry covers:
+  - **What it shows**, in plain words.
+  - **Where the number comes from**, in one line with no SPL. For example: "counts the rows of the expected list whose status is OK".
+  - **How to read it:** what a good value looks like, what a bad one means, and **what to do next**.
+- It also covers the statuses (OK, LATE, MISSING, NEVER_SEEN, MUTED, PENDING, INFO), the host roll-up (DOWN, DEGRADED), every cause the "Cause" column can show, and every banner state.
+- **The banner gets a worked example.** "Receiving: trackers and evaluator are current" means:
+  - Splunk is indexing new data.
+  - The background search that records when each stream last arrived ran within the last 2 minutes.
+  - The search that turns those times into statuses has run since.
+
+  So every status on the page is fresh and can be trusted. Each banner warning likewise gets an entry: what stopped, what the page does meanwhile (statuses held as PENDING, no alerts), and what to check.
+
+**On-screen wording.**
+- Where a label only makes sense after reading the guide, task 12d rewrites it in plain language. For example, the healthy banner becomes "Up to date: data is arriving and statuses were refreshed at hh:mm".
+- Each panel gets a one-line description in Dashboard Studio that points to its section of `dashboards.md`.
+
+**Coverage check (keeps the documents honest).** A static check in `tests/spl/` fails when:
+- a macro stanza in `macros.conf` has no entry in `macros.md`;
+- a panel title in the four views has no entry in `dashboards.md`;
+- either document names a macro or panel that no longer exists.
