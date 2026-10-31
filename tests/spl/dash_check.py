@@ -11,6 +11,11 @@ the deployed app, so it needs only the standard library.
   chains <app_dir> <view> [tok=value]   the same, as "ds_id<TAB>base<TAB>spl" with each chain's own
                                         post-process SPL and the id of its base ("-" for a search),
                                         so a test can run chains through the real post-process path
+  docs <app_dir> <docs_dir>             the coverage check of docs/data-health (task 12d): every
+                                        macro stanza has an entry in macros.md and every entry is a
+                                        stanza; every panel and input title of the four views has an
+                                        entry in its section of dashboards.md, every entry there is
+                                        a current title, and each panel's "Guide:" pointer resolves
 """
 import json
 import os
@@ -25,14 +30,39 @@ MACRO = re.compile(r"`([a-z0-9_]+)(?:\(([^`]*)\))?`")
 # host terms subsearch (a token never reaches the SPL, see dh_ui_host_terms), or for Hyper-V the
 # Worker-Admin source and the host as a quoted term.
 HOST_TERMS = "[| makeresults | eval host=${tok}|s$ | `dh_ui_host_terms`]"
+# (view, data source) -> (the constraint its first command must carry, the window it must use)
 RAW_OK = {
-    ("dh_host", "ds_chart"): HOST_TERMS.format(tok="host"),
-    ("dh_host", "ds_errors"): HOST_TERMS.format(tok="host"),
-    ("dh_host", "ds_hyperv"): 'source="XmlWinEventLog:Microsoft-Windows-Hyper-V-Worker-Admin" $host|s$ ',
-    ("dh_manage", "ds_bk_sources"): HOST_TERMS.format(tok="bk_host"),
+    ("dh_host", "ds_chart"): (HOST_TERMS.format(tok="host"), "earliest=-24h"),
+    ("dh_host", "ds_errors"): (HOST_TERMS.format(tok="host"), "earliest=-24h"),
+    ("dh_host", "ds_hyperv"): ('source="XmlWinEventLog:Microsoft-Windows-Hyper-V-Worker-Admin" $host|s$ ', "earliest=-7d"),
+    ("dh_manage", "ds_bk_sources"): (HOST_TERMS.format(tok="bk_host"), "earliest=-24h"),
 }
-# Raw data anywhere in a query: tstats, or an index other than the summary index data_health.
-RAW = re.compile(r'\btstats\b|\bindex\s*(=|!=)\s*"?(?!data_health\b)[A-Za-z0-9_*]|\bindex\s+IN\s*\(', re.I)
+# Every other search's own SPL must start by reading KV or summary data (allowlist)...
+KV_OR_SUMMARY = re.compile(r'^\s*(\| `dh_ui_[a-z_]+(\(|`)|\| inputlookup |\| makeresults |search index=data_health )')
+# ...and no query may read raw data anywhere (denylist): tstats, metasearch, from/datamodel, an
+# index other than the summary index data_health, or a search (top-level or in a subsearch) that
+# doesn't start with index=data_health.
+RAW = re.compile(r'\btstats\b|\bmetasearch\b|\|\s*from\b|\bdatamodel\b'
+                 r'|\bindex\s*(=|!=)\s*"?(?!data_health\b)[A-Za-z0-9_*]|\bindex\s+IN\s*\('
+                 r'|(^|\[|\|)\s*search\s+(?!index=data_health\b)', re.I)
+
+
+def first_command(q):
+    """The query's first command: up to the first "|" outside brackets, quotes and $tok|s$ tokens
+    (a leading "|" skipped)."""
+    s = q.lstrip()
+    blank = lambda m: "x" * len(m.group(0))
+    masked = TOKEN.sub(blank, re.sub(r'"(?:\\.|[^"\\])*"', blank, s))
+    start = 1 if masked.startswith("|") else 0
+    depth = 0
+    for i in range(start, len(masked)):
+        if masked[i] == "[":
+            depth += 1
+        elif masked[i] == "]":
+            depth -= 1
+        elif masked[i] == "|" and depth == 0:
+            return s[:i]
+    return s
 
 
 def load(path):
@@ -147,12 +177,18 @@ def check(app_dir):
                 writes.append(k)
                 if not re.search(r"\$[a-z]+_confirm\|s\$", q):
                     p(f"{k} writes without a confirmation token")
-            if RAW.search(q):
-                need = RAW_OK.get((name, k))
-                if need is None:
+            allowed = RAW_OK.get((name, k))
+            if allowed is None:
+                if RAW.search(q) or (ds["type"] == "ds.search" and not KV_OR_SUMMARY.match(q)):
                     p(f"{k} reads raw data (spec §8: panels read KV or summary data)")
-                elif need not in q:
-                    p(f"{k} reads raw data without its base-search constraint: {need}")
+            else:
+                head = first_command(q)
+                if allowed[0] not in head:
+                    p(f"{k}: its base search must carry the constraint {allowed[0]}")
+                if allowed[1] not in head:
+                    p(f"{k}: its base search must use the window {allowed[1]}")
+                if RAW.search(q.lstrip()[len(head):]):
+                    p(f"{k} reads more raw data after its base search")
         if writes:
             if not submit or layout["options"].get("submitOnDashboardLoad") is not False:
                 p("writes need submitButton=true and submitOnDashboardLoad=false (spec §7.8)")
@@ -209,8 +245,87 @@ def queries(app_dir, view, pairs, chains=False):
     return 0
 
 
+# dashboards.md: "## <view label>" sections; in each, an entry is a "### <title>" heading or the
+# first cell of a row in a table whose first header cell is "Tile" or "Input". These headings group
+# entries and are not panels themselves.
+GROUP_HEADINGS = {"KPI tiles", "Filters", "Inputs"}
+GUIDE = re.compile(r"Guide: docs/data-health/dashboards\.md, ([^>]+?) > (.+)$")
+
+
+def doc_sections(text):
+    """{section: {"headings": [...], "rows": [...]}} from a markdown document."""
+    out, cur, table_kind = {}, None, None
+    for line in text.splitlines():
+        if line.startswith("## "):
+            cur = line[3:].strip()
+            out[cur] = {"headings": [], "rows": []}
+            table_kind = None
+        elif cur is None:
+            continue
+        elif line.startswith("### "):
+            out[cur]["headings"].append(line[4:].strip())
+            table_kind = None
+        elif line.startswith("|"):
+            cells = [c.strip() for c in line.strip().strip("|").split("|")]
+            if table_kind is None:
+                table_kind = cells[0]
+            elif not re.match(r"^:?-+:?$", cells[0]) and table_kind in ("Tile", "Input"):
+                out[cur]["rows"].append(cells[0].replace("\\|", "|"))
+        else:
+            table_kind = None
+    return out
+
+
+def docs(app_dir, docs_dir):
+    problems = []
+    # macros.md: one "### `name(arg, ...)`" (or "### `name`") heading per stanza of macros.conf.
+    stanzas = {(n, c) for n, cs in macros(app_dir).items() for c in cs}
+    text = open(os.path.join(docs_dir, "macros.md"), encoding="utf-8").read()
+    entries = set()
+    for m in re.finditer(r"^### `([a-z0-9_]+)(?:\(([^)]*)\))?`", text, re.M):
+        entries.add((m.group(1), 0 if m.group(2) is None else len(m.group(2).split(","))))
+    for n, c in sorted(stanzas - entries):
+        problems.append(f"macros.md: no entry for {n}" + (f"({c} args)" if c else ""))
+    for n, c in sorted(entries - stanzas):
+        problems.append(f"macros.md: {n}" + (f"({c} args)" if c else "") + " is not a macro in macros.conf")
+    # dashboards.md: every panel and input title, by view.
+    sections = doc_sections(open(os.path.join(docs_dir, "dashboards.md"), encoding="utf-8").read())
+    for name, path in views(app_dir).items():
+        root, d = load(path)
+        label = root.find("label").text
+        sec = sections.get(label)
+        if sec is None:
+            problems.append(f"dashboards.md: no section '## {label}'")
+            continue
+        panels = {v["title"]: k for k, v in d.get("visualizations", {}).items() if v.get("title")}
+        inputs = {i["title"]: k for k, i in d.get("inputs", {}).items()}
+        documented = set(sec["headings"]) | set(sec["rows"])
+        for t in sorted(set(panels) | set(inputs)):
+            if t not in documented:
+                problems.append(f"dashboards.md, {label}: no entry for '{t}'")
+        for t in sec["headings"]:
+            if t not in panels and t not in inputs and t not in GROUP_HEADINGS:
+                problems.append(f"dashboards.md, {label}: '### {t}' is not a panel or input of {name}")
+        for t in sec["rows"]:
+            if t not in panels and t not in inputs:
+                problems.append(f"dashboards.md, {label}: table entry '{t}' is not a panel or input of {name}")
+        for k, v in d.get("visualizations", {}).items():
+            if v.get("type") == "splunk.markdown":
+                continue
+            g = GUIDE.search(v.get("description", ""))
+            if not g:
+                problems.append(f"{name}.{k}: its description has no 'Guide: docs/data-health/dashboards.md, <view> > <entry>' at its end")
+            elif g.group(1) != label or g.group(2) not in set(sec["headings"]):
+                problems.append(f"{name}.{k}: its guide pointer '{g.group(1)} > {g.group(2)}' is not a heading of '## {label}'")
+    for msg in problems:
+        print(msg)
+    return 1 if problems else 0
+
+
 if __name__ == "__main__":
     mode, app = sys.argv[1], sys.argv[2]
+    if mode == "docs":
+        sys.exit(docs(app, sys.argv[3]))
     if mode == "check":
         sys.exit(check(app))
     sys.exit(queries(app, sys.argv[3], sys.argv[4:], chains=(mode == "chains")))

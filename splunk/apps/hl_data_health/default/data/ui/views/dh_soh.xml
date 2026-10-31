@@ -47,7 +47,7 @@
             "name": "Outages",
             "options": {
                 "extend": "ds_soh",
-                "query": "| where section==\"outage\" | eval start=strftime(tonumber(start), \"%Y-%m-%d %H:%M\"), end=if(tonumber(open)==1, \"still open\", strftime(tonumber(end), \"%Y-%m-%d %H:%M\")), duration=tostring(tonumber(value), \"duration\") | sort 0 -value | table item start end duration | rename item AS entity_id"
+                "query": "| where section==\"outage\" | eval start=strftime(tonumber(start), \"%Y-%m-%d %H:%M\"), end=if(tonumber(open)==1, \"still open\", strftime(tonumber(end), \"%Y-%m-%d %H:%M\")), duration=tostring(tonumber(value), \"duration\") | sort 0 -value | table item start end duration | rename item AS entity_id | `dh_ui_headers`"
             }
         },
         "ds_flapping": {
@@ -55,7 +55,7 @@
             "name": "Flapping",
             "options": {
                 "extend": "ds_soh",
-                "query": "| where section==\"flapping\" | sort 0 -value | table item value | rename item AS entity_id, value AS transitions_24h"
+                "query": "| where section==\"flapping\" | sort 0 -value | table item value | rename item AS entity_id, value AS transitions_24h | `dh_ui_headers`"
             }
         },
         "ds_never": {
@@ -63,14 +63,14 @@
             "name": "Never seen and invalid profiles",
             "options": {
                 "extend": "ds_soh",
-                "query": "| where section==\"never_seen\" OR section==\"invalid_profile\" | eval detail=if(section==\"never_seen\", \"expected since \".strftime(tonumber(value), \"%Y-%m-%d %H:%M\"), value) | table section item detail | rename item AS entity_id"
+                "query": "| where section==\"never_seen\" OR section==\"invalid_profile\" | eval detail=if(section==\"never_seen\", \"expected since \".strftime(tonumber(value), \"%Y-%m-%d %H:%M\"), value) | eval section=case(section==\"never_seen\", \"never arrived\", section==\"invalid_profile\", \"unknown profile\", true(), section) | table section item detail | rename item AS entity_id | `dh_ui_headers`"
             }
         },
         "ds_unreg": {
             "type": "ds.search",
             "name": "Unregistered (live)",
             "options": {
-                "query": "| `dh_ui_unregistered(dh_expected, dh_state_fast, dh_state_slow, dh_baseline, now())`"
+                "query": "| `dh_ui_unregistered(dh_expected, dh_state_fast, dh_state_slow, dh_baseline, now())` | `dh_ui_headers`"
             }
         },
         "ds_fwd": {
@@ -78,7 +78,7 @@
             "name": "Forwarders",
             "options": {
                 "extend": "ds_soh",
-                "query": "| where section==\"fwd_version\" OR section==\"fwd_disconnected\" | eval last_seen=strftime(tonumber(last_seen), \"%Y-%m-%d %H:%M\") | table section item version last_seen | rename item AS host"
+                "query": "| where section==\"fwd_version\" OR section==\"fwd_disconnected\" | eval last_seen=strftime(tonumber(last_seen), \"%Y-%m-%d %H:%M\") | eval section=case(section==\"fwd_version\", \"wrong version\", section==\"fwd_disconnected\", \"disconnected\", true(), section) | table section item version last_seen | rename item AS host | `dh_ui_headers`"
             }
         },
         "ds_lag": {
@@ -86,7 +86,7 @@
             "name": "Lag p95",
             "options": {
                 "extend": "ds_soh",
-                "query": "| where section==\"lag\" | sort 0 -value | table item value day | rename item AS entity_id, value AS lag_p95_secs"
+                "query": "| where section==\"lag\" | sort 0 -value | eval day=strftime(tonumber(day), \"%Y-%m-%d\") | table item value day | rename item AS entity_id, value AS lag_p95_secs | `dh_ui_headers`"
             }
         },
         "ds_volume": {
@@ -94,7 +94,7 @@
             "name": "Volume flags",
             "options": {
                 "extend": "ds_soh",
-                "query": "| where section==\"volume\" | sort 0 -value | table item value min_ratio | rename item AS entity_id, value AS flagged_hours"
+                "query": "| where section==\"volume\" | sort 0 -value | table item value min_ratio | rename item AS entity_id, value AS flagged_hours | `dh_ui_headers`"
             }
         },
         "ds_lic_pct": {
@@ -118,7 +118,7 @@
             "name": "Skipped searches",
             "options": {
                 "extend": "ds_soh",
-                "query": "| where section==\"skipped\" | sort 0 -value | table item value | rename item AS search, value AS skipped_24h"
+                "query": "| where section==\"skipped\" | sort 0 -value | table item value | rename item AS search, value AS skipped_24h | `dh_ui_headers`"
             }
         },
         "ds_mutes": {
@@ -126,14 +126,14 @@
             "name": "Mutes",
             "options": {
                 "extend": "ds_soh",
-                "query": "| where section==\"mute_expiring\" OR section==\"mute_active\" | eval until=strftime(tonumber(value), \"%Y-%m-%d %H:%M\") | table section item until reason ticket set_by | rename item AS entity_id"
+                "query": "| where section==\"mute_expiring\" OR section==\"mute_active\" | eval until=strftime(tonumber(value), \"%Y-%m-%d %H:%M\") | eval section=case(section==\"mute_active\", \"active\", section==\"mute_expiring\", \"ends within 24 h\", true(), section) | table section item until reason ticket set_by | rename item AS entity_id | `dh_ui_headers`"
             }
         }
     },
     "visualizations": {
         "viz_when": {
             "type": "splunk.singlevalue",
-            "title": "Report of",
+            "title": "Report time",
             "dataSources": {
                 "primary": "ds_when"
             },
@@ -141,11 +141,12 @@
                 "majorValue": "> primary | seriesByName(\"report\") | lastPoint()",
                 "sparklineDisplay": "off",
                 "trendDisplay": "off"
-            }
+            },
+            "description": "When the daily report was made (07:00 each day). Guide: docs/data-health/dashboards.md, Daily state of health > Report time"
         },
         "viz_mttr": {
             "type": "splunk.singlevalue",
-            "title": "MTTR (24 h)",
+            "title": "Mean time to recover (24 h)",
             "dataSources": {
                 "primary": "ds_mttr"
             },
@@ -153,7 +154,8 @@
                 "majorValue": "> primary | seriesByName(\"mttr\") | lastPoint()",
                 "sparklineDisplay": "off",
                 "trendDisplay": "off"
-            }
+            },
+            "description": "How long an outage lasted on average. Guide: docs/data-health/dashboards.md, Daily state of health > Mean time to recover (24 h)"
         },
         "viz_outages_n": {
             "type": "splunk.singlevalue",
@@ -165,11 +167,12 @@
                 "majorValue": "> primary | seriesByName(\"outages\") | lastPoint()",
                 "sparklineDisplay": "off",
                 "trendDisplay": "off"
-            }
+            },
+            "description": "How many times data stopped in the last 24 h. Guide: docs/data-health/dashboards.md, Daily state of health > Outages (24 h)"
         },
         "viz_open_n": {
             "type": "splunk.singlevalue",
-            "title": "Still open",
+            "title": "Outages still open",
             "dataSources": {
                 "primary": "ds_mttr"
             },
@@ -177,11 +180,12 @@
                 "majorValue": "> primary | seriesByName(\"open_outages\") | lastPoint()",
                 "sparklineDisplay": "off",
                 "trendDisplay": "off"
-            }
+            },
+            "description": "How many of those have not come back yet. Guide: docs/data-health/dashboards.md, Daily state of health > Outages still open"
         },
         "viz_lic_pct": {
             "type": "splunk.singlevalue",
-            "title": "Licence used yesterday",
+            "title": "Licence used yesterday (% of the daily quota)",
             "dataSources": {
                 "primary": "ds_lic_pct"
             },
@@ -189,11 +193,12 @@
                 "majorValue": "> primary | seriesByName(\"usage\") | lastPoint()",
                 "sparklineDisplay": "off",
                 "trendDisplay": "off"
-            }
+            },
+            "description": "How close the instance came to its daily indexing limit. Guide: docs/data-health/dashboards.md, Daily state of health > Licence used yesterday (% of the daily quota)"
         },
         "viz_lic_days": {
             "type": "splunk.singlevalue",
-            "title": "Licence expires in (days)",
+            "title": "Days until the licence expires",
             "dataSources": {
                 "primary": "ds_lic_days"
             },
@@ -201,77 +206,85 @@
                 "majorValue": "> primary | seriesByName(\"value\") | lastPoint()",
                 "sparklineDisplay": "off",
                 "trendDisplay": "off"
-            }
+            },
+            "description": "When the Splunk licence runs out. Guide: docs/data-health/dashboards.md, Daily state of health > Days until the licence expires"
         },
         "viz_outages": {
             "type": "splunk.table",
-            "title": "Outages in 24 h with durations",
+            "title": "Outages in the last 24 h",
             "dataSources": {
                 "primary": "ds_outages"
             },
             "options": {
                 "count": 25
-            }
+            },
+            "description": "Each stretch of late or missing data, with how long it lasted. Guide: docs/data-health/dashboards.md, Daily state of health > Outages in the last 24 h"
         },
         "viz_flapping": {
             "type": "splunk.table",
-            "title": "Flapping (3 or more transitions in 24 h)",
+            "title": "Flapping (3 or more status changes in 24 h)",
             "dataSources": {
                 "primary": "ds_flapping"
             },
             "options": {
                 "count": 25
-            }
+            },
+            "description": "Streams that keep stopping and starting. Guide: docs/data-health/dashboards.md, Daily state of health > Flapping (3 or more status changes in 24 h)"
         },
         "viz_never": {
             "type": "splunk.table",
-            "title": "Never seen, and invalid profiles",
+            "title": "Never arrived, or a bad profile",
             "dataSources": {
                 "primary": "ds_never"
             },
             "options": {
                 "count": 25
-            }
+            },
+            "description": "Expected data that never came, and expected rows with a profile the app does not know. Guide: docs/data-health/dashboards.md, Daily state of health > Never arrived, or a bad profile"
         },
         "viz_unreg": {
             "type": "splunk.table",
-            "title": "Unregistered (live: seen in 7 d, not expected)",
+            "title": "Unregistered: seen in the last 7 d but not expected",
             "dataSources": {
                 "primary": "ds_unreg"
             },
             "options": {
                 "count": 25
-            }
+            },
+            "description": "Data that arrives but that nobody listed as expected. Guide: docs/data-health/dashboards.md, Daily state of health > Unregistered: seen in the last 7 d but not expected"
         },
         "viz_fwd": {
             "type": "splunk.table",
-            "title": "Forwarders off the expected version or disconnected",
+            "title": "Forwarders: wrong version or disconnected",
             "dataSources": {
                 "primary": "ds_fwd"
             },
             "options": {
                 "count": 25
-            }
+            },
+            "description": "Splunk agents that need an upgrade or have stopped calling in. Guide: docs/data-health/dashboards.md, Daily state of health > Forwarders: wrong version or disconnected"
         },
         "viz_lag": {
             "type": "splunk.table",
-            "title": "Lag p95 (sourcetypes at or above 60 s)",
+            "title": "Slow arrival (lag p95 of 60 s or more)",
             "dataSources": {
                 "primary": "ds_lag"
             },
             "options": {
                 "count": 25
-            }
+            },
+            "description": "Data that arrives long after it was written. Guide: docs/data-health/dashboards.md, Daily state of health > Slow arrival (lag p95 of 60 s or more)"
         },
         "viz_volume": {
             "type": "splunk.table",
-            "title": "Volume flags (24 h)",
+            "title": "Volume drops (24 h)",
             "dataSources": {
                 "primary": "ds_volume"
             },
             "options": {
                 "count": 25
-            }
+            },
+            "description": "Hours with far fewer events than usual. Guide: docs/data-health/dashboards.md, Daily state of health > Volume drops (24 h)"
         },
         "viz_skipped": {
             "type": "splunk.table",
@@ -281,7 +294,8 @@
             },
             "options": {
                 "count": 25
-            }
+            },
+            "description": "Background searches of this app that did not run on time. Guide: docs/data-health/dashboards.md, Daily state of health > Skipped searches (24 h)"
         },
         "viz_mutes": {
             "type": "splunk.table",
@@ -291,7 +305,8 @@
             },
             "options": {
                 "count": 25
-            }
+            },
+            "description": "What is muted now, and what unmutes within a day. Guide: docs/data-health/dashboards.md, Daily state of health > Active and expiring mutes"
         }
     },
     "layout": {

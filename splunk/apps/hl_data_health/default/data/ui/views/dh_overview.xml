@@ -178,7 +178,7 @@
         },
         "input_text": {
             "type": "input.text",
-            "title": "Text: words (separated by *) in the entity, description or cause",
+            "title": "Search text (words separated by *)",
             "options": {
                 "token": "f_text",
                 "defaultValue": "*"
@@ -228,7 +228,7 @@
             "name": "Needs attention (filtered)",
             "options": {
                 "extend": "ds_all",
-                "query": "| eval f_site=$f_site|s$, f_owner=$f_owner|s$, f_index=$f_index|s$, f_crit=$f_crit|s$, f_status=$f_status|s$, f_text=$f_text|s$ | `dh_ui_filter` | `dh_ui_attention(now())`"
+                "query": "| eval f_site=$f_site|s$, f_owner=$f_owner|s$, f_index=$f_index|s$, f_crit=$f_crit|s$, f_status=$f_status|s$, f_text=$f_text|s$ | `dh_ui_filter` | `dh_ui_attention(now())` | `dh_ui_headers`"
             }
         },
         "ds_opt_site": {
@@ -274,7 +274,7 @@
             "name": "Tamper findings (filtered)",
             "options": {
                 "extend": "ds_tamper",
-                "query": "| eval f_site=$f_site|s$, f_owner=$f_owner|s$, f_index=$f_index|s$, f_crit=$f_crit|s$, f_status=$f_status|s$, f_text=$f_text|s$ | `dh_ui_filter` | table first_seen time host indicator events code detail"
+                "query": "| eval f_site=$f_site|s$, f_owner=$f_owner|s$, f_index=$f_index|s$, f_crit=$f_crit|s$, f_status=$f_status|s$, f_text=$f_text|s$ | `dh_ui_filter` | table first_seen time host indicator events code detail | `dh_ui_headers`"
             }
         },
         "ds_tamper_n": {
@@ -297,7 +297,7 @@
             "name": "Recently recovered (filtered)",
             "options": {
                 "extend": "ds_recovered",
-                "query": "| eval f_site=$f_site|s$, f_owner=$f_owner|s$, f_index=$f_index|s$, f_crit=$f_crit|s$, f_status=$f_status|s$, f_text=$f_text|s$ | `dh_ui_filter` | table recovered host entity_id down_since down_for"
+                "query": "| eval f_site=$f_site|s$, f_owner=$f_owner|s$, f_index=$f_index|s$, f_crit=$f_crit|s$, f_status=$f_status|s$, f_text=$f_text|s$ | `dh_ui_filter` | table recovered host entity_id down_since down_for | `dh_ui_headers`"
             }
         }
     },
@@ -329,7 +329,9 @@
                         "value": "#9E1C1C"
                     }
                 ]
-            }
+            },
+            "title": "Is the data current?",
+            "description": "Whether the page can be trusted right now. Guide: docs/data-health/dashboards.md, Overview > Is the data current?"
         },
         "viz_k_tamper": {
             "type": "splunk.singlevalue",
@@ -342,7 +344,8 @@
                 "sparklineDisplay": "off",
                 "trendDisplay": "off",
                 "majorColor": "#DC4E41"
-            }
+            },
+            "description": "Signs that someone may have switched off logging. Guide: docs/data-health/dashboards.md, Overview > Tamper findings (24 h)"
         },
         "viz_headline": {
             "type": "splunk.singlevalue",
@@ -371,7 +374,9 @@
                         "value": "#9E1C1C"
                     }
                 ]
-            }
+            },
+            "title": "How many hosts need attention",
+            "description": "A one-line summary of the table below. Guide: docs/data-health/dashboards.md, Overview > How many hosts need attention"
         },
         "viz_attention": {
             "type": "splunk.table",
@@ -382,7 +387,7 @@
             "options": {
                 "count": 25
             },
-            "description": "One row per host: DOWN before DEGRADED, then the worst status, criticality (1 first) and duration (oldest first). Click a row for Host detail.",
+            "description": "One row per host with late or missing data; worst first. Click a row for Host detail. Guide: docs/data-health/dashboards.md, Overview > Needs attention",
             "eventHandlers": [
                 {
                     "type": "drilldown.linkToDashboard",
@@ -392,7 +397,7 @@
                         "tokens": [
                             {
                                 "token": "host",
-                                "value": "row.host.value"
+                                "value": "row.Host.value"
                             }
                         ],
                         "newTab": false
@@ -402,7 +407,7 @@
         },
         "viz_recovered": {
             "type": "splunk.table",
-            "title": "Recently recovered (24 h, back to OK)",
+            "title": "Recently recovered (back to OK in the last 24 h)",
             "dataSources": {
                 "primary": "ds_recovered_f"
             },
@@ -418,17 +423,18 @@
                         "tokens": [
                             {
                                 "token": "host",
-                                "value": "row.host.value"
+                                "value": "row.Host.value"
                             }
                         ],
                         "newTab": false
                     }
                 }
-            ]
+            ],
+            "description": "Data that stopped and has come back. Click a row for Host detail. Guide: docs/data-health/dashboards.md, Overview > Recently recovered (back to OK in the last 24 h)"
         },
         "viz_tamper": {
             "type": "splunk.table",
-            "title": "Tamper findings (first seen in 24 h, outside Ansible marker windows)",
+            "title": "Tamper findings (first seen in the last 24 h)",
             "dataSources": {
                 "primary": "ds_tamper_f"
             },
@@ -444,13 +450,14 @@
                         "tokens": [
                             {
                                 "token": "host",
-                                "value": "row.host.value"
+                                "value": "row.Host.value"
                             }
                         ],
                         "newTab": false
                     }
                 }
-            ]
+            ],
+            "description": "Signs that someone may have switched off logging. Click a row for Host detail. Guide: docs/data-health/dashboards.md, Overview > Tamper findings (first seen in the last 24 h)"
         },
         "viz_k_host_expected": {
             "type": "splunk.singlevalue",
@@ -462,7 +469,8 @@
                 "majorValue": "> primary | seriesByName(\"host_expected\") | lastPoint()",
                 "sparklineDisplay": "off",
                 "trendDisplay": "off"
-            }
+            },
+            "description": "How many hosts are on the expected list. Guide: docs/data-health/dashboards.md, Overview > KPI tiles"
         },
         "viz_k_host_ok": {
             "type": "splunk.singlevalue",
@@ -475,7 +483,8 @@
                 "sparklineDisplay": "off",
                 "trendDisplay": "off",
                 "majorColor": "#53A051"
-            }
+            },
+            "description": "How many expected hosts are arriving on time. Guide: docs/data-health/dashboards.md, Overview > KPI tiles"
         },
         "viz_k_host_late": {
             "type": "splunk.singlevalue",
@@ -488,7 +497,8 @@
                 "sparklineDisplay": "off",
                 "trendDisplay": "off",
                 "majorColor": "#F8BE34"
-            }
+            },
+            "description": "How many expected hosts are later than their limit. Guide: docs/data-health/dashboards.md, Overview > KPI tiles"
         },
         "viz_k_host_missing": {
             "type": "splunk.singlevalue",
@@ -501,7 +511,8 @@
                 "sparklineDisplay": "off",
                 "trendDisplay": "off",
                 "majorColor": "#DC4E41"
-            }
+            },
+            "description": "How many expected hosts are silent for more than twice their limit or never arrived. Guide: docs/data-health/dashboards.md, Overview > KPI tiles"
         },
         "viz_k_host_muted": {
             "type": "splunk.singlevalue",
@@ -514,11 +525,12 @@
                 "sparklineDisplay": "off",
                 "trendDisplay": "off",
                 "majorColor": "#9B9B9B"
-            }
+            },
+            "description": "How many expected hosts are muted on purpose. Guide: docs/data-health/dashboards.md, Overview > KPI tiles"
         },
         "viz_k_host_pending": {
             "type": "splunk.singlevalue",
-            "title": "Hosts pending",
+            "title": "Hosts waiting (PENDING)",
             "dataSources": {
                 "primary": "ds_kpi"
             },
@@ -526,7 +538,8 @@
                 "majorValue": "> primary | seriesByName(\"host_pending\") | lastPoint()",
                 "sparklineDisplay": "off",
                 "trendDisplay": "off"
-            }
+            },
+            "description": "How many expected hosts have no trusted status yet. Guide: docs/data-health/dashboards.md, Overview > KPI tiles"
         },
         "viz_k_sourcetype_expected": {
             "type": "splunk.singlevalue",
@@ -538,7 +551,8 @@
                 "majorValue": "> primary | seriesByName(\"sourcetype_expected\") | lastPoint()",
                 "sparklineDisplay": "off",
                 "trendDisplay": "off"
-            }
+            },
+            "description": "How many sourcetypes (kinds of data per host) are on the expected list. Guide: docs/data-health/dashboards.md, Overview > KPI tiles"
         },
         "viz_k_sourcetype_ok": {
             "type": "splunk.singlevalue",
@@ -551,7 +565,8 @@
                 "sparklineDisplay": "off",
                 "trendDisplay": "off",
                 "majorColor": "#53A051"
-            }
+            },
+            "description": "How many expected sourcetypes (kinds of data per host) are arriving on time. Guide: docs/data-health/dashboards.md, Overview > KPI tiles"
         },
         "viz_k_sourcetype_late": {
             "type": "splunk.singlevalue",
@@ -564,7 +579,8 @@
                 "sparklineDisplay": "off",
                 "trendDisplay": "off",
                 "majorColor": "#F8BE34"
-            }
+            },
+            "description": "How many expected sourcetypes (kinds of data per host) are later than their limit. Guide: docs/data-health/dashboards.md, Overview > KPI tiles"
         },
         "viz_k_sourcetype_missing": {
             "type": "splunk.singlevalue",
@@ -577,7 +593,8 @@
                 "sparklineDisplay": "off",
                 "trendDisplay": "off",
                 "majorColor": "#DC4E41"
-            }
+            },
+            "description": "How many expected sourcetypes (kinds of data per host) are silent for more than twice their limit or never arrived. Guide: docs/data-health/dashboards.md, Overview > KPI tiles"
         },
         "viz_k_sourcetype_muted": {
             "type": "splunk.singlevalue",
@@ -590,11 +607,12 @@
                 "sparklineDisplay": "off",
                 "trendDisplay": "off",
                 "majorColor": "#9B9B9B"
-            }
+            },
+            "description": "How many expected sourcetypes (kinds of data per host) are muted on purpose. Guide: docs/data-health/dashboards.md, Overview > KPI tiles"
         },
         "viz_k_sourcetype_pending": {
             "type": "splunk.singlevalue",
-            "title": "Sourcetypes pending",
+            "title": "Sourcetypes waiting (PENDING)",
             "dataSources": {
                 "primary": "ds_kpi"
             },
@@ -602,7 +620,8 @@
                 "majorValue": "> primary | seriesByName(\"sourcetype_pending\") | lastPoint()",
                 "sparklineDisplay": "off",
                 "trendDisplay": "off"
-            }
+            },
+            "description": "How many expected sourcetypes (kinds of data per host) have no trusted status yet. Guide: docs/data-health/dashboards.md, Overview > KPI tiles"
         },
         "viz_k_source_expected": {
             "type": "splunk.singlevalue",
@@ -614,7 +633,8 @@
                 "majorValue": "> primary | seriesByName(\"source_expected\") | lastPoint()",
                 "sparklineDisplay": "off",
                 "trendDisplay": "off"
-            }
+            },
+            "description": "How many sources (single files or inputs) are on the expected list. Guide: docs/data-health/dashboards.md, Overview > KPI tiles"
         },
         "viz_k_source_ok": {
             "type": "splunk.singlevalue",
@@ -627,7 +647,8 @@
                 "sparklineDisplay": "off",
                 "trendDisplay": "off",
                 "majorColor": "#53A051"
-            }
+            },
+            "description": "How many expected sources (single files or inputs) are arriving on time. Guide: docs/data-health/dashboards.md, Overview > KPI tiles"
         },
         "viz_k_source_late": {
             "type": "splunk.singlevalue",
@@ -640,7 +661,8 @@
                 "sparklineDisplay": "off",
                 "trendDisplay": "off",
                 "majorColor": "#F8BE34"
-            }
+            },
+            "description": "How many expected sources (single files or inputs) are later than their limit. Guide: docs/data-health/dashboards.md, Overview > KPI tiles"
         },
         "viz_k_source_missing": {
             "type": "splunk.singlevalue",
@@ -653,7 +675,8 @@
                 "sparklineDisplay": "off",
                 "trendDisplay": "off",
                 "majorColor": "#DC4E41"
-            }
+            },
+            "description": "How many expected sources (single files or inputs) are silent for more than twice their limit or never arrived. Guide: docs/data-health/dashboards.md, Overview > KPI tiles"
         },
         "viz_k_source_muted": {
             "type": "splunk.singlevalue",
@@ -666,11 +689,12 @@
                 "sparklineDisplay": "off",
                 "trendDisplay": "off",
                 "majorColor": "#9B9B9B"
-            }
+            },
+            "description": "How many expected sources (single files or inputs) are muted on purpose. Guide: docs/data-health/dashboards.md, Overview > KPI tiles"
         },
         "viz_k_source_pending": {
             "type": "splunk.singlevalue",
-            "title": "Sources pending",
+            "title": "Sources waiting (PENDING)",
             "dataSources": {
                 "primary": "ds_kpi"
             },
@@ -678,7 +702,8 @@
                 "majorValue": "> primary | seriesByName(\"source_pending\") | lastPoint()",
                 "sparklineDisplay": "off",
                 "trendDisplay": "off"
-            }
+            },
+            "description": "How many expected sources (single files or inputs) have no trusted status yet. Guide: docs/data-health/dashboards.md, Overview > KPI tiles"
         }
     },
     "layout": {

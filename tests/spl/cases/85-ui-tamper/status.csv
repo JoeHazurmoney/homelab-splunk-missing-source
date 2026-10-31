@@ -1,3 +1,4 @@
-entity_id,site,owner,criticality,status,host_rollup,description
-host|*|h1|*|*,lab,ops,1,OK,OK,pc
-host|*|h3|*|*,home,ops,2,MISSING,DOWN,vm
+entity_id,site,owner,index,criticality,status,host_rollup,description,cause,evaluated_at
+host|*|h1|*|*,lab,ops,*,1,OK,OK,pc,,NOW
+host|*|h3|*|*,home,ops,*,2,MISSING,DOWN,vm,,NOW-60
+host|*|h5|*|*,lab,ops,*,1,OK,OK,retired,,NOW-1000

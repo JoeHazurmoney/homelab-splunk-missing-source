@@ -1,6 +1,6 @@
 entity_id,status,cause_code,action,host_rollup
-host|*|pi5|*|*,MISSING,host_no_data,check pi5 and its syslog path,DOWN
-sourcetype|linux|pi5|syslog|*,MISSING,host_no_data,check pi5 and its syslog path,DOWN
-host|*|udm|*|*,MISSING,relay_down,fix the relay pi5 first,DOWN
-sourcetype|network|udm|unifi:syslog|*,MISSING,relay_down,fix the relay pi5 first,DOWN
-sourcetype|network|udm|hl:devprobe|*,MISSING,relay_down,fix the relay pi5 first,DOWN
+host|*|pi5|*|*,MISSING,host_no_data,Check pi5 and its syslog path,DOWN
+sourcetype|linux|pi5|syslog|*,MISSING,host_no_data,Check pi5 and its syslog path,DOWN
+host|*|udm|*|*,MISSING,relay_down,Fix the relay pi5 first,DOWN
+sourcetype|network|udm|unifi:syslog|*,MISSING,relay_down,Fix the relay pi5 first,DOWN
+sourcetype|network|udm|hl:devprobe|*,MISSING,relay_down,Fix the relay pi5 first,DOWN

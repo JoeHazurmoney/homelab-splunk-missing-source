@@ -2,5 +2,5 @@ entity_id,status,cause_code,action,host_rollup,liveness
 host|*|pi5|*|*,OK,,,OK,data
 sourcetype|linux|pi5|syslog|*,OK,,,OK,
 host|*|udm|*|*,OK,,,DEGRADED,probe
-sourcetype|network|udm|unifi:syslog|*,MISSING,probe_no_logs,check the remote syslog settings on udm,DEGRADED,
+sourcetype|network|udm|unifi:syslog|*,MISSING,probe_no_logs,Check the remote syslog settings on udm,DEGRADED,
 sourcetype|network|udm|hl:devprobe|*,OK,,,DEGRADED,

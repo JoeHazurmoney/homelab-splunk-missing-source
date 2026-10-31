@@ -5,6 +5,6 @@ main,3,g1,DEGRADED,NEVER_SEEN,2: linux_audit (linux): NEVER_SEEN; linux_secure (
 main,4,t1,DEGRADED,LATE,6: st1 st1: LATE; st2 st2: LATE; st3 st3: LATE; st4 st4: LATE; st5 st5: LATE; ...,2033-05-18 03:32,00:00:50,4,late,x,,,
 h_main,,,,,,,,,,,,4 hosts need attention,3
 h_ok,,,,,,,,,,,,All expected data is arriving,0
-h_gate,,,,,,,,,,,,Status on hold: see the banner (no alerts while the gate is closed),2
+h_gate,,,,,,,,,,,,On hold (see the banner above): no host is listed and no alerts fire until statuses refresh,2
 h_one,,,,,,,,,,,,1 host needs attention,3
 h_none,,,,,,,,,,,,All expected data is arriving,0
