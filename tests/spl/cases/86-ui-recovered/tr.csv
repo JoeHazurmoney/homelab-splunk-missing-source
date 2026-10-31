@@ -1,0 +1,8 @@
+time,entity_id,dh_host,status,prev_status
+NOW-7200,sourcetype|linux|h1|syslog|*,h1,LATE,OK
+NOW-3600,sourcetype|linux|h1|syslog|*,h1,OK,LATE
+NOW-1800,sourcetype|linux|h2|syslog|*,h2,MISSING,OK
+NOW-100000,sourcetype|linux|h3|syslog|*,h3,MISSING,OK
+NOW-90000,sourcetype|linux|h3|syslog|*,h3,OK,MISSING
+NOW-500,host|*|h4|*|*,,MISSING,OK
+NOW-100,host|*|h4|*|*,,OK,MISSING

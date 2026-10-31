@@ -1,0 +1,5 @@
+| `dh_ui_banner(@meta@, @status@, @NOW@)` | eval c="fine"
+| append [| `dh_ui_banner(@stale@, @status@, @NOW@)` | eval c="stale"]
+| append [| `dh_ui_banner(@resume@, @status@, @NOW@)` | eval c="resume"]
+| append [| `dh_ui_banner(@meta@, @oldstatus@, @NOW@)` | eval c="evalstale"]
+| append [| `dh_ui_banner(@none@, @nostatus@, @NOW@)` | eval c="nothing"]

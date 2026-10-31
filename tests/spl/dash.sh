@@ -1,0 +1,249 @@
+#!/usr/bin/env bash
+# Dashboard tests for hl_data_health (spec §7.8, §8; task 12), against the deployed app on the local
+# wd2l-splunk container. Each mode takes the SPL straight from the view definitions
+# (dash_check.py queries), so it tests what the dashboards run.
+#
+#   panels         every read-only data source of every view (Host detail and Manage on a real
+#                  host): no search errors, and each drilldown source returns the field it passes on.
+#   load [hosts]   the 300-host fixture (gen-scale.sh) evaluated into throwaway KV collections, then
+#                  the Overview's searches run at once against them: the load (first dispatch to
+#                  last result) must be under 3 s, and the KPIs and Needs attention must match the
+#                  generated mix.
+#   writes         the Manage writes end to end on throwaway KV collections and a throwaway CSV:
+#                  preview -> confirm -> apply, the stored rows, the admin log, the k-first test-block
+#                  file with the raw source, and that a repeated or stale confirmation applies nothing.
+#
+# Throwaway collections, lookup definitions and files are named dhtest_* and removed on exit.
+# Usage: tests/spl/dash.sh panels | load [hosts] | writes
+# shellcheck disable=SC2016  # backticks here are Splunk macro calls, not shell expansions
+set -euo pipefail
+here=$(cd "$(dirname "$0")" && pwd)
+# shellcheck source=tests/spl/run.sh
+. "$here/run.sh"
+
+KV_MADE=""
+dash_cleanup() {
+  local c
+  for c in $KV_MADE; do
+    dh_curl -o /dev/null -X DELETE "$DH_MGMT/servicesNS/nobody/$DH_APP/data/transforms/lookups/$c"
+    dh_curl -o /dev/null -X DELETE "$DH_MGMT/servicesNS/nobody/$DH_APP/storage/collections/config/$c"
+  done
+  # The REST deletes leave empty local/ files behind.
+  # shellcheck disable=SC2016  # expanded inside the container
+  [ -z "$KV_MADE" ] || dh_docker exec -u root "$DH_CONTAINER" sh -c 'for f in "$1"/local/collections.conf "$1"/local/transforms.conf; do [ -s "$f" ] || rm -f "$f"; done' sh "$DH_APP_DIR"
+  cleanup
+}
+trap dash_cleanup EXIT
+
+# kv_make <name> <like>: a throwaway KV collection and lookup definition with the fields of <like>.
+kv_make() {
+  local name=$1 fields code
+  fields=$(conf_lines "$here/../../splunk/apps/$DH_APP/default/transforms.conf" | grep -F "|[$2]|fields_list = " | sed 's/.*fields_list = //')
+  KV_MADE="$KV_MADE $name"
+  code=$(dh_curl -o "$work/kv.out" -w '%{http_code}' "$DH_MGMT/servicesNS/nobody/$DH_APP/storage/collections/config" -d "name=$name")
+  case $code in 200 | 201 | 409) ;; *) echo "kv_make $name: collection $code" >&2; return 1 ;; esac
+  code=$(dh_curl -o "$work/kv.out" -w '%{http_code}' "$DH_MGMT/servicesNS/nobody/$DH_APP/data/transforms/lookups" \
+    -d "name=$name" -d external_type=kvstore -d "collection=$name" --data-urlencode "fields_list=$fields")
+  case $code in 200 | 201 | 409) ;; *) echo "kv_make $name: lookup $code" >&2; return 1 ;; esac
+  # The KV service creates a collection added to an existing app only on this reload (task 11).
+  dh_curl -o "$work/kv.out" -X POST "$DH_MGMT/servicesNS/nobody/$DH_APP/storage/collections/config/_reload"
+}
+
+# job <spl> [mode]: a search job; prints its sid (mode normal: at once; blocking: when done).
+job() {
+  dh_curl "$DH_MGMT/servicesNS/admin/$DH_APP/search/jobs" -d "exec_mode=${2:-blocking}" -d output_mode=json \
+    --data-urlencode "search=$1" | grep -o '"sid":"[^"]*"' | cut -d'"' -f4
+}
+job_info() { dh_curl "$DH_MGMT/servicesNS/admin/$DH_APP/search/jobs/$1?output_mode=json"; }
+job_field() { printf '%s' "$1" | grep -o "\"$2\":[^,}]*" | head -1 | cut -d: -f2- | tr -d '"'; }
+job_errors() { printf '%s' "$1" | grep -o '"type":"\(ERROR\|FATAL\)","text":"[^"]*"' | sed 's/.*"text":"//; s/"$//' | sort -u || true; }
+job_csv() { dh_curl "$DH_MGMT/servicesNS/admin/$DH_APP/search/jobs/$1/results?output_mode=csv&count=0"; }
+job_del() { dh_curl -o /dev/null -X DELETE "$DH_MGMT/servicesNS/admin/$DH_APP/search/jobs/$1"; }
+
+# queries <view> [tok=value ...]: "ds<TAB>spl" lines from the view's definition.
+queries() { dash queries "$DH_APP_DIR" "$@" | tr -d '\r'; }
+
+# first <spl>: the first value of the first column of a search's results.
+first() { dh_search "$1" csv | tr -d '\r' | sed -n '2p' | cut -d, -f1 | tr -d '"'; }
+
+########## panels
+panels() {
+  local fail=0 view ds spl sid info errs rows dur host unreg args drill note f
+  host=$(first '| `dh_ui_status(dh_status)` | where level=="host" | stats count by host | table host')
+  unreg=$(first '| `dh_ui_unregistered(dh_expected, dh_state_fast, dh_state_slow, dh_baseline, now())` | table entity_id')
+  echo "panels: host=$host unregistered=${unreg:-none}"
+  # The drilldown sources and the field each passes to Host detail (dash_check prints them).
+  drill=$(dash check "$DH_APP_DIR" | sed -n 's/^drilldown \([a-z_]*\)\.[a-z_]* -> .*=<\([a-z_]*\)> from \([a-z_]*\)$/\1.\3 \2/p')
+  for view in dh_overview dh_host dh_manage dh_soh; do
+    args=()
+    case $view in
+      dh_host) args=("host=$host") ;;
+      dh_manage) args=("ov_host=$host" "ov_entity=host|*|$host|*|*" "bk_host=$host" "m_reason=panel check" "ex_host=dhtest-panel" "ad_entity=${unreg:-sourcetype|linux|dhtest-panel|syslog|*}") ;;
+    esac
+    while IFS=$'\t' read -r ds spl; do
+      case $spl in "#unset"*) echo "SKIP $view.$ds (${spl#\#}: a write waits for its confirmation)"; continue ;; esac
+      sid=$(job "$spl")
+      info=$(job_info "$sid")
+      errs=$(job_errors "$info" | grep -v 'hl_ingest_block' || true)
+      rows=$(job_field "$info" resultCount)
+      dur=$(job_field "$info" runDuration)
+      if [ -n "$errs" ]; then
+        echo "FAIL $view.$ds: $errs"
+        fail=1
+      else
+        note=""
+        if job_errors "$info" | grep -q hl_ingest_block; then note=" (hl_ingest_block is not defined yet: task 3)"; fi
+        echo "PASS $view.$ds rows=$rows ${dur}s$note"
+      fi
+      f=$(printf '%s\n' "$drill" | awk -v k="$view.$ds" '$1 == k { print $2 }')
+      if [ -n "$f" ] && [ "${rows:-0}" -eq 0 ]; then
+        echo "  ($view.$ds has no rows here: its drilldown field is covered by the fixture cases)"
+      elif [ -n "$f" ] && ! job_csv "$sid" | head -1 | tr -d '"\r' | tr ',' '\n' | grep -qx "$f"; then
+        echo "FAIL $view.$ds: drilldown field '$f' is not in its results"
+        fail=1
+      fi
+      job_del "$sid"
+    done < <(queries "$view" "${args[@]}")
+  done
+  [ "$fail" -eq 0 ] && echo "panels: PASS"
+  [ "$fail" -eq 0 ]
+}
+
+########## load
+load() {
+  local hosts=${1:-300} dir="$work/scale_src" id=scale ds spl sids="" sid t0 t1 wall ok=1 n info dur maxdur=0 got want
+  mkdir -p "$dir"
+  bash "$here/gen-scale.sh" "$hosts" "$dir"
+  upload "$id" "$dir"
+  kv_make dhtest_kv_status dh_status
+  kv_make dhtest_kv_meta dh_meta
+  # The evaluator over the fixture, into KV (a full replace), and a current tracker row.
+  sid=$(job "$(eval_call "$id") | outputlookup dhtest_kv_status | stats count")
+  n=$(job_csv "$sid" | tr -d '"\r' | sed -n 2p); job_del "$sid"
+  sid=$(job '| makeresults | eval name="tracker_fast", _key=name, last_run=now(), last_rx=now(), resumed_at=now()-86400 | fields _key name last_run last_rx resumed_at | outputlookup dhtest_kv_meta')
+  job_del "$sid"
+  echo "load: $n dh_status rows in KV (dhtest_kv_status) for $hosts hosts"
+  # The Overview's data sources against the KV copies, dispatched in parallel as the browser does
+  # (chains joined to their base, so each runs whole: an upper bound). The load is the wall time
+  # from the first dispatch to the last result, including this client's REST round trips.
+  local names=() spls=()
+  while IFS=$'\t' read -r ds spl; do
+    names+=("$ds")
+    spls+=("$(printf '%s' "$spl" | sed 's/\<dh_status\>/dhtest_kv_status/g; s/\<dh_meta\>/dhtest_kv_meta/g')")
+  done < <(queries dh_overview)
+  t0=$(date +%s%N)
+  for n in "${!names[@]}"; do job "${spls[$n]}" >"$work/sid.${names[$n]}" & done
+  wait
+  t1=$(date +%s%N)
+  for ds in "${names[@]}"; do sids="$sids $ds=$(cat "$work/sid.$ds")"; done
+  wall=$(awk -v a="$t0" -v b="$t1" 'BEGIN { printf "%.2f", (b - a) / 1e9 }')
+  for sid in $sids; do
+    info=$(job_info "${sid#*=}")
+    dur=$(job_field "$info" runDuration)
+    maxdur=$(awk -v a="$maxdur" -v b="$dur" 'BEGIN { print (b > a) ? b : a }')
+    if [ -n "$(job_errors "$info")" ]; then echo "load: FAIL ${sid%%=*}: $(job_errors "$info")"; ok=0; fi
+    printf 'load: %-14s %5ss  rows=%s\n' "${sid%%=*}" "$dur" "$(job_field "$info" resultCount)"
+  done
+  # Results: the KPIs and the number of hosts needing attention follow the generator's mix.
+  got=$(job_csv "$(cat "$work/sid.ds_kpi")" | tr -d '"\r' | awk -F, 'NR == 1 { for (i = 1; i <= NF; i++) c[$i] = i } NR == 2 { print $c["hosts"], $c["missing"], $c["muted"] }')
+  want="$hosts $(scale_want "$hosts" | awk '$1 == "MISSING" { m = $2 } $1 == "MUTED" { u = $2 } END { print m + 0, u + 0 }')"
+  if [ "$got" != "$want" ]; then echo "load: FAIL KPIs (hosts missing muted) got '$got' want '$want'"; ok=0; fi
+  got=$(job_csv "$(cat "$work/sid.ds_attention")" | tail -n +2 | grep -c . || true)
+  want=$(awk -v n="$hosts" 'BEGIN { for (i = 1; i <= n; i++) if (i % 50 && (i % 10 == 0 || i % 7 == 0 || i % 11 == 0)) c++; print c + 0 }')
+  if [ "$got" != "$want" ]; then echo "load: FAIL Needs attention has $got hosts, want $want"; ok=0; fi
+  for sid in $sids; do job_del "${sid#*=}"; done
+  echo "load: Overview loaded in ${wall}s (slowest search ${maxdur}s; limit 3 s)"
+  if ! awk -v w="$wall" 'BEGIN { exit !(w < 3) }'; then echo "load: FAIL too slow"; ok=0; fi
+  [ "$ok" -eq 1 ] && echo "load: PASS"
+  [ "$ok" -eq 1 ]
+}
+
+########## writes
+# w_run <ds> <tok=value ...>: run one Manage data source with the throwaway lookups; prints CSV.
+w_run() {
+  local ds=$1 spl
+  shift
+  spl=$(queries dh_manage "$@" | awk -F'\t' -v d="$ds" '$1 == d { print $2 }')
+  case $spl in "" | "#"*) echo "w_run: $ds not runnable: $spl" >&2; return 1 ;; esac
+  spl=$(printf '%s' "$spl" | sed 's/\<dh_overrides\>/dhtest_kv_overrides/g; s/\<dh_admin_log\>/dhtest_kv_admin_log/g; s/\<dh_expected\>/dhtest_kv_expected/g; s/\<hl_ingest_block\>/dhtest_w_blocks.csv/g')
+  if [ -n "${DH_DEBUG:-}" ]; then dh_search "$spl" xml | grep -o '<msg[^<]*' | sed "s/^/  $ds: /" >&2 || true; fi
+  dh_search "$spl" csv | tr -d '\r'
+}
+col() { awk -F, -v n="$1" 'NR == 1 { for (i = 1; i <= NF; i++) { gsub(/"/, "", $i); c[$i] = i } next } { v = $c[n]; gsub(/"/, "", v); print v }'; }
+expect() { # expect <label> <got> <want-regex>
+  if printf '%s' "$2" | grep -Eq -- "$3"; then echo "PASS $1"; else echo "FAIL $1: got '$2', want /$3/"; WFAIL=1; fi
+}
+kv_get() { dh_search "| inputlookup $1 | $2" csv | tr -d '\r'; }
+
+writes() {
+  WFAIL=0
+  local ov tok res ex ad bk file
+  kv_make dhtest_kv_overrides dh_overrides
+  kv_make dhtest_kv_admin_log dh_admin_log
+  kv_make dhtest_kv_expected dh_expected
+  ov=("ov_host=dhtest-w1" "ov_entity=host|*|dhtest-w1|*|*" "ov_action=mute" "ov_duration=3600" "m_reason=writes test" "m_ticket=CHG-12")
+  # Override: preview, then apply with the previewed token.
+  tok=$(w_run ds_ov_plan "${ov[@]}" | col dh_token)
+  expect "override preview gives a token" "$tok" '^[0-9a-f]{32}$'
+  res=$(w_run ds_ov_apply "${ov[@]}" "ov_confirm=$tok" | col result)
+  expect "override applied" "$res" '^applied: override_mute host\|\*\|dhtest-w1\|\*\|\*$'
+  res=$(kv_get dhtest_kv_overrides 'eval ok=if(mute_until>now()+3500 AND mute_until<=now()+3600, 1, 0) | table _key ok reason ticket set_by')
+  expect "override row (key, expiry, reason, ticket, set_by)" "$(printf '%s' "$res" | sed -n 2p)" '^"host\|\*\|dhtest-w1\|\*\|\*",1,"writes test","CHG-12",admin$'
+  res=$(w_run ds_ov_apply "${ov[@]}" "ov_confirm=$tok" | col result)
+  expect "override repeat (reload) applies nothing" "$res" '^nothing applied'
+  res=$(w_run ds_ov_apply "${ov[@]}" "ov_confirm=0123456789abcdef0123456789abcdef" | col result)
+  expect "override with a wrong confirmation applies nothing" "$res" '^nothing applied'
+  ov[2]="ov_action=unmute"
+  tok=$(w_run ds_ov_plan "${ov[@]}" | col dh_token)
+  res=$(w_run ds_ov_apply "${ov[@]}" "ov_confirm=$tok" | col result)
+  expect "unmute applied" "$res" '^applied: override_unmute'
+  res=$(kv_get dhtest_kv_overrides 'eval m=coalesce(mute_until, "none") | table m')
+  expect "unmute cleared mute_until" "$(printf '%s' "$res" | sed -n 2p)" '^none$'
+  res=$(kv_get dhtest_kv_admin_log 'stats count, values(action) as a | eval a=mvjoin(a, " ") | table count a')
+  expect "admin log: one row per applied change" "$(printf '%s' "$res" | sed -n 2p)" '^2,"override_mute override_unmute"$'
+  # Expected row: add, and a repeat.
+  ex=("ex_level=sourcetype" "ex_index=linux" "ex_host=DHTEST-W2.mshome.net" "ex_sourcetype=syslog" "ex_profile=continuous" "m_reason=writes test")
+  tok=$(w_run ds_ex_plan "${ex[@]}" | col dh_token)
+  res=$(w_run ds_ex_apply "${ex[@]}" "ex_confirm=$tok" | col result)
+  expect "expected row applied" "$res" '^applied: expected_add sourcetype\|linux\|dhtest-w2\|syslog\|\*$'
+  res=$(kv_get dhtest_kv_expected 'eval es=if(abs(expected_since-now())<120, "now", expected_since) | table _key host managed_by enabled profile collection criticality es')
+  expect "expected row stored" "$(printf '%s' "$res" | sed -n 2p)" '^"sourcetype\|linux\|dhtest-w2\|syslog\|\*","?dhtest-w2"?,ui,1,continuous,uf,2,now$'
+  res=$(w_run ds_ex_apply "${ex[@]}" "ex_confirm=$tok" | col result)
+  expect "expected row repeat applies nothing" "$res" '^nothing applied'
+  # Adopt.
+  ad=("ad_entity=sourcetype|linux|dhtest-w3|cpu|*" "ad_crit=3" "m_reason=writes test")
+  tok=$(w_run ds_ad_plan "${ad[@]}" | col dh_token)
+  res=$(w_run ds_ad_apply "${ad[@]}" "ad_confirm=$tok" | col result)
+  expect "adopt applied" "$res" '^applied: expected_adopt sourcetype\|linux\|dhtest-w3\|cpu\|\*$'
+  res=$(kv_get dhtest_kv_expected 'search host=dhtest-w3 | table managed_by profile collection criticality')
+  expect "adopted row stored" "$(printf '%s' "$res" | sed -n 2p)" '^ui,continuous,syslog,3$'
+  # Test block on an exact raw source: the file is rewritten with k first and the raw source in k.
+  bk=("bk_action=add" "bk_host=dhtest-w4" "bk_level=source" "bk_target=linux_secure|/var/log/secure.1" "bk_duration=900" "m_reason=writes test")
+  res=$(w_run ds_bk_plan "${bk[@]}" | col source_norm)
+  expect "block preview shows the normalized source" "$res" '^/var/log/secure\.\*$'
+  tok=$(w_run ds_bk_plan "${bk[@]}" | col dh_token)
+  res=$(w_run ds_bk_apply "${bk[@]}" "bk_confirm=$tok" | col result)
+  expect "block applied" "$res" '^applied: block_add dhtest-w4\|linux_secure\|/var/log/secure\.1$'
+  file=$(dh_docker exec -u root "$DH_CONTAINER" sh -c "cat $DH_APP_DIR/lookups/dhtest_w_blocks.csv" | tr -d '\r')
+  expect "block file header is k first" "$(printf '%s\n' "$file" | sed -n 1p)" '^k,until,reason,"?set_by"?$'
+  expect "block row keys the raw source" "$(printf '%s\n' "$file" | sed -n 2p)" '^"?dhtest-w4\|linux_secure\|/var/log/secure\.1"?,[0-9]+,"?writes test"?,"?admin"?$'
+  res=$(w_run ds_bk_apply "${bk[@]}" "bk_confirm=$tok" | col result)
+  expect "block repeat applies nothing" "$res" '^nothing applied'
+  bk[0]="bk_action=remove"
+  tok=$(w_run ds_bk_plan "${bk[@]}" | col dh_token)
+  res=$(w_run ds_bk_apply "${bk[@]}" "bk_confirm=$tok" | col result)
+  expect "block removed" "$res" '^applied: block_remove'
+  file=$(dh_docker exec -u root "$DH_CONTAINER" sh -c "cat $DH_APP_DIR/lookups/dhtest_w_blocks.csv" | tr -d '\r')
+  expect "last block removed leaves the placeholder" "$(printf '%s\n' "$file" | sed -n 1,2p | tr '\n' ' ')" '^k,until,reason,"?set_by"? "?-"?,0,'
+  res=$(kv_get dhtest_kv_admin_log 'stats count')
+  expect "admin log: every applied change, nothing for the refused ones" "$(printf '%s' "$res" | sed -n 2p)" '^6$'
+  [ "$WFAIL" -eq 0 ] && echo "writes: PASS"
+  [ "$WFAIL" -eq 0 ]
+}
+
+case ${1:-} in
+  panels) panels ;;
+  load) load "${2:-300}" ;;
+  writes) writes ;;
+  *) echo "usage: $0 panels | load [hosts] | writes" >&2; exit 2 ;;
+esac

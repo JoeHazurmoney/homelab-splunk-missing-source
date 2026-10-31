@@ -1,0 +1,9 @@
+c,dh_action,level,host,target,dh_secs,reason,actor,actor_roles
+b1,add,host,h1.mshome.net,-,3600,retest,taylor,admin
+b2,add,sourcetype,H4,linux_secure|*,900,r,taylor,admin
+b3,add,source,h5,linux_audit|/var/log/audit/audit.log.1,60,r,taylor,dh_admin
+b4,remove,sourcetype,h2,syslog|*,,r,taylor,admin
+b5,remove,source,h3,cpu|cpu,,r,taylor,admin
+b6,add,host,h1,-,90000,r,taylor,admin
+b7,add,host,h1,-,3600,r,ana,dh_analyst
+b8,add,source,h5,linux_audit|*,60,r,taylor,admin

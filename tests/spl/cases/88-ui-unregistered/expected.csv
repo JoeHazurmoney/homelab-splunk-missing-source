@@ -1,0 +1,4 @@
+entity_id,level,index,host,sourcetype,source,profile,interval_secs,max_gap_secs,managed_by,enabled
+host|*|u1|*|*,host,,u1,,,heartbeat,,,ansible,1
+source|linux|u1|linux_secure|/var/log/secure,source,linux,u1,linux_secure,/var/log/secure,sporadic,,7200,ansible,1
+sourcetype|linux|u2|cpu|*,sourcetype,linux,u2,cpu,,periodic,30,,ui,0

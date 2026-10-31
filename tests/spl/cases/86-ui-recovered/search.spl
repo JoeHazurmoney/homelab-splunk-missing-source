@@ -1,0 +1,1 @@
+| inputlookup @tr@ | eval _time=tonumber(time) | fields - time | `dh_ui_recovered(@status@, @NOW@)` | streamstats count as pos

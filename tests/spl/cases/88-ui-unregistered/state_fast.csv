@@ -1,0 +1,5 @@
+index,host,sourcetype,source,first_seen,last_indextime
+linux,u1,syslog,/var/log/messages,NOW-90000,NOW-60
+linux,u1,linux_secure,/var/log/secure,NOW-90000,NOW-60
+linux,U2.mshome.net,cpu,cpu,NOW-1000,NOW-30
+linux,u3,ps,ps,NOW-900000,NOW-700000

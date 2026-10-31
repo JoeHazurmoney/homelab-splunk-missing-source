@@ -1,0 +1,7 @@
+entity_id,level,index,host,sourcetype,source,status,host_rollup,criticality,owner,site,description,cause,evaluated_at
+host|*|a1|*|*,host,*,a1,*,*,OK,DEGRADED,1,ops,lab,,,NOW
+sourcetype|linux|a1|syslog|*,sourcetype,linux,a1,syslog,*,LATE,DEGRADED,2,ops,lab,messages,stream stopped,NOW
+sourcetype|windows|b1|XmlWinEventLog|*,sourcetype,windows,b1,XmlWinEventLog,*,MISSING,DOWN,1,sec,home,Security log,heartbeat missing,NOW-60
+host|*|b1|*|*,host,*,b1,*,*,MISSING,DOWN,1,sec,home,,heartbeat missing,NOW-60
+sourcetype|linux|old|syslog|*,sourcetype,linux,old,syslog,*,MISSING,DOWN,1,ops,lab,retired,,NOW-151
+sourcetype|linux|c1|cpu|*,sourcetype,linux,c1,cpu,*,OK,OK,3,ops,,,,NOW-150

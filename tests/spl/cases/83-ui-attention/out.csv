@@ -1,0 +1,8 @@
+c,pos,host,state,worst,children,since,duration,criticality,cause,action,runbook
+main,1,d1,DOWN,MISSING,2: cpu (linux): LATE; syslog (linux): MISSING,2033-05-18 03:23,00:10:00,1,heartbeat missing,ping d1,rb/d1
+main,2,g2,DEGRADED,MISSING,1: syslog (linux): MISSING,2033-05-18 03:31,00:01:40,1,stream stopped,check sender,
+main,3,g1,DEGRADED,NEVER_SEEN,2: linux_audit (linux): NEVER_SEEN; linux_secure (linux): LATE,2033-05-18 01:33,02:00:00,2,never arrived,deploy audit,rb/g1
+main,4,t1,DEGRADED,LATE,6: st1 st1: LATE; st2 st2: LATE; st3 st3: LATE; st4 st4: LATE; st5 st5: LATE; ...,2033-05-18 03:32,00:00:50,4,late,x,
+ok,0,,All expected data is arriving,,,,,,,,
+gate,0,,Status on hold: see the banner (no alerts while the gate is closed),,,,,,,,
+none,0,,All expected data is arriving,,,,,,,,

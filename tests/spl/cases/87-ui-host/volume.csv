@@ -1,0 +1,3 @@
+entity_id,ratio,flagged,note
+host|*|h7|*|*,,0,median below 100
+sourcetype|linux|h7|syslog|*,0.1,1,

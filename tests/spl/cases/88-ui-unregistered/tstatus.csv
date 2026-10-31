@@ -1,0 +1,5 @@
+entity_id,profile,threshold_secs,threshold_origin,threshold_note
+sourcetype|linux|u1|syslog|*,continuous,900,default,profile default (continuous)
+host|*|u1|*|*,heartbeat,90,default,profile default (heartbeat)
+source|linux|u1|linux_secure|/var/log/secure,sporadic,7200,max_gap_secs,max_gap_secs from the expected row
+sourcetype|linux|u2|cpu|*,periodic,120,default,profile default (periodic)

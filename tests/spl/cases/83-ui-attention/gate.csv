@@ -1,0 +1,2 @@
+entity_id,level,index,host,sourcetype,source,status,host_rollup,since,criticality,cause,cause_code
+sourcetype|linux|o1|syslog|*,sourcetype,linux,o1,syslog,*,PENDING,PENDING,NOW-50,1,trackers stale,gate_stale

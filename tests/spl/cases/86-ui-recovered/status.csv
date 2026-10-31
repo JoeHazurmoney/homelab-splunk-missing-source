@@ -1,0 +1,5 @@
+entity_id,status
+sourcetype|linux|h1|syslog|*,OK
+sourcetype|linux|h2|syslog|*,MISSING
+sourcetype|linux|h3|syslog|*,OK
+host|*|h4|*|*,OK

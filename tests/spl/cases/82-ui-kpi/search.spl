@@ -1,0 +1,2 @@
+| inputlookup @status@ | `dh_ui_kpi` | eval c="full"
+| append [| inputlookup @status@ | where 1==0 | `dh_ui_kpi` | eval c="empty"]

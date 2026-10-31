@@ -1,0 +1,4 @@
+entity_id,managed_by,enabled,expected_since,profile,criticality,interval_secs,collection,owner,site
+sourcetype|linux|h5|syslog|*,ansible,1,NOW-9000,continuous,2,,uf,ops,lab
+sourcetype|linux|h6|syslog|*,ui,1,NOW-5000,sporadic,3,,uf,ops,lab
+sourcetype|linux|h7|syslog|*,ansible,0,NOW-9000,continuous,2,,uf,ops,lab
