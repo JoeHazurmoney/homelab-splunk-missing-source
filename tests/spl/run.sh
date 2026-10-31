@@ -234,6 +234,20 @@ dash_static() {
   return 1
 }
 
+# Coverage of docs/data-health (task 12d): every macro and every panel and input is documented, and
+# the documents name nothing that no longer exists. The docs are copied into the container for it.
+docs_check() {
+  local docs="$here/../../docs/data-health" rc=0
+  dh_docker exec -u root "$DH_CONTAINER" rm -rf /tmp/dh_docs
+  dh_docker cp "$(dh_hostpath "$docs")" "$DH_CONTAINER:/tmp/dh_docs"
+  dh_docker exec -u root "$DH_CONTAINER" chmod -R a+rX /tmp/dh_docs
+  dash docs "$DH_APP_DIR" /tmp/dh_docs >"$work/docs.out" || rc=1
+  dh_docker exec -u root "$DH_CONTAINER" rm -rf /tmp/dh_docs
+  sed 's/^/  /' "$work/docs.out"
+  if [ "$rc" -eq 0 ]; then echo "PASS docs-coverage"; else echo "FAIL docs-coverage"; fi
+  return "$rc"
+}
+
 run_cases() {
   local pattern=${1:-*} pass=0 fail=0 dir name id ok
   if [ "$pattern" = "*" ]; then
@@ -241,6 +255,7 @@ run_cases() {
     if static_names_check; then pass=$((pass + 1)); else fail=$((fail + 1)); fi
     if conf_check; then pass=$((pass + 1)); else fail=$((fail + 1)); fi
     if dash_static; then pass=$((pass + 1)); else fail=$((fail + 1)); fi
+    if docs_check; then pass=$((pass + 1)); else fail=$((fail + 1)); fi
   fi
   for dir in "$here"/cases/$pattern/; do
     [ -f "$dir/out.csv" ] || continue

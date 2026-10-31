@@ -1,6 +1,6 @@
 c,sev,banner
-fine,0,Receiving: trackers and evaluator are current
-stale,3,Trackers stale: DH Tracker fast last ran 300 s ago (statuses held as PENDING) / Splunk not receiving: nothing indexed for 400 s (check the container and its ports)
-resume,2,Resuming after a gap at 2033-05-18 03:31: statuses held for 5 min
-evalstale,3,DH Evaluate last ran 400 s ago: statuses are stale
-nothing,3,Trackers stale: DH Tracker fast has never run / Splunk not receiving: nothing indexed yet / DH Evaluate has not written any status
+fine,0,Up to date: data is arriving and statuses were refreshed at 03:33
+stale,3,On hold: the arrival tracker (DH Tracker fast) last ran 300 s ago; Splunk has indexed nothing new for 400 s. Statuses show PENDING and no alerts fire.
+resume,2,Catching up: Splunk or the PC paused and resumed at 03:31 (sleep or restart). Statuses show PENDING for 5 min and no alerts fire.
+evalstale,3,Out of date: the status search (DH Evaluate) last ran 400 s ago. The statuses below may be old.
+nothing,3,On hold: the arrival tracker (DH Tracker fast) has never run; Splunk has indexed nothing yet; the status search (DH Evaluate) has not run yet. Statuses show PENDING and no alerts fire.
