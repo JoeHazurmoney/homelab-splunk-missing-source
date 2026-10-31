@@ -290,7 +290,7 @@ run_scale() {
   bash "$here/gen-scale.sh" "$hosts" "$dir"
   upload "$id" "$dir"
   echo "scale: $(($(wc -l <"$dir/expected.csv") - 1)) expected rows, $(($(wc -l <"$dir/state_fast.csv") - 1)) state rows"
-  sid=$(dh_curl "$DH_MGMT/servicesNS/admin/$DH_APP/search/jobs" -d exec_mode=blocking -d output_mode=json \
+  sid=$(dh_curl "$DH_MGMT/servicesNS/admin/$DH_APP/search/jobs" -d "tz=$DH_TZ" -d exec_mode=blocking -d output_mode=json \
     --data-urlencode "search=$(eval_call "$id") | stats count by status" | grep -o '"sid":"[^"]*"' | cut -d'"' -f4)
   json=$(dh_curl "$DH_MGMT/servicesNS/admin/$DH_APP/search/jobs/$sid?output_mode=json")
   dur=$(printf '%s' "$json" | grep -o '"runDuration":[0-9.]*' | head -1 | cut -d: -f2)

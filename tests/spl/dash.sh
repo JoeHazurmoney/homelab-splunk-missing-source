@@ -52,7 +52,7 @@ kv_make() {
 
 # job <spl> [mode]: a search job; prints its sid (mode normal: at once; blocking: when done).
 job() {
-  dh_curl "$DH_MGMT/servicesNS/admin/$DH_APP/search/jobs" -d "exec_mode=${2:-blocking}" -d output_mode=json \
+  dh_curl "$DH_MGMT/servicesNS/admin/$DH_APP/search/jobs" -d "tz=$DH_TZ" -d "exec_mode=${2:-blocking}" -d output_mode=json \
     --data-urlencode "search=$1" | grep -o '"sid":"[^"]*"' | cut -d'"' -f4
 }
 job_info() { dh_curl "$DH_MGMT/servicesNS/admin/$DH_APP/search/jobs/$1?output_mode=json"; }
