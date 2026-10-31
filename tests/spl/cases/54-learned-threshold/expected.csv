@@ -1,0 +1,11 @@
+entity_id,profile,interval_secs,max_gap_secs
+t1,continuous,,
+t2,continuous,,
+t3,continuous,,
+t4,sporadic,,
+t5,sporadic,,
+t6,sporadic,,
+t7,continuous,,
+t8,continuous,,
+t9,continuous,,
+t10,heartbeat,,

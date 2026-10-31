@@ -1,0 +1,7 @@
+host,code,bucket,time,events,suppressed,marker_action,marker_time,marker_run_id,updated,dh_new
+ha,win1102,NOW-1100,NOW-1000,3,0,,,,NOW,1
+ha,win1102,NOW-1400,NOW-1101,1,0,,,,NOW,1
+hb,win7036,NOW-3200,NOW-3200,1,1,stop,NOW-3000,r1,NOW,1
+hc,svcstop_auditd,NOW-5000,NOW-5000,1,1,apps,NOW-5900,r3,NOW,1
+hd,svcstop_auditd,NOW-5000,NOW-5000,1,0,,,,NOW,1
+hh,svcstop_auditd,NOW-604100,NOW-604000,1,1,stop,NOW-604500,r6,NOW,1

@@ -1,0 +1,3 @@
+c,entity_id,status
+orphans,host|*|h78|*|*,OK
+orphans,sourcetype|linux|h78|syslog|*,OK

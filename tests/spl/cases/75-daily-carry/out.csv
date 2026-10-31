@@ -1,0 +1,9 @@
+record,day,entity_id,count,max_gap_secs,open_gap_secs
+day,NOW-272000,,,,
+day,NOW-185600,,,,
+day,NOW-99200,,,,
+entity,NOW-272000,sourcetype|enclave1|h75a|syslog|*,0,129540,129540
+entity,NOW-185600,sourcetype|enclave1|h75a|syslog|*,0,215940,215940
+entity,NOW-99200,sourcetype|enclave1|h75a|syslog|*,1,259140,43140
+entity,NOW-99200,source|enclave1|h75a|syslog|/var/log/messages,1,43200,43140
+entity,NOW-99200,host|*|h75a|*|*,1,43200,43140

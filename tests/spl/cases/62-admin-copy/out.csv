@@ -1,0 +1,6 @@
+c,_time,actor,action,entity_id,reason,ticket
+hwm,NOW-3000,taylorb,mute,host|*|h2|*|*,maint,CHG-2
+hwm,NOW-100,taylorb,unmute,host|*|h2|*|*,done,CHG-2
+first,NOW-5000,taylorb,mute,host|*|h1|*|*,maint,CHG-1
+first,NOW-3000,taylorb,mute,host|*|h2|*|*,maint,CHG-2
+first,NOW-100,taylorb,unmute,host|*|h2|*|*,done,CHG-2

@@ -1,0 +1,3 @@
+level,index,host,sourcetype,source,collection,via,profile,interval_secs,max_gap_secs,criticality,enabled,expected_since
+host,,h33,,,uf,,heartbeat,,,1,,
+sourcetype,linux,h33,syslog,,uf,,continuous,,,2,,

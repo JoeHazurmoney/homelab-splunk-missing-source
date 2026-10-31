@@ -1,0 +1,9 @@
+| inputlookup @flap@ | eval _time=tonumber(time) | `dh_soh_flapping(@NOW@)`
+| append [| inputlookup @status@ | `dh_soh_status`]
+| append [| inputlookup @fwd@ | `dh_soh_fwd(@NOW@)`]
+| append [| inputlookup @overrides@ | `dh_soh_mutes(@NOW@)`]
+| append [| inputlookup @daily@ | `dh_soh_lag`]
+| append [| inputlookup @vol@ | eval _time=tonumber(time) | `dh_soh_volume(@NOW@)`]
+| append [| inputlookup @lic@ | `dh_soh_licence(@NOW@)`]
+| append [| inputlookup @sched@ | `dh_soh_skipped`]
+| append [| inputlookup @sched0@ | `dh_soh_skipped` | eval item="none-".item]

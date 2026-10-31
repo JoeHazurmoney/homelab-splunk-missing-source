@@ -1,0 +1,2 @@
+entity_id,bl_days,bl_learned_gap_secs,threshold_secs,threshold_origin,learning
+sourcetype|enclave1|h75a|syslog|*,3,375870,375870,learned,0

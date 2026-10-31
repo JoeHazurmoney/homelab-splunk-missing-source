@@ -1,0 +1,18 @@
+section,item,value
+flapping,f1,4
+flapping,f2,3
+never_seen,s1,NOW-7200
+invalid_profile,s2,invalid profile 'contnuous': treated as continuous
+fwd_version,w2,9.4.0
+fwd_disconnected,w3,NOW-4000
+mute_active,m1,NOW+3600
+mute_active,m2,NOW+200000
+mute_expiring,m1,NOW+3600
+lag,l1,120
+volume,x1,2
+licence,usage_pct,30
+licence,expires_days,10
+skipped,DH Evaluate,3
+skipped,DH Tracker fast,1
+skipped,total,4
+skipped,none-total,0

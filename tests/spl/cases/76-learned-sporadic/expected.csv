@@ -1,0 +1,2 @@
+level,index,host,sourcetype,source,profile,enabled,expected_since
+sourcetype,enclave1,h75a,syslog,,sporadic,,

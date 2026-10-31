@@ -1,0 +1,5 @@
+index,host,sourcetype,source,last_indextime
+linux,h66a,syslog,/var/log/messages,NOW-3456000
+linux,h66z,syslog,/var/log/messages,NOW-3456000
+linux,h66z,cron,cron,NOW-86400
+linux,h66y,st,src,NOW-2592001

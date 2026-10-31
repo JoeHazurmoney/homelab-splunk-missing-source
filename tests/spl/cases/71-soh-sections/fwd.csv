@@ -1,0 +1,5 @@
+host,guid,version,last_heartbeat,last_tcpin,last_marker_action
+w1,G1,10.6.1.1,NOW-30,NOW-30,
+w2,G2,9.4.0,NOW-30,NOW-30,
+w3,G3,10.6.1.1,NOW-5000,NOW-4000,
+w4,,,,,stop

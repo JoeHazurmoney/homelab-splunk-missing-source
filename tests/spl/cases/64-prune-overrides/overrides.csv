@@ -1,0 +1,7 @@
+entity_id,mute_until,reason,ticket,threshold_override_secs,set_by,set_at
+o1,NOW-10,maint,CHG-1,,taylorb,NOW-9000
+o2,NOW-10,maint,CHG-2,5000,taylorb,NOW-9000
+o3,NOW+3600,maint,CHG-3,,taylorb,NOW-9000
+o4,,noisy,CHG-4,7200,taylorb,NOW-9000
+o5,NOW,maint,CHG-5,,taylorb,NOW-9000
+o6,,,,,taylorb,NOW-9000

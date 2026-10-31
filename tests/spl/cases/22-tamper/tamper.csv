@@ -1,4 +1,8 @@
-host,time,indicator,detail
-h22a,NOW-650,1102 security log cleared,EventCode=1102
-h22b,NOW-650,7036 SplunkForwarder stopped,EventCode=7036
-h22c,NOW-5000,1102 security log cleared,EventCode=1102
+host,time,indicator,detail,suppressed
+h22a,NOW-650,1102 security log cleared,EventCode=1102,0
+h22b,NOW-650,7036 SplunkForwarder stopped,EventCode=7036,0
+h22c,NOW-5000,1102 security log cleared,EventCode=1102,0
+h22d,NOW-650,1102 security log cleared,EventCode=1102,1
+h22e,NOW-650,1102 security log cleared,EventCode=1102,
+h22f,NOW-650,1102 security log cleared,EventCode=1102,1
+h22f,NOW-5000,1102 security log cleared,EventCode=1102,

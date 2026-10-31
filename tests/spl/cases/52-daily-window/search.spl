@@ -1,0 +1,3 @@
+| inputlookup @done@ | `dh_daily_window(@NOW@)` | eval c="partial"
+| append [| inputlookup @all@ | `dh_daily_window(@NOW@)` | eval c="all"]
+| append [| makeresults | where 1==0 | `dh_daily_window(@NOW@)` | eval c="none"]

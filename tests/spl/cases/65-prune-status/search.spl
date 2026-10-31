@@ -1,0 +1,2 @@
+| inputlookup @status@ | `dh_prune_mark_status(@expected@)` | eval c="normal"
+| append [| inputlookup @status@ | `dh_prune_mark_status(@noexp@)` | eval c="noexp"]

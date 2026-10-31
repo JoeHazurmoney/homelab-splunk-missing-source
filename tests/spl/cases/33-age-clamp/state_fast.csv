@@ -1,0 +1,2 @@
+index,host,sourcetype,source,first_seen,last_indextime,last_eventtime,last_count,lag
+linux,h33,syslog,/var/log/messages,NOW-86400,NOW-20,NOW-20,1,0

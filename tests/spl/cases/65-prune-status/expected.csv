@@ -1,0 +1,5 @@
+level,index,host,sourcetype,source,enabled
+host,,h65a,,,
+sourcetype,linux,h65a,syslog,,1
+sourcetype,linux,h65a,disabled_st,,0
+source,linux,H65A.mshome.net,st,/var/log/x-2026-10-30.log,

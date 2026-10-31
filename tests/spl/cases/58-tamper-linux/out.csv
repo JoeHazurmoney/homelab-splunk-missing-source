@@ -1,0 +1,12 @@
+host,time,code,indicator
+wd2l-recv,NOW-900,audit_daemon_end,auditd stopped (DAEMON_END) auid=1000
+wd2l-recv,NOW-890,audit_daemon_abort,auditd aborted (DAEMON_ABORT)
+wd2l-recv,NOW-880,svcstop_splunkforwarder,SERVICE_STOP SplunkForwarder
+wd2l-recv,NOW-870,svcstop_auditd,SERVICE_STOP auditd
+wd2l-recv,NOW-860,svcstop_rsyslog,SERVICE_STOP rsyslog
+wd2l-recv,NOW-830,audit_config_change,audit rules changed (CONFIG_CHANGE remove_rule) auid=1000
+wd2l-recv,NOW-820,key_hl-uf-config,audit key hl-uf-config auid=1000
+wd2l-logsrv,NOW-810,key_wd2l-config,audit key wd2l-config auid=1000
+wd2l-recv,NOW-780,clock_injoffset,clock step 3600 s (TIME_INJOFFSET)
+wd2l-recv,NOW-760,clock_chrony,clock step 3600 s (chrony)
+wd2l-recv,NOW-740,key_hl-uf-bin,audit key hl-uf-bin auid=1000

@@ -42,6 +42,12 @@ for ep in apps/local admin/conf-collections admin/macros admin/conf-macros saved
   echo "reload $ep: $code"
   case $code in 200 | 201) ;; *) fail=1 ;; esac
 done
+# A collection added to an app that already exists is listed after admin/conf-collections, but
+# the KV service only creates it ("collection not found" on write) after the app's
+# storage/collections/config reload.
+code=$(dh_curl -o "$stage/reload.out" -w '%{http_code}' -X POST "$DH_MGMT/servicesNS/nobody/$DH_APP/storage/collections/config/_reload") || true
+echo "reload storage/collections/config: $code"
+case $code in 200 | 201) ;; *) fail=1 ;; esac
 if [ "$fail" -ne 0 ]; then
   echo "dev-deploy: some reloads failed (see above); splunkd may be running stale config" >&2
   exit 1

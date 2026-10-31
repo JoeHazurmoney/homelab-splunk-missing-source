@@ -1,0 +1,2 @@
+| makeresults | eval f=relative_time(@NOW@, `dh_tamper_finding_earliest`), m=relative_time(@NOW@, `dh_tamper_marker_earliest`)
+| eval f_ok=if(f==@NOW@-`dh_tamper_lookback_secs`, 1, 0), m_ok=if(m<=f-`dh_tamper_window_secs`, 1, 0) | table f_ok m_ok

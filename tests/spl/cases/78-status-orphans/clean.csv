@@ -1,0 +1,3 @@
+entity_id,status
+host|*|h78|*|*,OK
+sourcetype|linux|h78|syslog|*,OK

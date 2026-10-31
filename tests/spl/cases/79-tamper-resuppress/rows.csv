@@ -1,0 +1,8 @@
+kind,time,host,code,indicator,detail,target_host,action,by,run_id,finding_id,suppressed
+finding,NOW-950,ha,win1102,1102 security log cleared by taylo,channel=Security,,,,,,
+marker,NOW-2100,,,,,he,stop,taylorb,r7,,
+index,NOW-900,,,,,,,,,ha|win1102|1999998900,0
+index,NOW-1900,,,,,,,,,he|win1102|1999998000,0
+index,NOW-1900,,,,,,,,,hf|win1102|1999998000,1
+index,NOW-1800,,,,,,,,,hf|win1102|1999998000,0
+index,NOW-699000,,,,,,,,,hg|win1102|1999299900,1

@@ -1,0 +1,7 @@
+kind,b,title,group_id,status,quota,expiration_time,is_active
+usage,104857600,,,,,,
+usage,52428800,,,,,,
+license,,L1,Trial,VALID,524288000,NOW+864000,
+license,,L2,Free,VALID,524288000,2147483647,
+group,,Trial,,,,,1
+group,,Free,,,,,0
