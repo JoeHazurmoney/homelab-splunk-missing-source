@@ -133,7 +133,7 @@
     "visualizations": {
         "viz_when": {
             "type": "splunk.singlevalue",
-            "title": "Report of",
+            "title": "Report time",
             "dataSources": {
                 "primary": "ds_when"
             },
@@ -141,11 +141,12 @@
                 "majorValue": "> primary | seriesByName(\"report\") | lastPoint()",
                 "sparklineDisplay": "off",
                 "trendDisplay": "off"
-            }
+            },
+            "description": "When the daily report was made (07:00 each day). Guide: docs/data-health/dashboards.md, Daily state of health > Report time."
         },
         "viz_mttr": {
             "type": "splunk.singlevalue",
-            "title": "MTTR (24 h)",
+            "title": "Mean time to recover (24 h)",
             "dataSources": {
                 "primary": "ds_mttr"
             },
@@ -153,7 +154,8 @@
                 "majorValue": "> primary | seriesByName(\"mttr\") | lastPoint()",
                 "sparklineDisplay": "off",
                 "trendDisplay": "off"
-            }
+            },
+            "description": "How long an outage lasted on average. Guide: docs/data-health/dashboards.md, Daily state of health > Mean time to recover (24 h)."
         },
         "viz_outages_n": {
             "type": "splunk.singlevalue",
@@ -165,11 +167,12 @@
                 "majorValue": "> primary | seriesByName(\"outages\") | lastPoint()",
                 "sparklineDisplay": "off",
                 "trendDisplay": "off"
-            }
+            },
+            "description": "How many times data stopped in the last 24 h. Guide: docs/data-health/dashboards.md, Daily state of health > Outages (24 h)."
         },
         "viz_open_n": {
             "type": "splunk.singlevalue",
-            "title": "Still open",
+            "title": "Outages still open",
             "dataSources": {
                 "primary": "ds_mttr"
             },
@@ -177,11 +180,12 @@
                 "majorValue": "> primary | seriesByName(\"open_outages\") | lastPoint()",
                 "sparklineDisplay": "off",
                 "trendDisplay": "off"
-            }
+            },
+            "description": "How many of those have not come back yet. Guide: docs/data-health/dashboards.md, Daily state of health > Outages still open."
         },
         "viz_lic_pct": {
             "type": "splunk.singlevalue",
-            "title": "Licence used yesterday",
+            "title": "Licence used yesterday (% of the daily quota)",
             "dataSources": {
                 "primary": "ds_lic_pct"
             },
@@ -189,11 +193,12 @@
                 "majorValue": "> primary | seriesByName(\"usage\") | lastPoint()",
                 "sparklineDisplay": "off",
                 "trendDisplay": "off"
-            }
+            },
+            "description": "How close the instance came to its daily indexing limit. Guide: docs/data-health/dashboards.md, Daily state of health > Licence used yesterday (% of the daily quota)."
         },
         "viz_lic_days": {
             "type": "splunk.singlevalue",
-            "title": "Licence expires in (days)",
+            "title": "Days until the licence expires",
             "dataSources": {
                 "primary": "ds_lic_days"
             },
@@ -201,77 +206,85 @@
                 "majorValue": "> primary | seriesByName(\"value\") | lastPoint()",
                 "sparklineDisplay": "off",
                 "trendDisplay": "off"
-            }
+            },
+            "description": "When the Splunk licence runs out. Guide: docs/data-health/dashboards.md, Daily state of health > Days until the licence expires."
         },
         "viz_outages": {
             "type": "splunk.table",
-            "title": "Outages in 24 h with durations",
+            "title": "Outages in the last 24 h",
             "dataSources": {
                 "primary": "ds_outages"
             },
             "options": {
                 "count": 25
-            }
+            },
+            "description": "Each stretch of late or missing data, with how long it lasted. Guide: docs/data-health/dashboards.md, Daily state of health > Outages in the last 24 h."
         },
         "viz_flapping": {
             "type": "splunk.table",
-            "title": "Flapping (3 or more transitions in 24 h)",
+            "title": "Flapping (3 or more status changes in 24 h)",
             "dataSources": {
                 "primary": "ds_flapping"
             },
             "options": {
                 "count": 25
-            }
+            },
+            "description": "Streams that keep stopping and starting. Guide: docs/data-health/dashboards.md, Daily state of health > Flapping (3 or more status changes in 24 h)."
         },
         "viz_never": {
             "type": "splunk.table",
-            "title": "Never seen, and invalid profiles",
+            "title": "Never arrived, or a bad profile",
             "dataSources": {
                 "primary": "ds_never"
             },
             "options": {
                 "count": 25
-            }
+            },
+            "description": "Expected data that never came, and expected rows with a profile the app does not know. Guide: docs/data-health/dashboards.md, Daily state of health > Never arrived, or a bad profile."
         },
         "viz_unreg": {
             "type": "splunk.table",
-            "title": "Unregistered (live: seen in 7 d, not expected)",
+            "title": "Unregistered: seen in the last 7 d but not expected",
             "dataSources": {
                 "primary": "ds_unreg"
             },
             "options": {
                 "count": 25
-            }
+            },
+            "description": "Data that arrives but that nobody listed as expected. Guide: docs/data-health/dashboards.md, Daily state of health > Unregistered: seen in the last 7 d but not expected."
         },
         "viz_fwd": {
             "type": "splunk.table",
-            "title": "Forwarders off the expected version or disconnected",
+            "title": "Forwarders: wrong version or disconnected",
             "dataSources": {
                 "primary": "ds_fwd"
             },
             "options": {
                 "count": 25
-            }
+            },
+            "description": "Splunk agents that need an upgrade or have stopped calling in. Guide: docs/data-health/dashboards.md, Daily state of health > Forwarders: wrong version or disconnected."
         },
         "viz_lag": {
             "type": "splunk.table",
-            "title": "Lag p95 (sourcetypes at or above 60 s)",
+            "title": "Slow arrival (lag p95 of 60 s or more)",
             "dataSources": {
                 "primary": "ds_lag"
             },
             "options": {
                 "count": 25
-            }
+            },
+            "description": "Data that arrives long after it was written. Guide: docs/data-health/dashboards.md, Daily state of health > Slow arrival (lag p95 of 60 s or more)."
         },
         "viz_volume": {
             "type": "splunk.table",
-            "title": "Volume flags (24 h)",
+            "title": "Volume drops (24 h)",
             "dataSources": {
                 "primary": "ds_volume"
             },
             "options": {
                 "count": 25
-            }
+            },
+            "description": "Hours with far fewer events than usual. Guide: docs/data-health/dashboards.md, Daily state of health > Volume drops (24 h)."
         },
         "viz_skipped": {
             "type": "splunk.table",
@@ -281,7 +294,8 @@
             },
             "options": {
                 "count": 25
-            }
+            },
+            "description": "Background searches of this app that did not run on time. Guide: docs/data-health/dashboards.md, Daily state of health > Skipped searches (24 h)."
         },
         "viz_mutes": {
             "type": "splunk.table",
@@ -291,7 +305,8 @@
             },
             "options": {
                 "count": 25
-            }
+            },
+            "description": "What is muted now, and what unmutes within a day. Guide: docs/data-health/dashboards.md, Daily state of health > Active and expiring mutes."
         }
     },
     "layout": {

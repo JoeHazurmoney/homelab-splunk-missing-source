@@ -114,8 +114,8 @@
     "visualizations": {
         "viz_children": {
             "type": "splunk.table",
-            "title": "Expected children",
-            "description": "Status, age against threshold, profile, and where the threshold comes from (override, max_gap_secs, learned or default).",
+            "title": "Expected data from this host",
+            "description": "Each stream this host should send: its status and how late it is against its limit. Guide: docs/data-health/dashboards.md, Host detail > Expected data from this host.",
             "dataSources": {
                 "primary": "ds_children"
             },
@@ -131,57 +131,63 @@
             },
             "options": {
                 "stackMode": "stacked"
-            }
+            },
+            "description": "How much data arrived from this host over the day. Guide: docs/data-health/dashboards.md, Host detail > Events in the last 24 h by sourcetype."
         },
         "viz_fwd": {
             "type": "splunk.table",
-            "title": "Forwarder",
+            "title": "Forwarder (the Splunk agent on the host)",
             "dataSources": {
                 "primary": "ds_fwd"
             },
             "options": {
                 "count": 25
-            }
+            },
+            "description": "Version and last contact of the Splunk agent and the last Ansible and VM events. Guide: docs/data-health/dashboards.md, Host detail > Forwarder (the Splunk agent on the host)."
         },
         "viz_errors": {
             "type": "splunk.table",
-            "title": "Latest splunkd errors and warnings (24 h)",
+            "title": "Latest Splunk agent errors and warnings (24 h)",
             "dataSources": {
                 "primary": "ds_errors"
             },
             "options": {
                 "count": 25
-            }
+            },
+            "description": "What the Splunk agent on this host complained about. Guide: docs/data-health/dashboards.md, Host detail > Latest Splunk agent errors and warnings (24 h)."
         },
         "viz_tamper": {
             "type": "splunk.table",
-            "title": "Tamper findings (outside Ansible marker windows)",
+            "title": "Tamper findings on this host",
             "dataSources": {
                 "primary": "ds_tamper"
             },
             "options": {
                 "count": 25
-            }
+            },
+            "description": "Signs that someone may have switched off logging here. Guide: docs/data-health/dashboards.md, Host detail > Tamper findings on this host."
         },
         "viz_transitions": {
             "type": "splunk.table",
-            "title": "Status transitions (7 d)",
+            "title": "Status changes (7 d)",
             "dataSources": {
                 "primary": "ds_transitions"
             },
             "options": {
                 "count": 25
-            }
+            },
+            "description": "When each stream went late or missing and when it came back. Guide: docs/data-health/dashboards.md, Host detail > Status changes (7 d)."
         },
         "viz_hyperv": {
             "type": "splunk.table",
-            "title": "Hyper-V lifecycle events (7 d)",
+            "title": "Hyper-V VM events (7 d)",
             "dataSources": {
                 "primary": "ds_hyperv"
             },
             "options": {
                 "count": 25
-            }
+            },
+            "description": "When this VM was started or stopped on the Hyper-V host. Guide: docs/data-health/dashboards.md, Host detail > Hyper-V VM events (7 d)."
         },
         "viz_runbooks": {
             "type": "splunk.table",
@@ -200,7 +206,8 @@
                         "newTab": true
                     }
                 }
-            ]
+            ],
+            "description": "The how-to pages linked to this host. Guide: docs/data-health/dashboards.md, Host detail > Runbooks (click to open)."
         }
     },
     "layout": {

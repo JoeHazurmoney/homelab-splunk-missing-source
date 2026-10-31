@@ -123,7 +123,7 @@
         },
         "input_ov_threshold": {
             "type": "input.text",
-            "title": "1 Override: threshold seconds",
+            "title": "1 Override: threshold in seconds",
             "options": {
                 "token": "ov_threshold",
                 "defaultValue": "-"
@@ -296,7 +296,7 @@
         },
         "input_ex_interval": {
             "type": "input.text",
-            "title": "2 Add row: interval_secs (periodic)",
+            "title": "2 Add row: interval in seconds (periodic only)",
             "options": {
                 "token": "ex_interval",
                 "defaultValue": "-"
@@ -454,7 +454,7 @@
         },
         "input_th_text": {
             "type": "input.text",
-            "title": "Thresholds: filter (* wildcard)",
+            "title": "Thresholds: search text (words separated by *)",
             "options": {
                 "token": "th_text",
                 "defaultValue": "*"
@@ -815,38 +815,41 @@
         "viz_help": {
             "type": "splunk.markdown",
             "options": {
-                "markdown": "**Manage** (no auto-refresh). Every change takes three steps, and nothing is written before the last one:\n1. Fill the inputs of one form (1 to 4) and the **Reason**, then **Submit**: the preview shows the change (before and after) or why it is refused.\n2. Choose **Apply** in that form's *confirm* input and **Submit** again: the change is written and logged (admin log below).\n3. A repeated submit or a reloaded page applies nothing: the confirmation is tied to the state it was previewed against.\n\nMutes need a reason and expire within 30 days; a host mute covers its children. Adding a row or adopting needs **dh_admin**. **Test blocks** (dh_admin) drop real data at ingest for linux, windows and network within about 60 s; a source block matches the **exact raw source** (the normalized form is shown for reference only). In production a block control is itself a blinding vector."
+                "markdown": "**Manage** changes what the app expects and how it alerts. It never refreshes by itself, and nothing is written until you confirm. Each change takes three steps:\n1. Fill in one form (1 to 4) and the **Reason**, then press **Submit**. The *preview* shows the change, before and after, or why it is refused.\n2. In that form's *confirm* list choose **Apply**, then press **Submit** again. The change is written and recorded in the admin log at the bottom.\n3. Pressing Submit again, or reloading the page, does not repeat it. The confirmation only fits the state you previewed.\n\nA mute needs a reason and ends within 30 days; muting a host also mutes everything it sends. Adding or adopting a row and test blocks need the **dh_admin** role. A **test block** throws real data away at ingest (linux, windows and network only) within about a minute; a source block needs the exact raw source name. Guide: docs/data-health/dashboards.md, Manage."
             }
         },
         "viz_ov_preview": {
             "type": "splunk.table",
-            "title": "1 Override: preview",
+            "title": "1 Override (mute or threshold): preview",
             "dataSources": {
                 "primary": "ds_ov_preview"
             },
             "options": {
                 "count": 25
-            }
+            },
+            "description": "The change you are about to make; nothing is written yet. Guide: docs/data-health/dashboards.md, Manage > 1 Override (mute or threshold): preview."
         },
         "viz_ov_result": {
             "type": "splunk.table",
-            "title": "1 Override: result",
+            "title": "1 Override (mute or threshold): result",
             "dataSources": {
                 "primary": "ds_ov_apply"
             },
             "options": {
                 "count": 25
-            }
+            },
+            "description": "What was written after you confirmed. Guide: docs/data-health/dashboards.md, Manage > 1 Override (mute or threshold): result."
         },
         "viz_overrides": {
             "type": "splunk.table",
-            "title": "Current overrides (mutes and threshold overrides)",
+            "title": "Current mutes and threshold overrides",
             "dataSources": {
                 "primary": "ds_overrides"
             },
             "options": {
                 "count": 25
-            }
+            },
+            "description": "Every mute and threshold override in force. Guide: docs/data-health/dashboards.md, Manage > Current mutes and threshold overrides."
         },
         "viz_ex_preview": {
             "type": "splunk.table",
@@ -856,7 +859,8 @@
             },
             "options": {
                 "count": 25
-            }
+            },
+            "description": "The new or changed row of the expected list; nothing is written yet. Guide: docs/data-health/dashboards.md, Manage > 2 Add an expected row: preview."
         },
         "viz_ex_result": {
             "type": "splunk.table",
@@ -866,17 +870,19 @@
             },
             "options": {
                 "count": 25
-            }
+            },
+            "description": "What was written after you confirmed. Guide: docs/data-health/dashboards.md, Manage > 2 Add an expected row: result."
         },
         "viz_unreg": {
             "type": "splunk.table",
-            "title": "Unregistered: seen in the last 7 d, not expected",
+            "title": "Unregistered: seen in the last 7 d but not expected",
             "dataSources": {
                 "primary": "ds_unreg"
             },
             "options": {
                 "count": 25
-            }
+            },
+            "description": "Data that arrives but that nobody listed as expected. Guide: docs/data-health/dashboards.md, Manage > Unregistered: seen in the last 7 d but not expected."
         },
         "viz_ad_preview": {
             "type": "splunk.table",
@@ -886,7 +892,8 @@
             },
             "options": {
                 "count": 25
-            }
+            },
+            "description": "The expected row that adopting this data would add; nothing is written yet. Guide: docs/data-health/dashboards.md, Manage > 3 Adopt: preview."
         },
         "viz_ad_result": {
             "type": "splunk.table",
@@ -896,37 +903,41 @@
             },
             "options": {
                 "count": 25
-            }
+            },
+            "description": "What was written after you confirmed. Guide: docs/data-health/dashboards.md, Manage > 3 Adopt: result."
         },
         "viz_thresholds": {
             "type": "splunk.table",
-            "title": "Learned against configured thresholds",
+            "title": "Thresholds: learned against configured",
             "dataSources": {
                 "primary": "ds_thresholds"
             },
             "options": {
                 "count": 25
-            }
+            },
+            "description": "How long each stream may stay silent and where that limit comes from. Guide: docs/data-health/dashboards.md, Manage > Thresholds: learned against configured."
         },
         "viz_bk_sources": {
             "type": "splunk.table",
-            "title": "4 Test block: raw sources of the host (24 h), with the normalized form",
+            "title": "4 Test block: raw sources of the host (24 h)",
             "dataSources": {
                 "primary": "ds_bk_sources"
             },
             "options": {
                 "count": 25
-            }
+            },
+            "description": "The exact source names this host sent; a source block must use one of them. Guide: docs/data-health/dashboards.md, Manage > 4 Test block: raw sources of the host (24 h)."
         },
         "viz_blocks": {
             "type": "splunk.table",
-            "title": "Current test blocks (hl_ingest_block)",
+            "title": "Current test blocks",
             "dataSources": {
                 "primary": "ds_blocks"
             },
             "options": {
                 "count": 25
-            }
+            },
+            "description": "Data that is being dropped on purpose for a test. Guide: docs/data-health/dashboards.md, Manage > Current test blocks."
         },
         "viz_bk_preview": {
             "type": "splunk.table",
@@ -936,7 +947,8 @@
             },
             "options": {
                 "count": 25
-            }
+            },
+            "description": "The block you are about to add or remove; nothing is written yet. Guide: docs/data-health/dashboards.md, Manage > 4 Test block: preview."
         },
         "viz_bk_result": {
             "type": "splunk.table",
@@ -946,17 +958,19 @@
             },
             "options": {
                 "count": 25
-            }
+            },
+            "description": "What was written after you confirmed. Guide: docs/data-health/dashboards.md, Manage > 4 Test block: result."
         },
         "viz_log": {
             "type": "splunk.table",
-            "title": "Admin log",
+            "title": "Admin log (every change made here)",
             "dataSources": {
                 "primary": "ds_log"
             },
             "options": {
                 "count": 25
-            }
+            },
+            "description": "Who changed what and why. Guide: docs/data-health/dashboards.md, Manage > Admin log (every change made here)."
         }
     },
     "layout": {
