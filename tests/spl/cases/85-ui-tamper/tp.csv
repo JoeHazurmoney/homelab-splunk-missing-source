@@ -1,0 +1,10 @@
+finding_id,dh_host,time,code,indicator,detail,events,suppressed,it
+f1,h1,NOW-3700,win1102,1102 security log cleared,channel=Security,1,0,NOW-3600
+f2,h2,NOW-7300,svcstop_auditd,SERVICE_STOP auditd,type=SERVICE_STOP,1,0,NOW-7200
+f2,h2,NOW-7300,svcstop_auditd,SERVICE_STOP auditd,type=SERVICE_STOP,1,1,NOW-600
+f3,h3,NOW-5100,audit_config_change,audit rules changed,type=CONFIG_CHANGE,1,1,NOW-5000
+f3,h3,NOW-5100,audit_config_change,audit rules changed,type=CONFIG_CHANGE,3,0,NOW-300
+f4,h4,NOW-90100,win104,104 event log cleared,channel=System,1,0,NOW-90000
+f4,h4,NOW-90100,win104,104 event log cleared,channel=System,2,0,NOW-100
+f5,h5,NOW-200000,key_hl-x,audit key hl-x,type=SYSCALL,1,0,NOW-60
+f6,h6,NOW-200050,clock_chrony,clock step 400 s (chrony),type=syslog,1,,NOW-50

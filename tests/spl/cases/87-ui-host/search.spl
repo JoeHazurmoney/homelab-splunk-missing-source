@@ -1,0 +1,4 @@
+| inputlookup @status@ | `dh_ui_host_children(@volume@)` | streamstats count as pos | eval c="children"
+| append [| inputlookup @fwd@ | `dh_ui_fwd(@NOW@)` | eval c="fwd"]
+| append [| inputlookup @fwd@ | where 1==0 | `dh_ui_fwd(@NOW@)` | eval c="nofwd"]
+| append [| inputlookup @hv@ | eval _time=tonumber(time), _raw=raw | fields _time _raw | `dh_ui_hyperv` | where host=="wd2l-logsrv" | eval c="hyperv"]

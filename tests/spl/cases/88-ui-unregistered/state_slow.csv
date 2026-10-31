@@ -1,0 +1,2 @@
+index,host,sourcetype,source,first_seen,last_indextime
+linux,u1,syslog,/var/log/messages.*,NOW-200000,NOW-150000

@@ -1,0 +1,16 @@
+c,dh_ok,has_token,check,entity_id,host,index,source,via,profile,collection,expected_since,before
+x1,1,1,ok: choose Apply under Confirm and Submit,sourcetype|linux|newh|syslog|*,newh,linux,,,continuous,uf,NOW,not expected
+x2,0,0,needs the dh_admin role,sourcetype|linux|newh|syslog|*,newh,linux,,,continuous,uf,NOW,not expected
+x3,0,0,the index must be one the trackers watch (dh_indexes),sourcetype|main|newh|syslog|*,newh,main,,,continuous,uf,NOW,not expected
+x4,0,0,a periodic profile needs interval_secs,source|linux|newh|cpu|cpu,newh,linux,cpu,,periodic,uf,NOW,not expected
+x5,0,0,this entity is managed by ansible: change the inventory instead,sourcetype|linux|h5|syslog|*,h5,linux,,,sporadic,uf,NOW-9000,managed_by ansible / enabled 1 / profile continuous / criticality 2
+x6,1,1,ok: choose Apply under Confirm and Submit,sourcetype|linux|h6|syslog|*,h6,linux,,,continuous,uf,NOW-5000,managed_by ui / enabled 1 / profile sporadic / criticality 3
+x7,1,1,ok: choose Apply under Confirm and Submit,sourcetype|linux|h7|syslog|*,h7,linux,,,continuous,uf,NOW,managed_by ansible / enabled 0 / profile continuous / criticality 2
+x8,1,1,ok: choose Apply under Confirm and Submit,source|linux|h8|app|/var/log/app-*.log,h8,linux,/var/log/app-2026-10-30.log,,sporadic,uf,NOW,not expected
+x9,1,1,ok: choose Apply under Confirm and Submit,host|*|h9|*|*,h9,,,pi5,continuous,syslog,NOW,not expected
+x10,0,0,criticality is 1 to 4,sourcetype|linux|h10|syslog|*,h10,linux,,,continuous,uf,NOW,not expected
+x11,0,0,a reason is required,sourcetype|linux|h11|syslog|*,h11,linux,,,continuous,uf,NOW,not expected
+adopt,1,1,ok: choose Apply under Confirm and Submit,sourcetype|linux|u1|syslog|*,u1,linux,,,sporadic,uf,NOW,not expected
+adopt,1,1,ok: choose Apply under Confirm and Submit,host|*|u1|*|*,u1,,,,heartbeat,uf,NOW,not expected
+adopt,1,1,ok: choose Apply under Confirm and Submit,host|*|u2|*|*,u2,,,,continuous,syslog,NOW,not expected
+adopt,1,1,ok: choose Apply under Confirm and Submit,sourcetype|linux|u2|cpu|*,u2,linux,,,continuous,syslog,NOW,not expected

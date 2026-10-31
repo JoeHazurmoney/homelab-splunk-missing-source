@@ -1,0 +1,3 @@
+entity_id,site,owner,criticality,status,host_rollup,description
+host|*|h1|*|*,lab,ops,1,OK,OK,pc
+host|*|h3|*|*,home,ops,2,MISSING,DOWN,vm

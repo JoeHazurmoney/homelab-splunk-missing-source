@@ -1,0 +1,5 @@
+entity_id
+sourcetype|linux|u1|syslog|*
+host|*|u1|*|*
+host|*|u2|*|*
+sourcetype|linux|u2|cpu|*

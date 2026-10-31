@@ -1,0 +1,6 @@
+c,sev,banner
+fine,0,Receiving: trackers and evaluator are current
+stale,3,Trackers stale: DH Tracker fast last ran 300 s ago (statuses held as PENDING) / Splunk not receiving: nothing indexed for 400 s (check the container and its ports)
+resume,2,Resuming after a gap at 2033-05-18 03:31: statuses held for 5 min
+evalstale,3,DH Evaluate last ran 400 s ago: statuses are stale
+nothing,3,Trackers stale: DH Tracker fast has never run / Splunk not receiving: nothing indexed yet / DH Evaluate has not written any status

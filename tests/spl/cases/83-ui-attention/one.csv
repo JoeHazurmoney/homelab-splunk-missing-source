@@ -1,0 +1,3 @@
+entity_id,level,index,host,sourcetype,source,status,host_rollup,since,criticality,cause,cause_code
+sourcetype|linux|g2|syslog|*,sourcetype,linux,g2,syslog,*,MISSING,DEGRADED,NOW-100,1,stream stopped,stream_stopped
+sourcetype|linux|g2|cpu|*,sourcetype,linux,g2,cpu,*,LATE,DEGRADED,NOW-100,1,stream stopped,stream_stopped

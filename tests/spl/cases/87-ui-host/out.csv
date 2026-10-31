@@ -1,0 +1,19 @@
+c,pos,entity,status,age_vs_threshold,origin,label,volume,fact,value,time,event_id,meaning
+children,1,host (liveness: heartbeat),OK,20 s / 90 s,default,,median below 100,,,,,
+children,2,linux / syslog,LATE,400 s / 300 s,learned,,x0.1 of median FLAGGED,,,,,
+children,3,linux / linux_secure,MUTED,100 s / 86400 s,default (learning),muted until 2033-05-18 04:33 (patching),,,,,,
+children,4,linux / df / df,NEVER_SEEN,never arrived / 660 s,default,test block until 04:03,,,,,,
+fwd,,,,,,,,version,10.6.0.0 (expected 10.6.1.1),,,
+fwd,,,,,,,,os,Linux,,,
+fwd,,,,,,,,fwd_type,uf,,,
+fwd,,,,,,,,guid,G1,,,
+fwd,,,,,,,,heartbeat,2033-05-18 03:32 (00:00:30 ago),,,
+fwd,,,,,,,,last_connect,2033-05-18 03:32 (00:00:45 ago),,,
+fwd,,,,,,,,last_marker,start at 2033-05-18 02:33 by taylorb (run r1),,,
+fwd,,,,,,,,last_vm_event,18500 (started) at 2033-05-18 01:33,,,
+fwd,,,,,,,,probe,none,,,
+nofwd,,,,,,,,forwarder,no dh_fwd row: an agentless host or no UF has connected,,,
+hyperv,,,,,,,,,,2033-05-18 03:20,18500,started
+hyperv,,,,,,,,,,2033-05-18 03:21,18514,reset by the guest
+hyperv,,,,,,,,,,2033-05-18 03:23,18510,saved
+hyperv,,,,,,,,,,2033-05-18 03:28,18504,shut down by the host (Shutdown IC)

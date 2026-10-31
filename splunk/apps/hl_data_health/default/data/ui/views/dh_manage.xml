@@ -1,0 +1,1167 @@
+<dashboard version="2" theme="dark">
+    <label>Manage</label>
+    <description>Mute and unmute, threshold overrides, add or adopt expected rows, learned against configured thresholds, test blocks (admin) and the admin log (spec §8.3). No auto-refresh; every write is previewed, confirmed and logged.</description>
+    <definition><![CDATA[
+{
+    "title": "Manage",
+    "description": "Mute, threshold overrides, expected rows, adoption, learned against configured thresholds, test blocks and the admin log (spec §7.7, §7.8, §8.3). No auto-refresh; writes run only on Submit, after a preview and a confirmation.",
+    "inputs": {
+        "input_m_reason": {
+            "type": "input.text",
+            "title": "Reason (required for every change)",
+            "options": {
+                "token": "m_reason"
+            }
+        },
+        "input_m_ticket": {
+            "type": "input.text",
+            "title": "Ticket (- for none)",
+            "options": {
+                "token": "m_ticket",
+                "defaultValue": "-"
+            }
+        },
+        "input_ov_host": {
+            "type": "input.dropdown",
+            "title": "1 Override: host",
+            "options": {
+                "items": ">frame(label, value) | prepend(formattedStatics) | objects()",
+                "token": "ov_host"
+            },
+            "dataSources": {
+                "primary": "ds_hosts"
+            },
+            "context": {
+                "formattedConfig": {
+                    "number": {
+                        "prefix": ""
+                    }
+                },
+                "formattedStatics": ">statics | formatByType(formattedConfig)",
+                "statics": [],
+                "label": ">primary | seriesByName(\"label\") | renameSeries(\"label\") | formatByType(formattedConfig)",
+                "value": ">primary | seriesByName(\"value\") | renameSeries(\"value\") | formatByType(formattedConfig)"
+            }
+        },
+        "input_ov_entity": {
+            "type": "input.dropdown",
+            "title": "1 Override: entity (a host row mutes its children)",
+            "options": {
+                "items": ">frame(label, value) | prepend(formattedStatics) | objects()",
+                "token": "ov_entity"
+            },
+            "dataSources": {
+                "primary": "ds_ov_entities"
+            },
+            "context": {
+                "formattedConfig": {
+                    "number": {
+                        "prefix": ""
+                    }
+                },
+                "formattedStatics": ">statics | formatByType(formattedConfig)",
+                "statics": [],
+                "label": ">primary | seriesByName(\"label\") | renameSeries(\"label\") | formatByType(formattedConfig)",
+                "value": ">primary | seriesByName(\"value\") | renameSeries(\"value\") | formatByType(formattedConfig)"
+            }
+        },
+        "input_ov_action": {
+            "type": "input.dropdown",
+            "title": "1 Override: action",
+            "options": {
+                "items": [
+                    {
+                        "label": "Mute",
+                        "value": "mute"
+                    },
+                    {
+                        "label": "Unmute",
+                        "value": "unmute"
+                    },
+                    {
+                        "label": "Set threshold",
+                        "value": "threshold"
+                    },
+                    {
+                        "label": "Clear threshold",
+                        "value": "clear"
+                    }
+                ],
+                "token": "ov_action",
+                "defaultValue": "mute"
+            }
+        },
+        "input_ov_duration": {
+            "type": "input.dropdown",
+            "title": "1 Override: mute for",
+            "options": {
+                "items": [
+                    {
+                        "label": "1 hour",
+                        "value": "3600"
+                    },
+                    {
+                        "label": "4 hours",
+                        "value": "14400"
+                    },
+                    {
+                        "label": "1 day",
+                        "value": "86400"
+                    },
+                    {
+                        "label": "7 days",
+                        "value": "604800"
+                    },
+                    {
+                        "label": "30 days (maximum)",
+                        "value": "2592000"
+                    }
+                ],
+                "token": "ov_duration",
+                "defaultValue": "3600"
+            }
+        },
+        "input_ov_threshold": {
+            "type": "input.text",
+            "title": "1 Override: threshold seconds",
+            "options": {
+                "token": "ov_threshold",
+                "defaultValue": "-"
+            }
+        },
+        "input_ov_confirm": {
+            "type": "input.dropdown",
+            "title": "1 Override: confirm",
+            "options": {
+                "items": ">frame(label, value) | prepend(formattedStatics) | objects()",
+                "token": "ov_confirm"
+            },
+            "dataSources": {
+                "primary": "ds_ov_confirm"
+            },
+            "context": {
+                "formattedConfig": {
+                    "number": {
+                        "prefix": ""
+                    }
+                },
+                "formattedStatics": ">statics | formatByType(formattedConfig)",
+                "statics": [],
+                "label": ">primary | seriesByName(\"label\") | renameSeries(\"label\") | formatByType(formattedConfig)",
+                "value": ">primary | seriesByName(\"value\") | renameSeries(\"value\") | formatByType(formattedConfig)"
+            }
+        },
+        "input_ex_level": {
+            "type": "input.dropdown",
+            "title": "2 Add row: level",
+            "options": {
+                "items": [
+                    {
+                        "label": "host",
+                        "value": "host"
+                    },
+                    {
+                        "label": "sourcetype",
+                        "value": "sourcetype"
+                    },
+                    {
+                        "label": "source",
+                        "value": "source"
+                    }
+                ],
+                "token": "ex_level",
+                "defaultValue": "sourcetype"
+            }
+        },
+        "input_ex_index": {
+            "type": "input.dropdown",
+            "title": "2 Add row: index",
+            "options": {
+                "items": [
+                    {
+                        "label": "- (host row)",
+                        "value": "-"
+                    },
+                    {
+                        "label": "linux",
+                        "value": "linux"
+                    },
+                    {
+                        "label": "windows",
+                        "value": "windows"
+                    },
+                    {
+                        "label": "network",
+                        "value": "network"
+                    },
+                    {
+                        "label": "wd2l_uf_audit",
+                        "value": "wd2l_uf_audit"
+                    },
+                    {
+                        "label": "enclave1",
+                        "value": "enclave1"
+                    },
+                    {
+                        "label": "wd2l",
+                        "value": "wd2l"
+                    }
+                ],
+                "token": "ex_index",
+                "defaultValue": "linux"
+            }
+        },
+        "input_ex_host": {
+            "type": "input.text",
+            "title": "2 Add row: host",
+            "options": {
+                "token": "ex_host"
+            }
+        },
+        "input_ex_sourcetype": {
+            "type": "input.text",
+            "title": "2 Add row: sourcetype",
+            "options": {
+                "token": "ex_sourcetype",
+                "defaultValue": "-"
+            }
+        },
+        "input_ex_source": {
+            "type": "input.text",
+            "title": "2 Add row: source",
+            "options": {
+                "token": "ex_source",
+                "defaultValue": "-"
+            }
+        },
+        "input_ex_collection": {
+            "type": "input.dropdown",
+            "title": "2 Add row: collection",
+            "options": {
+                "items": [
+                    {
+                        "label": "uf",
+                        "value": "uf"
+                    },
+                    {
+                        "label": "syslog",
+                        "value": "syslog"
+                    },
+                    {
+                        "label": "hec",
+                        "value": "hec"
+                    }
+                ],
+                "token": "ex_collection",
+                "defaultValue": "uf"
+            }
+        },
+        "input_ex_via": {
+            "type": "input.text",
+            "title": "2 Add row: via (relay)",
+            "options": {
+                "token": "ex_via",
+                "defaultValue": "-"
+            }
+        },
+        "input_ex_profile": {
+            "type": "input.dropdown",
+            "title": "2 Add row: profile",
+            "options": {
+                "items": [
+                    {
+                        "label": "heartbeat",
+                        "value": "heartbeat"
+                    },
+                    {
+                        "label": "periodic",
+                        "value": "periodic"
+                    },
+                    {
+                        "label": "continuous",
+                        "value": "continuous"
+                    },
+                    {
+                        "label": "sporadic",
+                        "value": "sporadic"
+                    },
+                    {
+                        "label": "info",
+                        "value": "info"
+                    }
+                ],
+                "token": "ex_profile",
+                "defaultValue": "continuous"
+            }
+        },
+        "input_ex_interval": {
+            "type": "input.text",
+            "title": "2 Add row: interval_secs (periodic)",
+            "options": {
+                "token": "ex_interval",
+                "defaultValue": "-"
+            }
+        },
+        "input_ex_crit": {
+            "type": "input.dropdown",
+            "title": "2 Add row: criticality",
+            "options": {
+                "items": [
+                    {
+                        "label": "1 (highest)",
+                        "value": "1"
+                    },
+                    {
+                        "label": "2",
+                        "value": "2"
+                    },
+                    {
+                        "label": "3",
+                        "value": "3"
+                    },
+                    {
+                        "label": "4",
+                        "value": "4"
+                    }
+                ],
+                "token": "ex_crit",
+                "defaultValue": "2"
+            }
+        },
+        "input_ex_owner": {
+            "type": "input.text",
+            "title": "2 Add row: owner",
+            "options": {
+                "token": "ex_owner",
+                "defaultValue": "-"
+            }
+        },
+        "input_ex_site": {
+            "type": "input.text",
+            "title": "2 Add row: site",
+            "options": {
+                "token": "ex_site",
+                "defaultValue": "-"
+            }
+        },
+        "input_ex_runbook": {
+            "type": "input.text",
+            "title": "2 Add row: runbook",
+            "options": {
+                "token": "ex_runbook",
+                "defaultValue": "-"
+            }
+        },
+        "input_ex_description": {
+            "type": "input.text",
+            "title": "2 Add row: description",
+            "options": {
+                "token": "ex_description",
+                "defaultValue": "-"
+            }
+        },
+        "input_ex_confirm": {
+            "type": "input.dropdown",
+            "title": "2 Add row: confirm",
+            "options": {
+                "items": ">frame(label, value) | prepend(formattedStatics) | objects()",
+                "token": "ex_confirm"
+            },
+            "dataSources": {
+                "primary": "ds_ex_confirm"
+            },
+            "context": {
+                "formattedConfig": {
+                    "number": {
+                        "prefix": ""
+                    }
+                },
+                "formattedStatics": ">statics | formatByType(formattedConfig)",
+                "statics": [],
+                "label": ">primary | seriesByName(\"label\") | renameSeries(\"label\") | formatByType(formattedConfig)",
+                "value": ">primary | seriesByName(\"value\") | renameSeries(\"value\") | formatByType(formattedConfig)"
+            }
+        },
+        "input_ad_entity": {
+            "type": "input.dropdown",
+            "title": "3 Adopt: unregistered entity",
+            "options": {
+                "items": ">frame(label, value) | prepend(formattedStatics) | objects()",
+                "token": "ad_entity"
+            },
+            "dataSources": {
+                "primary": "ds_ad_entities"
+            },
+            "context": {
+                "formattedConfig": {
+                    "number": {
+                        "prefix": ""
+                    }
+                },
+                "formattedStatics": ">statics | formatByType(formattedConfig)",
+                "statics": [],
+                "label": ">primary | seriesByName(\"label\") | renameSeries(\"label\") | formatByType(formattedConfig)",
+                "value": ">primary | seriesByName(\"value\") | renameSeries(\"value\") | formatByType(formattedConfig)"
+            }
+        },
+        "input_ad_crit": {
+            "type": "input.dropdown",
+            "title": "3 Adopt: criticality",
+            "options": {
+                "items": [
+                    {
+                        "label": "1 (highest)",
+                        "value": "1"
+                    },
+                    {
+                        "label": "2",
+                        "value": "2"
+                    },
+                    {
+                        "label": "3",
+                        "value": "3"
+                    },
+                    {
+                        "label": "4",
+                        "value": "4"
+                    }
+                ],
+                "token": "ad_crit",
+                "defaultValue": "2"
+            }
+        },
+        "input_ad_confirm": {
+            "type": "input.dropdown",
+            "title": "3 Adopt: confirm",
+            "options": {
+                "items": ">frame(label, value) | prepend(formattedStatics) | objects()",
+                "token": "ad_confirm"
+            },
+            "dataSources": {
+                "primary": "ds_ad_confirm"
+            },
+            "context": {
+                "formattedConfig": {
+                    "number": {
+                        "prefix": ""
+                    }
+                },
+                "formattedStatics": ">statics | formatByType(formattedConfig)",
+                "statics": [],
+                "label": ">primary | seriesByName(\"label\") | renameSeries(\"label\") | formatByType(formattedConfig)",
+                "value": ">primary | seriesByName(\"value\") | renameSeries(\"value\") | formatByType(formattedConfig)"
+            }
+        },
+        "input_th_text": {
+            "type": "input.text",
+            "title": "Thresholds: filter (* wildcard)",
+            "options": {
+                "token": "th_text",
+                "defaultValue": "*"
+            }
+        },
+        "input_bk_action": {
+            "type": "input.dropdown",
+            "title": "4 Test block (admin): action",
+            "options": {
+                "items": [
+                    {
+                        "label": "Add",
+                        "value": "add"
+                    },
+                    {
+                        "label": "Remove",
+                        "value": "remove"
+                    }
+                ],
+                "token": "bk_action",
+                "defaultValue": "add"
+            }
+        },
+        "input_bk_host": {
+            "type": "input.dropdown",
+            "title": "4 Test block: host",
+            "options": {
+                "items": ">frame(label, value) | prepend(formattedStatics) | objects()",
+                "token": "bk_host"
+            },
+            "dataSources": {
+                "primary": "ds_hosts"
+            },
+            "context": {
+                "formattedConfig": {
+                    "number": {
+                        "prefix": ""
+                    }
+                },
+                "formattedStatics": ">statics | formatByType(formattedConfig)",
+                "statics": [],
+                "label": ">primary | seriesByName(\"label\") | renameSeries(\"label\") | formatByType(formattedConfig)",
+                "value": ">primary | seriesByName(\"value\") | renameSeries(\"value\") | formatByType(formattedConfig)"
+            }
+        },
+        "input_bk_level": {
+            "type": "input.dropdown",
+            "title": "4 Test block: level",
+            "options": {
+                "items": [
+                    {
+                        "label": "host (all its data)",
+                        "value": "host"
+                    },
+                    {
+                        "label": "sourcetype",
+                        "value": "sourcetype"
+                    },
+                    {
+                        "label": "source (exact raw source)",
+                        "value": "source"
+                    }
+                ],
+                "token": "bk_level",
+                "defaultValue": "host"
+            }
+        },
+        "input_bk_target": {
+            "type": "input.dropdown",
+            "title": "4 Test block: sourcetype or raw source",
+            "options": {
+                "items": ">frame(label, value) | prepend(formattedStatics) | objects()",
+                "token": "bk_target",
+                "defaultValue": "-"
+            },
+            "dataSources": {
+                "primary": "ds_bk_targets"
+            },
+            "context": {
+                "formattedConfig": {
+                    "number": {
+                        "prefix": ""
+                    }
+                },
+                "formattedStatics": ">statics | formatByType(formattedConfig)",
+                "statics": [
+                    [
+                        "(whole host)"
+                    ],
+                    [
+                        "-"
+                    ]
+                ],
+                "label": ">primary | seriesByName(\"label\") | renameSeries(\"label\") | formatByType(formattedConfig)",
+                "value": ">primary | seriesByName(\"value\") | renameSeries(\"value\") | formatByType(formattedConfig)"
+            }
+        },
+        "input_bk_duration": {
+            "type": "input.dropdown",
+            "title": "4 Test block: for",
+            "options": {
+                "items": [
+                    {
+                        "label": "5 minutes",
+                        "value": "300"
+                    },
+                    {
+                        "label": "15 minutes",
+                        "value": "900"
+                    },
+                    {
+                        "label": "1 hour",
+                        "value": "3600"
+                    },
+                    {
+                        "label": "4 hours",
+                        "value": "14400"
+                    },
+                    {
+                        "label": "24 hours (maximum)",
+                        "value": "86400"
+                    }
+                ],
+                "token": "bk_duration",
+                "defaultValue": "900"
+            }
+        },
+        "input_bk_confirm": {
+            "type": "input.dropdown",
+            "title": "4 Test block: confirm",
+            "options": {
+                "items": ">frame(label, value) | prepend(formattedStatics) | objects()",
+                "token": "bk_confirm"
+            },
+            "dataSources": {
+                "primary": "ds_bk_confirm"
+            },
+            "context": {
+                "formattedConfig": {
+                    "number": {
+                        "prefix": ""
+                    }
+                },
+                "formattedStatics": ">statics | formatByType(formattedConfig)",
+                "statics": [],
+                "label": ">primary | seriesByName(\"label\") | renameSeries(\"label\") | formatByType(formattedConfig)",
+                "value": ">primary | seriesByName(\"value\") | renameSeries(\"value\") | formatByType(formattedConfig)"
+            }
+        }
+    },
+    "defaults": {
+        "dataSources": {
+            "ds.search": {
+                "options": {
+                    "queryParameters": {
+                        "earliest": "-24h",
+                        "latest": "now"
+                    }
+                }
+            }
+        }
+    },
+    "dataSources": {
+        "ds_hosts": {
+            "type": "ds.search",
+            "name": "Hosts",
+            "options": {
+                "query": "| `dh_ui_status(dh_status)` | stats count by host | eval label=host, value=host | table label value"
+            }
+        },
+        "ds_ov_entities": {
+            "type": "ds.search",
+            "name": "Entities of the override host",
+            "options": {
+                "query": "| `dh_ui_status(dh_status)` | where host==$ov_host|s$ | eval dh_lv=case(level==\"host\", 0, level==\"sourcetype\", 1, true(), 2), label=entity_id.\" (\".status.\")\", value=entity_id | sort 0 dh_lv entity_id | table label value"
+            }
+        },
+        "ds_ov_plan": {
+            "type": "ds.search",
+            "name": "Override plan",
+            "options": {
+                "query": "| makeresults | eval entity_id=$ov_entity|s$, dh_action=$ov_action|s$, dh_secs=if($ov_action|s$==\"mute\", $ov_duration|s$, $ov_threshold|s$), reason=$m_reason|s$, ticket=$m_ticket|s$ | `dh_ui_actor` | `dh_ui_override_plan(dh_overrides, now())`"
+            }
+        },
+        "ds_ov_preview": {
+            "type": "ds.chain",
+            "name": "Preview",
+            "options": {
+                "extend": "ds_ov_plan",
+                "query": "| table action entity_id before after check"
+            }
+        },
+        "ds_ov_confirm": {
+            "type": "ds.chain",
+            "name": "Confirmation choice",
+            "options": {
+                "extend": "ds_ov_plan",
+                "query": "| where dh_ok==1 | eval label=\"Apply: \".action.\" \".entity_id, value=dh_token | table label value"
+            }
+        },
+        "ds_ov_apply": {
+            "type": "ds.search",
+            "name": "Override apply",
+            "options": {
+                "query": "| makeresults | eval entity_id=$ov_entity|s$, dh_action=$ov_action|s$, dh_secs=if($ov_action|s$==\"mute\", $ov_duration|s$, $ov_threshold|s$), reason=$m_reason|s$, ticket=$m_ticket|s$ | `dh_ui_actor` | `dh_ui_override_plan(dh_overrides, now())` | eval dh_confirm=$ov_confirm|s$ | `dh_ui_override_write(dh_overrides, dh_admin_log, now())`"
+            }
+        },
+        "ds_overrides": {
+            "type": "ds.search",
+            "name": "Current overrides",
+            "options": {
+                "query": "| inputlookup dh_overrides | eval mute_until=if(isnull(mute_until), \"-\", strftime(tonumber(mute_until), \"%Y-%m-%d %H:%M\")), set_at=strftime(tonumber(set_at), \"%Y-%m-%d %H:%M\") | sort 0 entity_id | table entity_id mute_until reason ticket threshold_override_secs set_by set_at"
+            }
+        },
+        "ds_ex_plan": {
+            "type": "ds.search",
+            "name": "Add-row plan",
+            "options": {
+                "query": "| makeresults | eval dh_action=\"add\", level=$ex_level|s$, index=$ex_index|s$, host=$ex_host|s$, sourcetype=$ex_sourcetype|s$, source=$ex_source|s$, collection=$ex_collection|s$, via=$ex_via|s$, profile=$ex_profile|s$, interval_secs=$ex_interval|s$, criticality=$ex_crit|s$, owner=$ex_owner|s$, site=$ex_site|s$, runbook=$ex_runbook|s$, description=$ex_description|s$, reason=$m_reason|s$, ticket=$m_ticket|s$ | `dh_ui_actor` | `dh_ui_expected_plan(dh_expected, now())`"
+            }
+        },
+        "ds_ex_preview": {
+            "type": "ds.chain",
+            "name": "Preview",
+            "options": {
+                "extend": "ds_ex_plan",
+                "query": "| table action entity_id before after check"
+            }
+        },
+        "ds_ex_confirm": {
+            "type": "ds.chain",
+            "name": "Confirmation choice",
+            "options": {
+                "extend": "ds_ex_plan",
+                "query": "| where dh_ok==1 | eval label=\"Apply: \".action.\" \".entity_id, value=dh_token | table label value"
+            }
+        },
+        "ds_ex_apply": {
+            "type": "ds.search",
+            "name": "Add-row apply",
+            "options": {
+                "query": "| makeresults | eval dh_action=\"add\", level=$ex_level|s$, index=$ex_index|s$, host=$ex_host|s$, sourcetype=$ex_sourcetype|s$, source=$ex_source|s$, collection=$ex_collection|s$, via=$ex_via|s$, profile=$ex_profile|s$, interval_secs=$ex_interval|s$, criticality=$ex_crit|s$, owner=$ex_owner|s$, site=$ex_site|s$, runbook=$ex_runbook|s$, description=$ex_description|s$, reason=$m_reason|s$, ticket=$m_ticket|s$ | `dh_ui_actor` | `dh_ui_expected_plan(dh_expected, now())` | eval dh_confirm=$ex_confirm|s$ | `dh_ui_expected_write(dh_expected, dh_admin_log, now())`"
+            }
+        },
+        "ds_unreg": {
+            "type": "ds.search",
+            "name": "Unregistered",
+            "options": {
+                "query": "| `dh_ui_unregistered(dh_expected, dh_state_fast, dh_state_slow, dh_baseline, now())`"
+            }
+        },
+        "ds_ad_entities": {
+            "type": "ds.chain",
+            "name": "Unregistered choices",
+            "options": {
+                "extend": "ds_unreg",
+                "query": "| eval label=entity_id.\" (last seen \".last_seen.\")\", value=entity_id | table label value"
+            }
+        },
+        "ds_ad_plan": {
+            "type": "ds.search",
+            "name": "Adopt plan",
+            "options": {
+                "query": "| makeresults | eval entity_id=$ad_entity|s$ | `dh_ui_adopt_row(dh_baseline, dh_fwd)` | eval criticality=$ad_crit|s$, reason=$m_reason|s$, ticket=$m_ticket|s$ | `dh_ui_actor` | `dh_ui_expected_plan(dh_expected, now())`"
+            }
+        },
+        "ds_ad_preview": {
+            "type": "ds.chain",
+            "name": "Preview",
+            "options": {
+                "extend": "ds_ad_plan",
+                "query": "| table action entity_id before after check"
+            }
+        },
+        "ds_ad_confirm": {
+            "type": "ds.chain",
+            "name": "Confirmation choice",
+            "options": {
+                "extend": "ds_ad_plan",
+                "query": "| where dh_ok==1 | eval label=\"Apply: \".action.\" \".entity_id, value=dh_token | table label value"
+            }
+        },
+        "ds_ad_apply": {
+            "type": "ds.search",
+            "name": "Adopt apply",
+            "options": {
+                "query": "| makeresults | eval entity_id=$ad_entity|s$ | `dh_ui_adopt_row(dh_baseline, dh_fwd)` | eval criticality=$ad_crit|s$, reason=$m_reason|s$, ticket=$m_ticket|s$ | `dh_ui_actor` | `dh_ui_expected_plan(dh_expected, now())` | eval dh_confirm=$ad_confirm|s$ | `dh_ui_expected_write(dh_expected, dh_admin_log, now())`"
+            }
+        },
+        "ds_thresholds": {
+            "type": "ds.search",
+            "name": "Learned against configured thresholds",
+            "options": {
+                "query": "| `dh_ui_status(dh_status)` | eval f_site=\"*\", f_owner=\"*\", f_index=\"*\", f_crit=\"*\", f_status=\"*\", f_text=$th_text|s$ | `dh_ui_filter` | `dh_ui_thresholds(dh_baseline, dh_expected)`"
+            }
+        },
+        "ds_bk_sources": {
+            "type": "ds.search",
+            "name": "Raw sources of the block host (24 h)",
+            "options": {
+                "query": "| tstats count max(_indextime) as it where index IN (linux, windows, network) [| makeresults | eval host=$bk_host|s$ | `dh_ui_host_terms`] earliest=-24h latest=+1d by index sourcetype source | eval source_norm=`dh_source_norm(source)`, last_seen=strftime(it, \"%Y-%m-%d %H:%M\") | sort 0 sourcetype source | table index sourcetype source source_norm count last_seen"
+            }
+        },
+        "ds_bk_targets": {
+            "type": "ds.chain",
+            "name": "Block target choices",
+            "options": {
+                "extend": "ds_bk_sources",
+                "query": "| eval lvl=$bk_level|s$ | where lvl!=\"host\" | eval value=if(lvl==\"source\", sourcetype.\"|\".source, sourcetype.\"|*\"), label=if(lvl==\"source\", sourcetype.\" | raw: \".source.\" | normalized: \".source_norm, sourcetype) | stats count by label value | table label value"
+            }
+        },
+        "ds_blocks": {
+            "type": "ds.search",
+            "name": "Current test blocks",
+            "options": {
+                "query": "| makeresults | eval dh_seed=1 | inputlookup append=true hl_ingest_block | where isnull(dh_seed) AND isnotnull(k) AND k!=\"-\" | eval state=if(tonumber(until)>now(), \"test block until \".strftime(tonumber(until), \"%H:%M\"), \"expired (pruned within about 2 min)\"), until=strftime(tonumber(until), \"%Y-%m-%d %H:%M\") | table k until reason set_by state"
+            }
+        },
+        "ds_bk_plan": {
+            "type": "ds.search",
+            "name": "Test-block plan",
+            "options": {
+                "query": "| makeresults | eval dh_action=$bk_action|s$, level=$bk_level|s$, host=$bk_host|s$, target=$bk_target|s$, dh_secs=$bk_duration|s$, reason=$m_reason|s$, ticket=$m_ticket|s$ | `dh_ui_actor` | `dh_ui_block_plan(hl_ingest_block, now())`"
+            }
+        },
+        "ds_bk_preview": {
+            "type": "ds.chain",
+            "name": "Preview",
+            "options": {
+                "extend": "ds_bk_plan",
+                "query": "| table action k source_norm before after check"
+            }
+        },
+        "ds_bk_confirm": {
+            "type": "ds.chain",
+            "name": "Confirmation choice",
+            "options": {
+                "extend": "ds_bk_plan",
+                "query": "| where dh_ok==1 | eval label=\"Apply: \".action.\" \".entity_id, value=dh_token | table label value"
+            }
+        },
+        "ds_bk_apply": {
+            "type": "ds.search",
+            "name": "Test-block apply",
+            "options": {
+                "query": "| makeresults | eval dh_action=$bk_action|s$, level=$bk_level|s$, host=$bk_host|s$, target=$bk_target|s$, dh_secs=$bk_duration|s$, reason=$m_reason|s$, ticket=$m_ticket|s$ | `dh_ui_actor` | `dh_ui_block_plan(hl_ingest_block, now())` | eval dh_confirm=$bk_confirm|s$ | `dh_ui_block_write(hl_ingest_block, dh_admin_log, now())`"
+            }
+        },
+        "ds_log": {
+            "type": "ds.search",
+            "name": "Admin log",
+            "options": {
+                "query": "| inputlookup dh_admin_log | sort 0 -time | head 1000 | eval time=strftime(tonumber(time), \"%Y-%m-%d %H:%M:%S\") | table time actor action entity_id detail reason ticket"
+            }
+        }
+    },
+    "visualizations": {
+        "viz_help": {
+            "type": "splunk.markdown",
+            "options": {
+                "markdown": "**Manage** (no auto-refresh). Every change takes three steps, and nothing is written before the last one:\n1. Fill the inputs of one form (1 to 4) and the **Reason**, then **Submit**: the preview shows the change (before and after) or why it is refused.\n2. Choose **Apply** in that form's *confirm* input and **Submit** again: the change is written and logged (admin log below).\n3. A repeated submit or a reloaded page applies nothing: the confirmation is tied to the state it was previewed against.\n\nMutes need a reason and expire within 30 days; a host mute covers its children. Adding a row or adopting needs **dh_admin**. **Test blocks** (dh_admin) drop real data at ingest for linux, windows and network within about 60 s; a source block matches the **exact raw source** (the normalized form is shown for reference only). In production a block control is itself a blinding vector."
+            }
+        },
+        "viz_ov_preview": {
+            "type": "splunk.table",
+            "title": "1 Override: preview",
+            "dataSources": {
+                "primary": "ds_ov_preview"
+            },
+            "options": {
+                "count": 25
+            }
+        },
+        "viz_ov_result": {
+            "type": "splunk.table",
+            "title": "1 Override: result",
+            "dataSources": {
+                "primary": "ds_ov_apply"
+            },
+            "options": {
+                "count": 25
+            }
+        },
+        "viz_overrides": {
+            "type": "splunk.table",
+            "title": "Current overrides (mutes and threshold overrides)",
+            "dataSources": {
+                "primary": "ds_overrides"
+            },
+            "options": {
+                "count": 25
+            }
+        },
+        "viz_ex_preview": {
+            "type": "splunk.table",
+            "title": "2 Add an expected row: preview",
+            "dataSources": {
+                "primary": "ds_ex_preview"
+            },
+            "options": {
+                "count": 25
+            }
+        },
+        "viz_ex_result": {
+            "type": "splunk.table",
+            "title": "2 Add an expected row: result",
+            "dataSources": {
+                "primary": "ds_ex_apply"
+            },
+            "options": {
+                "count": 25
+            }
+        },
+        "viz_unreg": {
+            "type": "splunk.table",
+            "title": "Unregistered: seen in the last 7 d, not expected",
+            "dataSources": {
+                "primary": "ds_unreg"
+            },
+            "options": {
+                "count": 25
+            }
+        },
+        "viz_ad_preview": {
+            "type": "splunk.table",
+            "title": "3 Adopt: preview",
+            "dataSources": {
+                "primary": "ds_ad_preview"
+            },
+            "options": {
+                "count": 25
+            }
+        },
+        "viz_ad_result": {
+            "type": "splunk.table",
+            "title": "3 Adopt: result",
+            "dataSources": {
+                "primary": "ds_ad_apply"
+            },
+            "options": {
+                "count": 25
+            }
+        },
+        "viz_thresholds": {
+            "type": "splunk.table",
+            "title": "Learned against configured thresholds",
+            "dataSources": {
+                "primary": "ds_thresholds"
+            },
+            "options": {
+                "count": 25
+            }
+        },
+        "viz_bk_sources": {
+            "type": "splunk.table",
+            "title": "4 Test block: raw sources of the host (24 h), with the normalized form",
+            "dataSources": {
+                "primary": "ds_bk_sources"
+            },
+            "options": {
+                "count": 25
+            }
+        },
+        "viz_blocks": {
+            "type": "splunk.table",
+            "title": "Current test blocks (hl_ingest_block)",
+            "dataSources": {
+                "primary": "ds_blocks"
+            },
+            "options": {
+                "count": 25
+            }
+        },
+        "viz_bk_preview": {
+            "type": "splunk.table",
+            "title": "4 Test block: preview",
+            "dataSources": {
+                "primary": "ds_bk_preview"
+            },
+            "options": {
+                "count": 25
+            }
+        },
+        "viz_bk_result": {
+            "type": "splunk.table",
+            "title": "4 Test block: result",
+            "dataSources": {
+                "primary": "ds_bk_apply"
+            },
+            "options": {
+                "count": 25
+            }
+        },
+        "viz_log": {
+            "type": "splunk.table",
+            "title": "Admin log",
+            "dataSources": {
+                "primary": "ds_log"
+            },
+            "options": {
+                "count": 25
+            }
+        }
+    },
+    "layout": {
+        "type": "grid",
+        "options": {
+            "width": 1440,
+            "height": 2770,
+            "submitButton": true,
+            "submitOnDashboardLoad": false
+        },
+        "globalInputs": [
+            "input_m_reason",
+            "input_m_ticket",
+            "input_ov_host",
+            "input_ov_entity",
+            "input_ov_action",
+            "input_ov_duration",
+            "input_ov_threshold",
+            "input_ov_confirm",
+            "input_ex_level",
+            "input_ex_index",
+            "input_ex_host",
+            "input_ex_sourcetype",
+            "input_ex_source",
+            "input_ex_collection",
+            "input_ex_via",
+            "input_ex_profile",
+            "input_ex_interval",
+            "input_ex_crit",
+            "input_ex_owner",
+            "input_ex_site",
+            "input_ex_runbook",
+            "input_ex_description",
+            "input_ex_confirm",
+            "input_ad_entity",
+            "input_ad_crit",
+            "input_ad_confirm",
+            "input_th_text",
+            "input_bk_action",
+            "input_bk_host",
+            "input_bk_level",
+            "input_bk_target",
+            "input_bk_duration",
+            "input_bk_confirm"
+        ],
+        "structure": [
+            {
+                "item": "viz_help",
+                "type": "block",
+                "position": {
+                    "x": 0,
+                    "y": 0,
+                    "w": 1440,
+                    "h": 190
+                }
+            },
+            {
+                "item": "viz_ov_preview",
+                "type": "block",
+                "position": {
+                    "x": 0,
+                    "y": 190,
+                    "w": 720,
+                    "h": 200
+                }
+            },
+            {
+                "item": "viz_ov_result",
+                "type": "block",
+                "position": {
+                    "x": 720,
+                    "y": 190,
+                    "w": 720,
+                    "h": 200
+                }
+            },
+            {
+                "item": "viz_overrides",
+                "type": "block",
+                "position": {
+                    "x": 0,
+                    "y": 390,
+                    "w": 1440,
+                    "h": 300
+                }
+            },
+            {
+                "item": "viz_ex_preview",
+                "type": "block",
+                "position": {
+                    "x": 0,
+                    "y": 690,
+                    "w": 720,
+                    "h": 200
+                }
+            },
+            {
+                "item": "viz_ex_result",
+                "type": "block",
+                "position": {
+                    "x": 720,
+                    "y": 690,
+                    "w": 720,
+                    "h": 200
+                }
+            },
+            {
+                "item": "viz_unreg",
+                "type": "block",
+                "position": {
+                    "x": 0,
+                    "y": 890,
+                    "w": 1440,
+                    "h": 320
+                }
+            },
+            {
+                "item": "viz_ad_preview",
+                "type": "block",
+                "position": {
+                    "x": 0,
+                    "y": 1210,
+                    "w": 720,
+                    "h": 200
+                }
+            },
+            {
+                "item": "viz_ad_result",
+                "type": "block",
+                "position": {
+                    "x": 720,
+                    "y": 1210,
+                    "w": 720,
+                    "h": 200
+                }
+            },
+            {
+                "item": "viz_thresholds",
+                "type": "block",
+                "position": {
+                    "x": 0,
+                    "y": 1410,
+                    "w": 1440,
+                    "h": 420
+                }
+            },
+            {
+                "item": "viz_bk_sources",
+                "type": "block",
+                "position": {
+                    "x": 0,
+                    "y": 1830,
+                    "w": 720,
+                    "h": 320
+                }
+            },
+            {
+                "item": "viz_blocks",
+                "type": "block",
+                "position": {
+                    "x": 720,
+                    "y": 1830,
+                    "w": 720,
+                    "h": 320
+                }
+            },
+            {
+                "item": "viz_bk_preview",
+                "type": "block",
+                "position": {
+                    "x": 0,
+                    "y": 2150,
+                    "w": 720,
+                    "h": 200
+                }
+            },
+            {
+                "item": "viz_bk_result",
+                "type": "block",
+                "position": {
+                    "x": 720,
+                    "y": 2150,
+                    "w": 720,
+                    "h": 200
+                }
+            },
+            {
+                "item": "viz_log",
+                "type": "block",
+                "position": {
+                    "x": 0,
+                    "y": 2350,
+                    "w": 1440,
+                    "h": 420
+                }
+            }
+        ]
+    }
+}
+]]></definition>
+    <meta type="hiddenElements"><![CDATA[
+{
+    "hideEdit": false,
+    "hideOpenInSearch": false,
+    "hideExport": false
+}
+]]></meta>
+</dashboard>

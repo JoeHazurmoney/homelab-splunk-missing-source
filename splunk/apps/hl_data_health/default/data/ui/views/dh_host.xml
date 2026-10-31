@@ -1,0 +1,307 @@
+<dashboard version="2" theme="dark">
+    <label>Host detail</label>
+    <description>One host (spec §8.2): its expected children with age against threshold and the threshold's origin, 24 h of data by sourcetype, the forwarder, splunkd errors, tamper findings, transitions and Hyper-V events.</description>
+    <definition><![CDATA[
+{
+    "title": "Host detail",
+    "description": "One host (spec §8.2). Opened from the Overview with the host set; pick another host above.",
+    "inputs": {
+        "input_host": {
+            "type": "input.dropdown",
+            "title": "Host",
+            "options": {
+                "items": ">frame(label, value) | prepend(formattedStatics) | objects()",
+                "token": "host",
+                "selectFirstSearchResult": true
+            },
+            "dataSources": {
+                "primary": "ds_hosts"
+            },
+            "context": {
+                "formattedConfig": {
+                    "number": {
+                        "prefix": ""
+                    }
+                },
+                "formattedStatics": ">statics | formatByType(formattedConfig)",
+                "statics": [],
+                "label": ">primary | seriesByName(\"label\") | renameSeries(\"label\") | formatByType(formattedConfig)",
+                "value": ">primary | seriesByName(\"value\") | renameSeries(\"value\") | formatByType(formattedConfig)"
+            }
+        }
+    },
+    "defaults": {
+        "dataSources": {
+            "ds.search": {
+                "options": {
+                    "queryParameters": {
+                        "earliest": "-24h",
+                        "latest": "now"
+                    }
+                }
+            }
+        }
+    },
+    "dataSources": {
+        "ds_hosts": {
+            "type": "ds.search",
+            "name": "Hosts",
+            "options": {
+                "query": "| `dh_ui_status(dh_status)` | stats max(eval(if(level==\"host\", host_rollup, null()))) as rollup by host | eval label=host.if(isnotnull(rollup), \" (\".rollup.\")\", \"\"), value=host | table label value"
+            }
+        },
+        "ds_children": {
+            "type": "ds.search",
+            "name": "Children",
+            "options": {
+                "query": "| `dh_ui_status(dh_status)` | where host==$host|s$ | `dh_ui_host_children(dh_volume)`"
+            }
+        },
+        "ds_chart": {
+            "type": "ds.search",
+            "name": "24 h by sourcetype (tstats)",
+            "options": {
+                "query": "| tstats prestats=t count where index IN (`dh_indexes`) [| makeresults | eval host=$host|s$ | `dh_ui_host_terms`] earliest=-24h latest=now by _time span=10m sourcetype | timechart span=10m count by sourcetype",
+                "queryParameters": {
+                    "earliest": "-24h",
+                    "latest": "now"
+                }
+            }
+        },
+        "ds_fwd": {
+            "type": "ds.search",
+            "name": "Forwarder",
+            "options": {
+                "query": "| inputlookup dh_fwd where host=$host|s$ | `dh_ui_fwd(now())`"
+            }
+        },
+        "ds_errors": {
+            "type": "ds.search",
+            "name": "Latest splunkd errors",
+            "options": {
+                "query": "search index=_internal sourcetype=splunkd (log_level=ERROR OR log_level=WARN) [| makeresults | eval host=$host|s$ | `dh_ui_host_terms`] earliest=-24h latest=now | head 25 | eval time=strftime(_time, \"%Y-%m-%d %H:%M:%S\"), message=coalesce(event_message, _raw) | table time log_level component message"
+            }
+        },
+        "ds_tamper": {
+            "type": "ds.search",
+            "name": "Tamper findings",
+            "options": {
+                "query": "| inputlookup dh_tamper where host=$host|s$ | where coalesce(tonumber(suppressed), 0)==0 | sort 0 -time | eval time=strftime(tonumber(time), \"%Y-%m-%d %H:%M\") | table time indicator events code detail finding_id"
+            }
+        },
+        "ds_transitions": {
+            "type": "ds.search",
+            "name": "Transitions (7 d)",
+            "options": {
+                "query": "search index=data_health source=\"dh:transition\" sourcetype=stash dh_host=$host|s$ earliest=-7d latest=+1d | sort 0 -_time | head 200 | eval time=strftime(_time, \"%Y-%m-%d %H:%M\") | table time entity_id prev_status status cause"
+            }
+        },
+        "ds_hyperv": {
+            "type": "ds.search",
+            "name": "Hyper-V events (7 d)",
+            "options": {
+                "query": "search index=windows sourcetype=XmlWinEventLog source=\"XmlWinEventLog:Microsoft-Windows-Hyper-V-Worker-Admin\" $host|s$ earliest=-7d latest=now | `dh_ui_hyperv` | where host==$host|s$ | head 50"
+            }
+        },
+        "ds_runbooks": {
+            "type": "ds.search",
+            "name": "Runbooks",
+            "options": {
+                "query": "| `dh_ui_status(dh_status)` | where host==$host|s$ AND isnotnull(runbook) AND runbook!=\"\" | stats count as entities by runbook"
+            }
+        }
+    },
+    "visualizations": {
+        "viz_children": {
+            "type": "splunk.table",
+            "title": "Expected children",
+            "description": "Status, age against threshold, profile, and where the threshold comes from (override, max_gap_secs, learned or default).",
+            "dataSources": {
+                "primary": "ds_children"
+            },
+            "options": {
+                "count": 25
+            }
+        },
+        "viz_chart": {
+            "type": "splunk.column",
+            "title": "Events in the last 24 h by sourcetype",
+            "dataSources": {
+                "primary": "ds_chart"
+            },
+            "options": {
+                "stackMode": "stacked"
+            }
+        },
+        "viz_fwd": {
+            "type": "splunk.table",
+            "title": "Forwarder",
+            "dataSources": {
+                "primary": "ds_fwd"
+            },
+            "options": {
+                "count": 25
+            }
+        },
+        "viz_errors": {
+            "type": "splunk.table",
+            "title": "Latest splunkd errors and warnings (24 h)",
+            "dataSources": {
+                "primary": "ds_errors"
+            },
+            "options": {
+                "count": 25
+            }
+        },
+        "viz_tamper": {
+            "type": "splunk.table",
+            "title": "Tamper findings (outside Ansible marker windows)",
+            "dataSources": {
+                "primary": "ds_tamper"
+            },
+            "options": {
+                "count": 25
+            }
+        },
+        "viz_transitions": {
+            "type": "splunk.table",
+            "title": "Status transitions (7 d)",
+            "dataSources": {
+                "primary": "ds_transitions"
+            },
+            "options": {
+                "count": 25
+            }
+        },
+        "viz_hyperv": {
+            "type": "splunk.table",
+            "title": "Hyper-V lifecycle events (7 d)",
+            "dataSources": {
+                "primary": "ds_hyperv"
+            },
+            "options": {
+                "count": 25
+            }
+        },
+        "viz_runbooks": {
+            "type": "splunk.table",
+            "title": "Runbooks (click to open)",
+            "dataSources": {
+                "primary": "ds_runbooks"
+            },
+            "options": {
+                "count": 25
+            },
+            "eventHandlers": [
+                {
+                    "type": "drilldown.customUrl",
+                    "options": {
+                        "url": "$row.runbook.value$",
+                        "newTab": true
+                    }
+                }
+            ]
+        }
+    },
+    "layout": {
+        "type": "grid",
+        "options": {
+            "width": 1440,
+            "height": 1700
+        },
+        "globalInputs": [
+            "input_host"
+        ],
+        "structure": [
+            {
+                "item": "viz_children",
+                "type": "block",
+                "position": {
+                    "x": 0,
+                    "y": 0,
+                    "w": 1440,
+                    "h": 400
+                }
+            },
+            {
+                "item": "viz_chart",
+                "type": "block",
+                "position": {
+                    "x": 0,
+                    "y": 400,
+                    "w": 960,
+                    "h": 320
+                }
+            },
+            {
+                "item": "viz_fwd",
+                "type": "block",
+                "position": {
+                    "x": 960,
+                    "y": 400,
+                    "w": 480,
+                    "h": 320
+                }
+            },
+            {
+                "item": "viz_errors",
+                "type": "block",
+                "position": {
+                    "x": 0,
+                    "y": 720,
+                    "w": 1440,
+                    "h": 320
+                }
+            },
+            {
+                "item": "viz_tamper",
+                "type": "block",
+                "position": {
+                    "x": 0,
+                    "y": 1040,
+                    "w": 720,
+                    "h": 320
+                }
+            },
+            {
+                "item": "viz_transitions",
+                "type": "block",
+                "position": {
+                    "x": 720,
+                    "y": 1040,
+                    "w": 720,
+                    "h": 320
+                }
+            },
+            {
+                "item": "viz_hyperv",
+                "type": "block",
+                "position": {
+                    "x": 0,
+                    "y": 1360,
+                    "w": 720,
+                    "h": 340
+                }
+            },
+            {
+                "item": "viz_runbooks",
+                "type": "block",
+                "position": {
+                    "x": 720,
+                    "y": 1360,
+                    "w": 720,
+                    "h": 340
+                }
+            }
+        ]
+    }
+}
+]]></definition>
+    <meta type="hiddenElements"><![CDATA[
+{
+    "hideEdit": false,
+    "hideOpenInSearch": false,
+    "hideExport": false
+}
+]]></meta>
+</dashboard>

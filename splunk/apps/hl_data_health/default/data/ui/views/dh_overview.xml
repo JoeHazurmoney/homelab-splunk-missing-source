@@ -1,0 +1,950 @@
+<dashboard version="2" theme="dark">
+    <label>Overview</label>
+    <description>SOC view of expected data (spec §8.1): the banner, KPIs per level, hosts that need attention, recent recoveries and tamper findings. Refreshes every 60 s. Click a row to open Host detail.</description>
+    <definition><![CDATA[
+{
+    "title": "Overview",
+    "description": "SOC view of expected data (spec §8.1). Refreshes every 60 s. The filters apply to every panel but the banner. Click a row to open Host detail.",
+    "inputs": {
+        "input_site": {
+            "type": "input.dropdown",
+            "title": "Site",
+            "options": {
+                "items": ">frame(label, value) | prepend(formattedStatics) | objects()",
+                "token": "f_site",
+                "defaultValue": "*"
+            },
+            "dataSources": {
+                "primary": "ds_opt_site"
+            },
+            "context": {
+                "formattedConfig": {
+                    "number": {
+                        "prefix": ""
+                    }
+                },
+                "formattedStatics": ">statics | formatByType(formattedConfig)",
+                "statics": [
+                    [
+                        "All"
+                    ],
+                    [
+                        "*"
+                    ]
+                ],
+                "label": ">primary | seriesByName(\"label\") | renameSeries(\"label\") | formatByType(formattedConfig)",
+                "value": ">primary | seriesByName(\"value\") | renameSeries(\"value\") | formatByType(formattedConfig)"
+            }
+        },
+        "input_owner": {
+            "type": "input.dropdown",
+            "title": "Owner",
+            "options": {
+                "items": ">frame(label, value) | prepend(formattedStatics) | objects()",
+                "token": "f_owner",
+                "defaultValue": "*"
+            },
+            "dataSources": {
+                "primary": "ds_opt_owner"
+            },
+            "context": {
+                "formattedConfig": {
+                    "number": {
+                        "prefix": ""
+                    }
+                },
+                "formattedStatics": ">statics | formatByType(formattedConfig)",
+                "statics": [
+                    [
+                        "All"
+                    ],
+                    [
+                        "*"
+                    ]
+                ],
+                "label": ">primary | seriesByName(\"label\") | renameSeries(\"label\") | formatByType(formattedConfig)",
+                "value": ">primary | seriesByName(\"value\") | renameSeries(\"value\") | formatByType(formattedConfig)"
+            }
+        },
+        "input_index": {
+            "type": "input.dropdown",
+            "title": "Index",
+            "options": {
+                "items": ">frame(label, value) | prepend(formattedStatics) | objects()",
+                "token": "f_index",
+                "defaultValue": "*"
+            },
+            "dataSources": {
+                "primary": "ds_opt_index"
+            },
+            "context": {
+                "formattedConfig": {
+                    "number": {
+                        "prefix": ""
+                    }
+                },
+                "formattedStatics": ">statics | formatByType(formattedConfig)",
+                "statics": [
+                    [
+                        "All"
+                    ],
+                    [
+                        "*"
+                    ]
+                ],
+                "label": ">primary | seriesByName(\"label\") | renameSeries(\"label\") | formatByType(formattedConfig)",
+                "value": ">primary | seriesByName(\"value\") | renameSeries(\"value\") | formatByType(formattedConfig)"
+            }
+        },
+        "input_crit": {
+            "type": "input.dropdown",
+            "title": "Criticality",
+            "options": {
+                "items": [
+                    {
+                        "label": "All",
+                        "value": "*"
+                    },
+                    {
+                        "label": "1 (highest)",
+                        "value": "1"
+                    },
+                    {
+                        "label": "2",
+                        "value": "2"
+                    },
+                    {
+                        "label": "3",
+                        "value": "3"
+                    },
+                    {
+                        "label": "4",
+                        "value": "4"
+                    }
+                ],
+                "token": "f_crit",
+                "defaultValue": "*"
+            }
+        },
+        "input_status": {
+            "type": "input.dropdown",
+            "title": "Status",
+            "options": {
+                "items": [
+                    {
+                        "label": "All",
+                        "value": "*"
+                    },
+                    {
+                        "label": "Host DOWN",
+                        "value": "DOWN"
+                    },
+                    {
+                        "label": "Host DEGRADED",
+                        "value": "DEGRADED"
+                    },
+                    {
+                        "label": "MISSING",
+                        "value": "MISSING"
+                    },
+                    {
+                        "label": "NEVER_SEEN",
+                        "value": "NEVER_SEEN"
+                    },
+                    {
+                        "label": "LATE",
+                        "value": "LATE"
+                    },
+                    {
+                        "label": "OK",
+                        "value": "OK"
+                    },
+                    {
+                        "label": "MUTED",
+                        "value": "MUTED"
+                    },
+                    {
+                        "label": "PENDING",
+                        "value": "PENDING"
+                    },
+                    {
+                        "label": "INFO",
+                        "value": "INFO"
+                    }
+                ],
+                "token": "f_status",
+                "defaultValue": "*"
+            }
+        },
+        "input_text": {
+            "type": "input.text",
+            "title": "Text: words (separated by *) in the entity, description or cause",
+            "options": {
+                "token": "f_text",
+                "defaultValue": "*"
+            }
+        }
+    },
+    "defaults": {
+        "dataSources": {
+            "ds.search": {
+                "options": {
+                    "queryParameters": {
+                        "earliest": "-24h@h",
+                        "latest": "now"
+                    },
+                    "refresh": "60s",
+                    "refreshType": "delay"
+                }
+            }
+        }
+    },
+    "dataSources": {
+        "ds_all": {
+            "type": "ds.search",
+            "name": "Current dh_status rows",
+            "options": {
+                "query": "| `dh_ui_status(dh_status)`"
+            }
+        },
+        "ds_kpi": {
+            "type": "ds.chain",
+            "name": "KPIs per level (filtered)",
+            "options": {
+                "extend": "ds_all",
+                "query": "| eval f_site=$f_site|s$, f_owner=$f_owner|s$, f_index=$f_index|s$, f_crit=$f_crit|s$, f_status=$f_status|s$, f_text=$f_text|s$ | `dh_ui_filter` | `dh_ui_kpi`"
+            }
+        },
+        "ds_headline": {
+            "type": "ds.chain",
+            "name": "Needs attention headline (filtered)",
+            "options": {
+                "extend": "ds_all",
+                "query": "| eval f_site=$f_site|s$, f_owner=$f_owner|s$, f_index=$f_index|s$, f_crit=$f_crit|s$, f_status=$f_status|s$, f_text=$f_text|s$ | `dh_ui_filter` | `dh_ui_attention_headline`"
+            }
+        },
+        "ds_attention": {
+            "type": "ds.chain",
+            "name": "Needs attention (filtered)",
+            "options": {
+                "extend": "ds_all",
+                "query": "| eval f_site=$f_site|s$, f_owner=$f_owner|s$, f_index=$f_index|s$, f_crit=$f_crit|s$, f_status=$f_status|s$, f_text=$f_text|s$ | `dh_ui_filter` | `dh_ui_attention(now())`"
+            }
+        },
+        "ds_opt_site": {
+            "type": "ds.chain",
+            "name": "site choices",
+            "options": {
+                "extend": "ds_all",
+                "query": "| where isnotnull(site) AND site!=\"\" | stats count by site | eval label=site, value=site | table label value"
+            }
+        },
+        "ds_opt_owner": {
+            "type": "ds.chain",
+            "name": "owner choices",
+            "options": {
+                "extend": "ds_all",
+                "query": "| where isnotnull(owner) AND owner!=\"\" | stats count by owner | eval label=owner, value=owner | table label value"
+            }
+        },
+        "ds_opt_index": {
+            "type": "ds.chain",
+            "name": "index choices",
+            "options": {
+                "extend": "ds_all",
+                "query": "| where level!=\"host\" AND isnotnull(index) | stats count by index | eval label=index, value=index | table label value"
+            }
+        },
+        "ds_banner": {
+            "type": "ds.search",
+            "name": "Banner",
+            "options": {
+                "query": "| `dh_ui_banner(dh_meta, dh_status, now())`"
+            }
+        },
+        "ds_tamper": {
+            "type": "ds.search",
+            "name": "Tamper findings in 24 h (first seen)",
+            "options": {
+                "query": "search index=data_health source=\"dh:tamper\" sourcetype=stash earliest=-31d latest=+1d | eval it=_indextime | `dh_ui_tamper_24h(dh_status, now())`"
+            }
+        },
+        "ds_tamper_f": {
+            "type": "ds.chain",
+            "name": "Tamper findings (filtered)",
+            "options": {
+                "extend": "ds_tamper",
+                "query": "| eval f_site=$f_site|s$, f_owner=$f_owner|s$, f_index=$f_index|s$, f_crit=$f_crit|s$, f_status=$f_status|s$, f_text=$f_text|s$ | `dh_ui_filter` | table first_seen time host indicator events code detail"
+            }
+        },
+        "ds_tamper_n": {
+            "type": "ds.chain",
+            "name": "Tamper count (filtered)",
+            "options": {
+                "extend": "ds_tamper",
+                "query": "| eval f_site=$f_site|s$, f_owner=$f_owner|s$, f_index=$f_index|s$, f_crit=$f_crit|s$, f_status=$f_status|s$, f_text=$f_text|s$ | `dh_ui_filter` | stats count"
+            }
+        },
+        "ds_recovered": {
+            "type": "ds.search",
+            "name": "Recently recovered (24 h)",
+            "options": {
+                "query": "search index=data_health source=\"dh:transition\" sourcetype=stash earliest=-7d latest=+1d | `dh_ui_recovered(dh_status, now())`"
+            }
+        },
+        "ds_recovered_f": {
+            "type": "ds.chain",
+            "name": "Recently recovered (filtered)",
+            "options": {
+                "extend": "ds_recovered",
+                "query": "| eval f_site=$f_site|s$, f_owner=$f_owner|s$, f_index=$f_index|s$, f_crit=$f_crit|s$, f_status=$f_status|s$, f_text=$f_text|s$ | `dh_ui_filter` | table recovered host entity_id down_since down_for"
+            }
+        }
+    },
+    "visualizations": {
+        "viz_banner": {
+            "type": "splunk.singlevalue",
+            "dataSources": {
+                "primary": "ds_banner"
+            },
+            "options": {
+                "majorValue": "> primary | seriesByName(\"banner\") | lastPoint()",
+                "backgroundColor": "> primary | seriesByName(\"sev\") | lastPoint() | rangeValue(sevColors)",
+                "sparklineDisplay": "off",
+                "trendDisplay": "off"
+            },
+            "context": {
+                "sevColors": [
+                    {
+                        "to": 1,
+                        "value": "#1C4F2B"
+                    },
+                    {
+                        "from": 1,
+                        "to": 3,
+                        "value": "#7A5D00"
+                    },
+                    {
+                        "from": 3,
+                        "value": "#9E1C1C"
+                    }
+                ]
+            }
+        },
+        "viz_k_tamper": {
+            "type": "splunk.singlevalue",
+            "title": "Tamper findings (24 h)",
+            "dataSources": {
+                "primary": "ds_tamper_n"
+            },
+            "options": {
+                "majorValue": "> primary | seriesByName(\"count\") | lastPoint()",
+                "sparklineDisplay": "off",
+                "trendDisplay": "off",
+                "majorColor": "#DC4E41"
+            }
+        },
+        "viz_headline": {
+            "type": "splunk.singlevalue",
+            "dataSources": {
+                "primary": "ds_headline"
+            },
+            "options": {
+                "majorValue": "> primary | seriesByName(\"headline\") | lastPoint()",
+                "backgroundColor": "> primary | seriesByName(\"sev\") | lastPoint() | rangeValue(sevColors)",
+                "sparklineDisplay": "off",
+                "trendDisplay": "off"
+            },
+            "context": {
+                "sevColors": [
+                    {
+                        "to": 1,
+                        "value": "#1C4F2B"
+                    },
+                    {
+                        "from": 1,
+                        "to": 3,
+                        "value": "#7A5D00"
+                    },
+                    {
+                        "from": 3,
+                        "value": "#9E1C1C"
+                    }
+                ]
+            }
+        },
+        "viz_attention": {
+            "type": "splunk.table",
+            "title": "Needs attention",
+            "dataSources": {
+                "primary": "ds_attention"
+            },
+            "options": {
+                "count": 25
+            },
+            "description": "One row per host: DOWN before DEGRADED, then the worst status, criticality (1 first) and duration (oldest first). Click a row for Host detail.",
+            "eventHandlers": [
+                {
+                    "type": "drilldown.linkToDashboard",
+                    "options": {
+                        "app": "hl_data_health",
+                        "dashboard": "dh_host",
+                        "tokens": [
+                            {
+                                "token": "host",
+                                "value": "row.host.value"
+                            }
+                        ],
+                        "newTab": false
+                    }
+                }
+            ]
+        },
+        "viz_recovered": {
+            "type": "splunk.table",
+            "title": "Recently recovered (24 h, back to OK)",
+            "dataSources": {
+                "primary": "ds_recovered_f"
+            },
+            "options": {
+                "count": 25
+            },
+            "eventHandlers": [
+                {
+                    "type": "drilldown.linkToDashboard",
+                    "options": {
+                        "app": "hl_data_health",
+                        "dashboard": "dh_host",
+                        "tokens": [
+                            {
+                                "token": "host",
+                                "value": "row.host.value"
+                            }
+                        ],
+                        "newTab": false
+                    }
+                }
+            ]
+        },
+        "viz_tamper": {
+            "type": "splunk.table",
+            "title": "Tamper findings (first seen in 24 h, outside Ansible marker windows)",
+            "dataSources": {
+                "primary": "ds_tamper_f"
+            },
+            "options": {
+                "count": 25
+            },
+            "eventHandlers": [
+                {
+                    "type": "drilldown.linkToDashboard",
+                    "options": {
+                        "app": "hl_data_health",
+                        "dashboard": "dh_host",
+                        "tokens": [
+                            {
+                                "token": "host",
+                                "value": "row.host.value"
+                            }
+                        ],
+                        "newTab": false
+                    }
+                }
+            ]
+        },
+        "viz_k_host_expected": {
+            "type": "splunk.singlevalue",
+            "title": "Hosts expected",
+            "dataSources": {
+                "primary": "ds_kpi"
+            },
+            "options": {
+                "majorValue": "> primary | seriesByName(\"host_expected\") | lastPoint()",
+                "sparklineDisplay": "off",
+                "trendDisplay": "off"
+            }
+        },
+        "viz_k_host_ok": {
+            "type": "splunk.singlevalue",
+            "title": "Hosts OK",
+            "dataSources": {
+                "primary": "ds_kpi"
+            },
+            "options": {
+                "majorValue": "> primary | seriesByName(\"host_ok\") | lastPoint()",
+                "sparklineDisplay": "off",
+                "trendDisplay": "off",
+                "majorColor": "#53A051"
+            }
+        },
+        "viz_k_host_late": {
+            "type": "splunk.singlevalue",
+            "title": "Hosts late",
+            "dataSources": {
+                "primary": "ds_kpi"
+            },
+            "options": {
+                "majorValue": "> primary | seriesByName(\"host_late\") | lastPoint()",
+                "sparklineDisplay": "off",
+                "trendDisplay": "off",
+                "majorColor": "#F8BE34"
+            }
+        },
+        "viz_k_host_missing": {
+            "type": "splunk.singlevalue",
+            "title": "Hosts missing",
+            "dataSources": {
+                "primary": "ds_kpi"
+            },
+            "options": {
+                "majorValue": "> primary | seriesByName(\"host_missing\") | lastPoint()",
+                "sparklineDisplay": "off",
+                "trendDisplay": "off",
+                "majorColor": "#DC4E41"
+            }
+        },
+        "viz_k_host_muted": {
+            "type": "splunk.singlevalue",
+            "title": "Hosts muted",
+            "dataSources": {
+                "primary": "ds_kpi"
+            },
+            "options": {
+                "majorValue": "> primary | seriesByName(\"host_muted\") | lastPoint()",
+                "sparklineDisplay": "off",
+                "trendDisplay": "off",
+                "majorColor": "#9B9B9B"
+            }
+        },
+        "viz_k_host_pending": {
+            "type": "splunk.singlevalue",
+            "title": "Hosts pending",
+            "dataSources": {
+                "primary": "ds_kpi"
+            },
+            "options": {
+                "majorValue": "> primary | seriesByName(\"host_pending\") | lastPoint()",
+                "sparklineDisplay": "off",
+                "trendDisplay": "off"
+            }
+        },
+        "viz_k_sourcetype_expected": {
+            "type": "splunk.singlevalue",
+            "title": "Sourcetypes expected",
+            "dataSources": {
+                "primary": "ds_kpi"
+            },
+            "options": {
+                "majorValue": "> primary | seriesByName(\"sourcetype_expected\") | lastPoint()",
+                "sparklineDisplay": "off",
+                "trendDisplay": "off"
+            }
+        },
+        "viz_k_sourcetype_ok": {
+            "type": "splunk.singlevalue",
+            "title": "Sourcetypes OK",
+            "dataSources": {
+                "primary": "ds_kpi"
+            },
+            "options": {
+                "majorValue": "> primary | seriesByName(\"sourcetype_ok\") | lastPoint()",
+                "sparklineDisplay": "off",
+                "trendDisplay": "off",
+                "majorColor": "#53A051"
+            }
+        },
+        "viz_k_sourcetype_late": {
+            "type": "splunk.singlevalue",
+            "title": "Sourcetypes late",
+            "dataSources": {
+                "primary": "ds_kpi"
+            },
+            "options": {
+                "majorValue": "> primary | seriesByName(\"sourcetype_late\") | lastPoint()",
+                "sparklineDisplay": "off",
+                "trendDisplay": "off",
+                "majorColor": "#F8BE34"
+            }
+        },
+        "viz_k_sourcetype_missing": {
+            "type": "splunk.singlevalue",
+            "title": "Sourcetypes missing",
+            "dataSources": {
+                "primary": "ds_kpi"
+            },
+            "options": {
+                "majorValue": "> primary | seriesByName(\"sourcetype_missing\") | lastPoint()",
+                "sparklineDisplay": "off",
+                "trendDisplay": "off",
+                "majorColor": "#DC4E41"
+            }
+        },
+        "viz_k_sourcetype_muted": {
+            "type": "splunk.singlevalue",
+            "title": "Sourcetypes muted",
+            "dataSources": {
+                "primary": "ds_kpi"
+            },
+            "options": {
+                "majorValue": "> primary | seriesByName(\"sourcetype_muted\") | lastPoint()",
+                "sparklineDisplay": "off",
+                "trendDisplay": "off",
+                "majorColor": "#9B9B9B"
+            }
+        },
+        "viz_k_sourcetype_pending": {
+            "type": "splunk.singlevalue",
+            "title": "Sourcetypes pending",
+            "dataSources": {
+                "primary": "ds_kpi"
+            },
+            "options": {
+                "majorValue": "> primary | seriesByName(\"sourcetype_pending\") | lastPoint()",
+                "sparklineDisplay": "off",
+                "trendDisplay": "off"
+            }
+        },
+        "viz_k_source_expected": {
+            "type": "splunk.singlevalue",
+            "title": "Sources expected",
+            "dataSources": {
+                "primary": "ds_kpi"
+            },
+            "options": {
+                "majorValue": "> primary | seriesByName(\"source_expected\") | lastPoint()",
+                "sparklineDisplay": "off",
+                "trendDisplay": "off"
+            }
+        },
+        "viz_k_source_ok": {
+            "type": "splunk.singlevalue",
+            "title": "Sources OK",
+            "dataSources": {
+                "primary": "ds_kpi"
+            },
+            "options": {
+                "majorValue": "> primary | seriesByName(\"source_ok\") | lastPoint()",
+                "sparklineDisplay": "off",
+                "trendDisplay": "off",
+                "majorColor": "#53A051"
+            }
+        },
+        "viz_k_source_late": {
+            "type": "splunk.singlevalue",
+            "title": "Sources late",
+            "dataSources": {
+                "primary": "ds_kpi"
+            },
+            "options": {
+                "majorValue": "> primary | seriesByName(\"source_late\") | lastPoint()",
+                "sparklineDisplay": "off",
+                "trendDisplay": "off",
+                "majorColor": "#F8BE34"
+            }
+        },
+        "viz_k_source_missing": {
+            "type": "splunk.singlevalue",
+            "title": "Sources missing",
+            "dataSources": {
+                "primary": "ds_kpi"
+            },
+            "options": {
+                "majorValue": "> primary | seriesByName(\"source_missing\") | lastPoint()",
+                "sparklineDisplay": "off",
+                "trendDisplay": "off",
+                "majorColor": "#DC4E41"
+            }
+        },
+        "viz_k_source_muted": {
+            "type": "splunk.singlevalue",
+            "title": "Sources muted",
+            "dataSources": {
+                "primary": "ds_kpi"
+            },
+            "options": {
+                "majorValue": "> primary | seriesByName(\"source_muted\") | lastPoint()",
+                "sparklineDisplay": "off",
+                "trendDisplay": "off",
+                "majorColor": "#9B9B9B"
+            }
+        },
+        "viz_k_source_pending": {
+            "type": "splunk.singlevalue",
+            "title": "Sources pending",
+            "dataSources": {
+                "primary": "ds_kpi"
+            },
+            "options": {
+                "majorValue": "> primary | seriesByName(\"source_pending\") | lastPoint()",
+                "sparklineDisplay": "off",
+                "trendDisplay": "off"
+            }
+        }
+    },
+    "layout": {
+        "type": "grid",
+        "options": {
+            "width": 1440,
+            "height": 1330
+        },
+        "globalInputs": [
+            "input_site",
+            "input_owner",
+            "input_index",
+            "input_crit",
+            "input_status",
+            "input_text"
+        ],
+        "structure": [
+            {
+                "item": "viz_banner",
+                "type": "block",
+                "position": {
+                    "x": 0,
+                    "y": 0,
+                    "w": 1200,
+                    "h": 70
+                }
+            },
+            {
+                "item": "viz_k_tamper",
+                "type": "block",
+                "position": {
+                    "x": 1200,
+                    "y": 0,
+                    "w": 240,
+                    "h": 70
+                }
+            },
+            {
+                "item": "viz_k_host_expected",
+                "type": "block",
+                "position": {
+                    "x": 0,
+                    "y": 70,
+                    "w": 240,
+                    "h": 100
+                }
+            },
+            {
+                "item": "viz_k_host_ok",
+                "type": "block",
+                "position": {
+                    "x": 240,
+                    "y": 70,
+                    "w": 240,
+                    "h": 100
+                }
+            },
+            {
+                "item": "viz_k_host_late",
+                "type": "block",
+                "position": {
+                    "x": 480,
+                    "y": 70,
+                    "w": 240,
+                    "h": 100
+                }
+            },
+            {
+                "item": "viz_k_host_missing",
+                "type": "block",
+                "position": {
+                    "x": 720,
+                    "y": 70,
+                    "w": 240,
+                    "h": 100
+                }
+            },
+            {
+                "item": "viz_k_host_muted",
+                "type": "block",
+                "position": {
+                    "x": 960,
+                    "y": 70,
+                    "w": 240,
+                    "h": 100
+                }
+            },
+            {
+                "item": "viz_k_host_pending",
+                "type": "block",
+                "position": {
+                    "x": 1200,
+                    "y": 70,
+                    "w": 240,
+                    "h": 100
+                }
+            },
+            {
+                "item": "viz_k_sourcetype_expected",
+                "type": "block",
+                "position": {
+                    "x": 0,
+                    "y": 170,
+                    "w": 240,
+                    "h": 100
+                }
+            },
+            {
+                "item": "viz_k_sourcetype_ok",
+                "type": "block",
+                "position": {
+                    "x": 240,
+                    "y": 170,
+                    "w": 240,
+                    "h": 100
+                }
+            },
+            {
+                "item": "viz_k_sourcetype_late",
+                "type": "block",
+                "position": {
+                    "x": 480,
+                    "y": 170,
+                    "w": 240,
+                    "h": 100
+                }
+            },
+            {
+                "item": "viz_k_sourcetype_missing",
+                "type": "block",
+                "position": {
+                    "x": 720,
+                    "y": 170,
+                    "w": 240,
+                    "h": 100
+                }
+            },
+            {
+                "item": "viz_k_sourcetype_muted",
+                "type": "block",
+                "position": {
+                    "x": 960,
+                    "y": 170,
+                    "w": 240,
+                    "h": 100
+                }
+            },
+            {
+                "item": "viz_k_sourcetype_pending",
+                "type": "block",
+                "position": {
+                    "x": 1200,
+                    "y": 170,
+                    "w": 240,
+                    "h": 100
+                }
+            },
+            {
+                "item": "viz_k_source_expected",
+                "type": "block",
+                "position": {
+                    "x": 0,
+                    "y": 270,
+                    "w": 240,
+                    "h": 100
+                }
+            },
+            {
+                "item": "viz_k_source_ok",
+                "type": "block",
+                "position": {
+                    "x": 240,
+                    "y": 270,
+                    "w": 240,
+                    "h": 100
+                }
+            },
+            {
+                "item": "viz_k_source_late",
+                "type": "block",
+                "position": {
+                    "x": 480,
+                    "y": 270,
+                    "w": 240,
+                    "h": 100
+                }
+            },
+            {
+                "item": "viz_k_source_missing",
+                "type": "block",
+                "position": {
+                    "x": 720,
+                    "y": 270,
+                    "w": 240,
+                    "h": 100
+                }
+            },
+            {
+                "item": "viz_k_source_muted",
+                "type": "block",
+                "position": {
+                    "x": 960,
+                    "y": 270,
+                    "w": 240,
+                    "h": 100
+                }
+            },
+            {
+                "item": "viz_k_source_pending",
+                "type": "block",
+                "position": {
+                    "x": 1200,
+                    "y": 270,
+                    "w": 240,
+                    "h": 100
+                }
+            },
+            {
+                "item": "viz_headline",
+                "type": "block",
+                "position": {
+                    "x": 0,
+                    "y": 370,
+                    "w": 1440,
+                    "h": 60
+                }
+            },
+            {
+                "item": "viz_attention",
+                "type": "block",
+                "position": {
+                    "x": 0,
+                    "y": 430,
+                    "w": 1440,
+                    "h": 460
+                }
+            },
+            {
+                "item": "viz_recovered",
+                "type": "block",
+                "position": {
+                    "x": 0,
+                    "y": 890,
+                    "w": 720,
+                    "h": 440
+                }
+            },
+            {
+                "item": "viz_tamper",
+                "type": "block",
+                "position": {
+                    "x": 720,
+                    "y": 890,
+                    "w": 720,
+                    "h": 440
+                }
+            }
+        ]
+    }
+}
+]]></definition>
+    <meta type="hiddenElements"><![CDATA[
+{
+    "hideEdit": false,
+    "hideOpenInSearch": false,
+    "hideExport": false
+}
+]]></meta>
+</dashboard>

@@ -1,0 +1,12 @@
+c,dh_action,level,index,host,sourcetype,source,collection,via,profile,interval_secs,criticality,owner,site,runbook,description,reason,ticket,actor,actor_roles
+x1,add,sourcetype,linux,NEWH.mshome.net,syslog,-,uf,-,continuous,-,2,ops,lab,-,-,add syslog,-,taylor,admin
+x2,add,sourcetype,linux,newh,syslog,-,uf,-,continuous,-,2,ops,lab,-,-,add syslog,-,ana,dh_analyst
+x3,add,sourcetype,main,newh,syslog,-,uf,-,continuous,-,2,ops,lab,-,-,add syslog,-,taylor,admin
+x4,add,source,linux,newh,cpu,cpu,uf,-,periodic,-,3,ops,lab,-,-,add cpu,-,taylor,dh_admin
+x5,add,sourcetype,linux,h5,syslog,-,uf,-,sporadic,-,2,ops,lab,-,-,change,-,taylor,admin
+x6,add,sourcetype,linux,h6,syslog,-,uf,-,continuous,-,2,ops,lab,-,-,change,-,taylor,admin
+x7,add,sourcetype,linux,h7,syslog,-,uf,-,continuous,-,2,ops,lab,-,-,re-add,-,taylor,admin
+x8,add,source,linux,h8,app,/var/log/app-2026-10-30.log,uf,-,sporadic,-,2,ops,lab,-,-,add app,-,taylor,admin
+x9,add,host,-,h9,-,-,syslog,pi5,continuous,-,1,ops,lab,-,-,add device,-,taylor,admin
+x10,add,sourcetype,linux,h10,syslog,-,uf,-,continuous,-,5,ops,lab,-,-,add,-,taylor,admin
+x11,add,sourcetype,linux,h11,syslog,-,uf,-,continuous,-,2,ops,lab,-,-,-,-,taylor,admin

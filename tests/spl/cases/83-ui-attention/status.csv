@@ -1,0 +1,17 @@
+entity_id,level,index,host,sourcetype,source,status,host_rollup,since,criticality,cause,cause_code,action,runbook
+host|*|d1|*|*,host,*,d1,*,*,MISSING,DOWN,NOW-600,1,heartbeat missing,hb_missing,ping d1,rb/d1
+sourcetype|linux|d1|syslog|*,sourcetype,linux,d1,syslog,*,MISSING,DOWN,NOW-500,2,c,hb_missing,a,
+sourcetype|linux|d1|cpu|*,sourcetype,linux,d1,cpu,*,LATE,DOWN,NOW-300,3,c,hb_missing,a,
+host|*|g1|*|*,host,*,g1,*,*,OK,DEGRADED,NOW-90000,2,,,,rb/g1host
+sourcetype|linux|g1|linux_secure|*,sourcetype,linux,g1,linux_secure,*,LATE,DEGRADED,NOW-1000,2,input broken,hb_ok_input_missing,check secure,
+sourcetype|linux|g1|linux_audit|*,sourcetype,linux,g1,linux_audit,*,NEVER_SEEN,DEGRADED,NOW-7200,2,never arrived,hb_ok_never_seen,deploy audit,rb/g1
+sourcetype|linux|g2|syslog|*,sourcetype,linux,g2,syslog,*,MISSING,DEGRADED,NOW-100,1,stream stopped,stream_stopped,check sender,
+host|*|m1|*|*,host,*,m1,*,*,MUTED,MUTED,NOW-50,1,muted,muted,none,
+sourcetype|linux|m1|syslog|*,sourcetype,linux,m1,syslog,*,MUTED,MUTED,NOW-50,1,muted,muted,none,
+sourcetype|linux|o1|syslog|*,sourcetype,linux,o1,syslog,*,OK,OK,NOW-50,1,,,,
+source|linux|t1|st1|st1,source,linux,t1,st1,st1,LATE,DEGRADED,NOW-50,4,late,stream_stopped,x,
+source|linux|t1|st2|st2,source,linux,t1,st2,st2,LATE,DEGRADED,NOW-50,4,late,stream_stopped,x,
+source|linux|t1|st3|st3,source,linux,t1,st3,st3,LATE,DEGRADED,NOW-50,4,late,stream_stopped,x,
+source|linux|t1|st4|st4,source,linux,t1,st4,st4,LATE,DEGRADED,NOW-50,4,late,stream_stopped,x,
+source|linux|t1|st5|st5,source,linux,t1,st5,st5,LATE,DEGRADED,NOW-50,4,late,stream_stopped,x,
+source|linux|t1|st6|st6,source,linux,t1,st6,st6,LATE,DEGRADED,NOW-50,4,late,stream_stopped,x,

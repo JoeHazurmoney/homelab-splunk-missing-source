@@ -1,0 +1,10 @@
+entity_id,level,status
+h1,host,OK
+h2,host,MISSING
+s1,sourcetype,OK
+s2,sourcetype,LATE
+s3,sourcetype,NEVER_SEEN
+x1,source,MISSING
+x2,source,MUTED
+x3,source,PENDING
+x4,source,OK

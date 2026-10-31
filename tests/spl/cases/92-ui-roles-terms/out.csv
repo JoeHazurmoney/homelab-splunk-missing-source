@@ -1,0 +1,7 @@
+c,v
+inherited,dh_admin hl_ops power user
+admin,admin power user
+no_role_list,dh_analyst
+host,pi5 pi5.*
+host_injection,#none
+host_fqdn,#none

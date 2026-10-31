@@ -19,6 +19,9 @@
 # shellcheck disable=SC2016  # backticks here are Splunk macro calls, not shell expansions
 # Usage: tests/spl/run.sh [case-glob]     e.g. tests/spl/run.sh '1*'
 #        tests/spl/run.sh --scale [hosts] the generated scale case (default 300 hosts x 20)
+# The dashboards (task 12): a full run also checks the views statically (dash_check.py); their
+# panel searches, the 300-host load time on KV and the Manage writes run from tests/spl/dash.sh,
+# which sources this file for its helpers.
 set -euo pipefail
 here=$(cd "$(dirname "$0")" && pwd)
 # shellcheck source=tests/spl/lib.sh
@@ -78,7 +81,7 @@ eval_call() { # the evaluator over a case's fixture tables
 
 base_search() { # base_search <id> <dir>: the case's search.spl (substituted, one line) or dh_eval
   if [ -f "$2/search.spl" ]; then
-    tr -d '\r' <"$2/search.spl" | tr '\n' ' ' | sed "s/@NOW@/$NOW/g; s/@\([a-z_]*\)@/dhtest_${1}_\1.csv/g"
+    tr -d '\r' <"$2/search.spl" | tr '\n' ' ' | sed "s/@NOW@/$NOW/g; s/@\([a-z0-9_]*\)@/dhtest_${1}_\1.csv/g"
   else
     eval_call "$1"
   fi
@@ -94,7 +97,9 @@ line_expr() { # eval expression joining the named columns with commas (nulls as 
 }
 
 errors() { # print the search's error messages, for a failing case
-  dh_search "$1" json | grep -o '"type":"\(ERROR\|FATAL\)","text":"[^"]*"' | sort -u | head -5 || true
+  # (json export drops some parse-time FATALs, such as a lookup's missing output field; xml keeps them)
+  { dh_search "$1" json | grep -o '"type":"\(ERROR\|FATAL\)","text":"[^"]*"'
+    dh_search "$1" xml | grep -o '<msg type="\(ERROR\|FATAL\)">[^<]*'; } | sort -u | head -5 || true
 }
 
 # check <id> <dir> <expected-file> <spl-suffix>: run, diff, report. Returns 1 on a mismatch.
@@ -114,6 +119,7 @@ check() {
   echo "  columns: $cols"
   sed 's/^/  /' "$work/$id.diff"
   errors "$spl" | sed 's/^/  search: /'
+  if [ -n "${DH_DEBUG:-}" ]; then printf '  spl: %s\n' "$spl"; fi
   return 1
 }
 
@@ -211,12 +217,30 @@ conf_check() {
   return 1
 }
 
+# dash <mode> [args]: tests/spl/dash_check.py inside the container, on the deployed app.
+dash() { dh_docker exec -i -u splunk "$DH_CONTAINER" /opt/splunk/bin/python3 - "$@" <"$here/dash_check.py"; }
+
+# The views' static rules (spec §7.8, §8): Studio and dark, every reference resolves, tables
+# paginate at 25, only the Overview refreshes, writes need a submit button and a confirmation
+# token, no collect, panels read KV or summary data, and drilldowns reach an input of their target.
+dash_static() {
+  if dash check "$DH_APP_DIR" >"$work/dash.out"; then
+    sed 's/^/  /' "$work/dash.out"
+    echo "PASS dashboards"
+    return 0
+  fi
+  sed 's/^/  /' "$work/dash.out"
+  echo "FAIL dashboards"
+  return 1
+}
+
 run_cases() {
   local pattern=${1:-*} pass=0 fail=0 dir name id ok
   if [ "$pattern" = "*" ]; then
     if names_check; then pass=$((pass + 1)); else fail=$((fail + 1)); fi
     if static_names_check; then pass=$((pass + 1)); else fail=$((fail + 1)); fi
     if conf_check; then pass=$((pass + 1)); else fail=$((fail + 1)); fi
+    if dash_static; then pass=$((pass + 1)); else fail=$((fail + 1)); fi
   fi
   for dir in "$here"/cases/$pattern/; do
     [ -f "$dir/out.csv" ] || continue
@@ -279,4 +303,7 @@ run_scale() {
   [ "$ok" -eq 1 ]
 }
 
-if [ "${1:-}" = "--scale" ]; then run_scale "${2:-300}"; else run_cases "${1:-*}"; fi
+# (dash.sh sources this file for its helpers, so only run when executed)
+if [ "${BASH_SOURCE[0]}" = "$0" ]; then
+  if [ "${1:-}" = "--scale" ]; then run_scale "${2:-300}"; else run_cases "${1:-*}"; fi
+fi

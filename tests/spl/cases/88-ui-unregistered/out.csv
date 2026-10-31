@@ -1,0 +1,8 @@
+c,entity_id,level,index,host,sourcetype,sources,last_seen,first_seen,suggested_profile,days,configured,default,learned_raw,learned,applied_origin
+unreg,sourcetype|linux|u2|cpu|*,sourcetype,linux,u2,cpu,1,2033-05-18 03:32,2033-05-18 03:16,,,,,,,
+unreg,host|*|u2|*|*,host,*,u2,*,1,2033-05-18 03:32,2033-05-18 03:16,,,,,,,
+unreg,sourcetype|linux|u1|syslog|*,sourcetype,linux,u1,syslog,2,2033-05-18 03:32,2033-05-15 20:00,continuous,5,,,,,
+thresholds,sourcetype|linux|u1|syslog|*,,,,,,,,continuous,5,-,900,2190,2190,default
+thresholds,host|*|u1|*|*,,,,,,,,,0,-,90,-,-,default
+thresholds,source|linux|u1|linux_secure|/var/log/secure,,,,,,,,,2,7200,86400,100,-,max_gap_secs
+thresholds,sourcetype|linux|u2|cpu|*,,,,,,,,,0,-,120,-,-,default

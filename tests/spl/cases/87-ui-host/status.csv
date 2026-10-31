@@ -1,0 +1,5 @@
+entity_id,level,index,host,sourcetype,source,liveness,status,age_secs,threshold_secs,threshold_origin,threshold_note,learning,since,muted_until,mute_reason,test_block_until,profile
+host|*|h7|*|*,host,*,h7,*,*,heartbeat,OK,20,90,default,profile default (heartbeat),0,NOW-86400,,,,heartbeat
+sourcetype|linux|h7|syslog|*,sourcetype,linux,h7,syslog,*,,LATE,400,300,learned,learned from 5 days,0,NOW-100,,,,continuous
+sourcetype|linux|h7|linux_secure|*,sourcetype,linux,h7,linux_secure,*,,MUTED,100,86400,default,profile default while learning,1,NOW-50,NOW+3600,patching,,sporadic
+source|linux|h7|df|df,source,linux,h7,df,df,,NEVER_SEEN,,660,default,profile default (periodic),0,NOW-3600,,,NOW+1800,periodic

@@ -1,0 +1,11 @@
+c,entity_id,dh_action,dh_secs,reason,ticket,actor
+m1,host|*|h1|*|*,mute,3600,patching,CHG-1,taylor
+m2,host|*|h1|*|*,mute,2592001,patching,,taylor
+m3,host|*|h1|*|*,mute,3600,-,,taylor
+m4,host|*|h1|*|*,unmute,,done,,taylor
+m5,host|*|e5|*|*,unmute,,done,-,taylor
+m6,host|*|e6|*|*,threshold,1800,noisy,T7,taylor
+m7,host|*|e6|*|*,threshold,30,noisy,,taylor
+m8,host|*|e8|*|*,clear,,r8,,taylor
+m9,bogus,mute,3600,x,,taylor
+m10,host|*|h1|*|*,explode,3600,x,,taylor
