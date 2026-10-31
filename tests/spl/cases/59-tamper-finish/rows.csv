@@ -11,3 +11,5 @@ marker,NOW-5900,,,,,HC.mshome.net,apps,ci,r3
 finding,NOW-5000,hd,svcstop_auditd,SERVICE_STOP auditd,,,,,
 marker,NOW-5000,,,,,hx,stop,ci,r4
 marker,NOW-6000,,,,,hd,stop,ci,r5
+finding,NOW-604000,hh,svcstop_auditd,SERVICE_STOP auditd,,,,,
+marker,NOW-604500,,,,,hh,stop,taylorb,r6

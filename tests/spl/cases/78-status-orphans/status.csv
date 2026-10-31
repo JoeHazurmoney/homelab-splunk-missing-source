@@ -1,0 +1,5 @@
+entity_id,status
+host|*|h78|*|*,OK
+sourcetype|linux|h78|syslog|*,OK
+sourcetype|linux|h78|off|*,MISSING
+sourcetype|linux|h78|gone|*,MISSING

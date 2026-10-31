@@ -1,0 +1,3 @@
+kind,time,host,code,indicator,detail,target_host,action,by,run_id
+finding,NOW-950,ha,win1102,1102 security log cleared by taylo,channel=Security,,,,
+marker,NOW-2100,,,,,he,stop,taylorb,r7

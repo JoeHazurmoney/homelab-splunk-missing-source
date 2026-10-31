@@ -1,0 +1,5 @@
+| makeresults count=4320 | streamstats count as k | eval k=k-1, _time=@NOW@-272000+60*k, dh_kind="up"
+| append [| makeresults | eval _time=@NOW@-56000, dh_kind="data", index="enclave1", host="h75a", sourcetype="syslog", source="/var/log/messages", count=1, it=_time+2, et=_time]
+| append [| inputlookup @rows@]
+| fields - k
+| `dh_daily_from_minutes(@fwd@, @expected@)` | `dh_baseline_compute(14, @NOW@)` | search entity_id="sourcetype*" | rename learned_gap_secs AS bl_learned_gap_secs, days AS bl_days | lookup @prof@ entity_id OUTPUT profile | `dh_profile_defaults` | `dh_threshold`

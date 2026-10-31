@@ -168,7 +168,8 @@ static_names_check() {
   for s in "DH Tracker fast|dh_state_merge|state_fast" "DH Tracker fast|dh_fwd_fold|fwd" "DH Tracker fast|dh_meta_fast|meta" \
     "DH Tracker slow|dh_state_merge|state_slow" "DH Baseline daily|dh_daily_from_minutes|fwd" \
     "DH Volume hourly|dh_volume_flag|baseline" "DH Admin log copy|dh_admin_copy_rows|meta" "DH Tamper|dh_tamper_finish|" \
-    "DH Daily SoH report|dh_soh_outages|status"; do
+    "DH Daily SoH report|dh_soh_outages|status" "DH Evaluate|dh_status_keep|expected" \
+    "DH Tamper|dh_tamper_finish|tamper"; do
     IFS='|' read -r n m l <<<"$s"
     line=$(conf_lines "$app/savedsearches.conf" | grep -F "|[$n]|search = " || true)
     if [ -z "$line" ]; then echo "  saved search '$n' not found"; bad=1; continue; fi
@@ -177,6 +178,14 @@ static_names_check() {
     want=$(conf_lines "$app/macros.conf" | grep -F "|[dh_lookup_$l]|" | sed 's/.*definition = //')
     got=$(printf '%s\n' "$line" | grep -oE "\`$m\([a-z_]+" | head -1 | sed "s/^\`$m(//")
     if [ "$got" != "$want" ]; then echo "  '$n' calls $m($got, ...) but dh_lookup_$l is $want"; bad=1; fi
+  done
+  # <saved search>|<+ must contain, - must not contain>|<text>
+  for s in "DH Tamper|+|earliest=\`dh_tamper_finding_earliest\`" "DH Tamper|+|earliest=\`dh_tamper_marker_earliest\`" \
+    "DH Prune daily|-|dh_status"; do
+    IFS='|' read -r n m l <<<"$s"
+    line=$(conf_lines "$app/savedsearches.conf" | grep -F "|[$n]|search = " || true)
+    case $m$line in "+"*"$l"* | "-"*) ;; *) echo "  '$n' does not contain $l"; bad=1 ;; esac
+    case $m$line in "-"*"$l"*) echo "  '$n' must not contain $l (one writer per collection)"; bad=1 ;; esac
   done
   if [ "$bad" -eq 0 ]; then echo "PASS lookup-names-static"; return 0; fi
   echo "FAIL lookup-names-static"

@@ -2,3 +2,5 @@ level,index,host,sourcetype,source,collection,via,profile,interval_secs,max_gap_
 host,,h22a,,,uf,,heartbeat,,,1,,
 host,,h22b,,,uf,,heartbeat,,,1,,
 host,,h22c,,,uf,,heartbeat,,,1,,
+host,,h22d,,,uf,,heartbeat,,,1,,
+host,,h22e,,,uf,,heartbeat,,,1,,

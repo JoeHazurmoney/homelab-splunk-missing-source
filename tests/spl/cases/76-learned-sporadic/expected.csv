@@ -1,0 +1,2 @@
+level,index,host,sourcetype,source,enabled
+sourcetype,enclave1,h75a,syslog,,

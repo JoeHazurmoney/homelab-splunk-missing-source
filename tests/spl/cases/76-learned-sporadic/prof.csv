@@ -1,0 +1,3 @@
+entity_id,profile
+sourcetype|enclave1|h75a|syslog|*,sporadic
+sourcetype|enclave1|h75b|syslog|*,sporadic

@@ -39,10 +39,12 @@ DH Alert tamper,alert_comparator,greater than
 DH Alert tamper,alert_threshold,0
 DH Alert tamper,alert.digest_mode,0
 DH Alert tamper,alert.suppress,1
-DH Alert tamper,alert.suppress.fields,dh_host
+DH Alert tamper,alert.suppress.fields,dh_host,code
 DH Alert tamper,alert.suppress.period,1h
 DH Alert tamper,alert.track,1
 DH Alert tamper,action.logevent,1
 DH Alert tamper,action.logevent.param.index,data_health
 DH Alert tamper,action.logevent.param.source,dh:alert
 DH Alert tamper,action.logevent.param.sourcetype,stash
+DH Prune,schedule_priority,highest
+DH Alert missing,schedule_priority,highest

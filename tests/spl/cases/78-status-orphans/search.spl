@@ -1,0 +1,3 @@
+| inputlookup @eval@ | `dh_status_keep(@expected@, @status@)` | eval c="orphans"
+| append [| inputlookup @eval@ | `dh_status_keep(@expected@, @clean@)` | eval c="clean"]
+| append [| inputlookup @eval@ | `dh_status_keep(@noexp@, @status@)` | eval c="noexp"]
