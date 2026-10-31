@@ -1,1 +1,2 @@
-| inputlookup @tr@ | eval _time=tonumber(time) | fields - time | `dh_ui_recovered(@status@, @NOW@)` | streamstats count as pos
+| inputlookup @tr@ | eval _time=tonumber(time) | fields - time | `dh_ui_recovered(@status@, @NOW@)` | streamstats count as pos | eval c="all"
+| append [| inputlookup @tr@ | eval _time=tonumber(time) | fields - time | `dh_ui_recovered(@status@, @NOW@)` | eval f_site="lab", f_owner="*", f_index="*", f_crit="*", f_status="*", f_text="*" | `dh_ui_filter` | eval c="site"]

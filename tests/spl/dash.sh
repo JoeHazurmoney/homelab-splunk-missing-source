@@ -5,6 +5,7 @@
 #
 #   panels         every read-only data source of every view (Host detail and Manage on a real
 #                  host): no search errors, and each drilldown source returns the field it passes on.
+#                  Chains run as post-process searches on their base's job, as Studio runs them.
 #   load [hosts]   the 300-host fixture (gen-scale.sh) evaluated into throwaway KV collections, then
 #                  the Overview's searches run at once against them: the load (first dispatch to
 #                  last result) must be under 3 s, and the KPIs and Needs attention must match the
@@ -67,44 +68,63 @@ queries() { dash queries "$DH_APP_DIR" "$@" | tr -d '\r'; }
 first() { dh_search "$1" csv | tr -d '\r' | sed -n '2p' | cut -d, -f1 | tr -d '"'; }
 
 ########## panels
+# pp <sid> <spl> [mode]: a job's results through a post-process search (what a ds.chain does;
+# on 10.6 the v1 results endpoint refuses post-processing, and v2 takes it only as a POST).
+pp() {
+  dh_curl "$DH_MGMT/servicesNS/admin/$DH_APP/search/v2/jobs/$1/results" --data-urlencode "search=$2" -d "output_mode=${3:-csv}" -d count=0
+}
+
 panels() {
-  local fail=0 view ds spl sid info errs rows dur host unreg args drill note f
+  local fail=0 view ds base spl sid info errs rows dur host unreg args drill note f csv
+  local -A base_sid=()
   host=$(first '| `dh_ui_status(dh_status)` | where level=="host" | stats count by host | table host')
   unreg=$(first '| `dh_ui_unregistered(dh_expected, dh_state_fast, dh_state_slow, dh_baseline, now())` | table entity_id')
   echo "panels: host=$host unregistered=${unreg:-none}"
   # The drilldown sources and the field each passes to Host detail (dash_check prints them).
-  drill=$(dash check "$DH_APP_DIR" | sed -n 's/^drilldown \([a-z_]*\)\.[a-z_]* -> .*=<\([a-z_]*\)> from \([a-z_]*\)$/\1.\3 \2/p')
+  drill=$({ dash check "$DH_APP_DIR" || true; } | sed -n 's/^drilldown \([a-z_]*\)\.[a-z_]* -> .*=<\([a-z_]*\)> from \([a-z_]*\)$/\1.\3 \2/p')
   for view in dh_overview dh_host dh_manage dh_soh; do
     args=()
     case $view in
       dh_host) args=("host=$host") ;;
       dh_manage) args=("ov_host=$host" "ov_entity=host|*|$host|*|*" "bk_host=$host" "m_reason=panel check" "ex_host=dhtest-panel" "ad_entity=${unreg:-sourcetype|linux|dhtest-panel|syslog|*}") ;;
     esac
-    while IFS=$'\t' read -r ds spl; do
+    # Searches run as jobs; chains run as post-process searches on their base's job, as in Studio.
+    while IFS=$'\t' read -r ds base spl; do
       case $spl in "#unset"*) echo "SKIP $view.$ds (${spl#\#}: a write waits for its confirmation)"; continue ;; esac
-      sid=$(job "$spl")
-      info=$(job_info "$sid")
+      if [ "$base" = "-" ]; then
+        sid=$(job "$spl")
+        base_sid[$ds]=$sid
+        info=$(job_info "$sid")
+        csv=$(job_csv "$sid" | tr -d '\r')
+        rows=$(job_field "$info" resultCount)
+        dur="$(job_field "$info" runDuration)s"
+      else
+        sid=${base_sid[$base]:-}
+        if [ -z "$sid" ]; then echo "FAIL $view.$ds: base $base has no job"; fail=1; continue; fi
+        info=$(pp "$sid" "$spl" json)
+        csv=$(pp "$sid" "$spl" | tr -d '\r')
+        rows=$(printf '%s\n' "$csv" | sed '/^$/d' | tail -n +2 | wc -l | tr -d ' ')
+        dur="post-process of $base"
+      fi
       errs=$(job_errors "$info" | grep -v 'hl_ingest_block' || true)
-      rows=$(job_field "$info" resultCount)
-      dur=$(job_field "$info" runDuration)
       if [ -n "$errs" ]; then
         echo "FAIL $view.$ds: $errs"
         fail=1
       else
         note=""
         if job_errors "$info" | grep -q hl_ingest_block; then note=" (hl_ingest_block is not defined yet: task 3)"; fi
-        echo "PASS $view.$ds rows=$rows ${dur}s$note"
+        echo "PASS $view.$ds rows=$rows $dur$note"
       fi
       f=$(printf '%s\n' "$drill" | awk -v k="$view.$ds" '$1 == k { print $2 }')
       if [ -n "$f" ] && [ "${rows:-0}" -eq 0 ]; then
         echo "  ($view.$ds has no rows here: its drilldown field is covered by the fixture cases)"
-      elif [ -n "$f" ] && ! job_csv "$sid" | head -1 | tr -d '"\r' | tr ',' '\n' | grep -qx "$f"; then
+      elif [ -n "$f" ] && ! printf '%s\n' "$csv" | head -1 | tr -d '"' | tr ',' '\n' | grep -qx "$f"; then
         echo "FAIL $view.$ds: drilldown field '$f' is not in its results"
         fail=1
       fi
-      job_del "$sid"
-    done < <(queries "$view" "${args[@]}")
+    done < <(dash chains "$DH_APP_DIR" "$view" "${args[@]}" | tr -d '\r')
   done
+  for sid in "${base_sid[@]}"; do job_del "$sid"; done
   [ "$fail" -eq 0 ] && echo "panels: PASS"
   [ "$fail" -eq 0 ]
 }
@@ -145,9 +165,11 @@ load() {
     printf 'load: %-14s %5ss  rows=%s\n' "${sid%%=*}" "$dur" "$(job_field "$info" resultCount)"
   done
   # Results: the KPIs and the number of hosts needing attention follow the generator's mix.
-  got=$(job_csv "$(cat "$work/sid.ds_kpi")" | tr -d '"\r' | awk -F, 'NR == 1 { for (i = 1; i <= NF; i++) c[$i] = i } NR == 2 { print $c["hosts"], $c["missing"], $c["muted"] }')
-  want="$hosts $(scale_want "$hosts" | awk '$1 == "MISSING" { m = $2 } $1 == "MUTED" { u = $2 } END { print m + 0, u + 0 }')"
-  if [ "$got" != "$want" ]; then echo "load: FAIL KPIs (hosts missing muted) got '$got' want '$want'"; ok=0; fi
+  # The KPIs per level: hosts are muted every 50th; of the rest, every 10th loses its heartbeat
+  # (host missing), every 7th its syslog (a sourcetype) and every 11th its vmstat (a source).
+  got=$(job_csv "$(cat "$work/sid.ds_kpi")" | tr -d '"\r' | awk -F, 'NR == 1 { for (i = 1; i <= NF; i++) c[$i] = i } NR == 2 { print $c["host_expected"], $c["host_missing"], $c["sourcetype_missing"], $c["source_missing"], $c["host_muted"] + $c["sourcetype_muted"] + $c["source_muted"] }')
+  want=$(awk -v n="$hosts" 'BEGIN { m = int(n / 50); print n, int(n / 10) - m, int(n / 7) - int(n / 350), int(n / 11) - int(n / 550), 20 * m }')
+  if [ "$got" != "$want" ]; then echo "load: FAIL KPIs (hosts, host/sourcetype/source missing, muted) got '$got' want '$want'"; ok=0; fi
   got=$(job_csv "$(cat "$work/sid.ds_attention")" | tail -n +2 | grep -c . || true)
   want=$(awk -v n="$hosts" 'BEGIN { for (i = 1; i <= n; i++) if (i % 50 && (i % 10 == 0 || i % 7 == 0 || i % 11 == 0)) c++; print c + 0 }')
   if [ "$got" != "$want" ]; then echo "load: FAIL Needs attention has $got hosts, want $want"; ok=0; fi
@@ -167,7 +189,8 @@ w_run() {
   case $spl in "" | "#"*) echo "w_run: $ds not runnable: $spl" >&2; return 1 ;; esac
   spl=$(printf '%s' "$spl" | sed 's/\<dh_overrides\>/dhtest_kv_overrides/g; s/\<dh_admin_log\>/dhtest_kv_admin_log/g; s/\<dh_expected\>/dhtest_kv_expected/g; s/\<hl_ingest_block\>/dhtest_w_blocks.csv/g')
   if [ -n "${DH_DEBUG:-}" ]; then dh_search "$spl" xml | grep -o '<msg[^<]*' | sed "s/^/  $ds: /" >&2 || true; fi
-  dh_search "$spl" csv | tr -d '\r'
+  # (actor_roles is multivalued: dropped so that every row stays on one CSV line)
+  dh_search "$spl | fields - actor_roles" csv | tr -d '\r'
 }
 col() { awk -F, -v n="$1" 'NR == 1 { for (i = 1; i <= NF; i++) { gsub(/"/, "", $i); c[$i] = i } next } { v = $c[n]; gsub(/"/, "", v); print v }'; }
 expect() { # expect <label> <got> <want-regex>
@@ -218,7 +241,7 @@ writes() {
   res=$(kv_get dhtest_kv_expected 'search host=dhtest-w3 | table managed_by profile collection criticality')
   expect "adopted row stored" "$(printf '%s' "$res" | sed -n 2p)" '^ui,continuous,syslog,3$'
   # Test block on an exact raw source: the file is rewritten with k first and the raw source in k.
-  bk=("bk_action=add" "bk_host=dhtest-w4" "bk_level=source" "bk_target=linux_secure|/var/log/secure.1" "bk_duration=900" "m_reason=writes test")
+  bk=("bk_action=add" "bk_host=dhtest-w4" "bk_level=source" "bk_target=linux_secure|/var/log/secure.1" "bk_duration=900" "m_reason=writes test" "m_ticket=CHG-B")
   res=$(w_run ds_bk_plan "${bk[@]}" | col source_norm)
   expect "block preview shows the normalized source" "$res" '^/var/log/secure\.\*$'
   tok=$(w_run ds_bk_plan "${bk[@]}" | col dh_token)
@@ -233,6 +256,8 @@ writes() {
   tok=$(w_run ds_bk_plan "${bk[@]}" | col dh_token)
   res=$(w_run ds_bk_apply "${bk[@]}" "bk_confirm=$tok" | col result)
   expect "block removed" "$res" '^applied: block_remove'
+  res=$(kv_get dhtest_kv_admin_log 'search action=block_* | stats values(ticket) as t, count | eval t=mvjoin(t, " ") | table count t')
+  expect "block admin-log rows carry the ticket" "$(printf '%s' "$res" | sed -n 2p)" '^2,"?CHG-B"?$'
   file=$(dh_docker exec -u root "$DH_CONTAINER" sh -c "cat $DH_APP_DIR/lookups/dhtest_w_blocks.csv" | tr -d '\r')
   expect "last block removed leaves the placeholder" "$(printf '%s\n' "$file" | sed -n 1,2p | tr '\n' ' ')" '^k,until,reason,"?set_by"? "?-"?,0,'
   res=$(kv_get dhtest_kv_admin_log 'stats count')

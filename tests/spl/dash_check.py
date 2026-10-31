@@ -8,6 +8,9 @@ the deployed app, so it needs only the standard library.
                                         base, tokens substituted from the arguments, else the
                                         inputs' defaults), one "ds_id<TAB>spl" per line; a data
                                         source with an unset token prints "ds_id<TAB>#unset <tok>"
+  chains <app_dir> <view> [tok=value]   the same, as "ds_id<TAB>base<TAB>spl" with each chain's own
+                                        post-process SPL and the id of its base ("-" for a search),
+                                        so a test can run chains through the real post-process path
 """
 import json
 import os
@@ -17,15 +20,19 @@ import xml.etree.ElementTree as ET
 
 TOKEN = re.compile(r"\$([A-Za-z0-9_.:]+)(\|[a-z])?\$")
 MACRO = re.compile(r"`([a-z0-9_]+)(?:\(([^`]*)\))?`")
-# Panels that may read raw indexes (spec §8: "every panel reads KV or summary data, except the
-# host-detail chart"); the others are bounded to one host and are noted in the task-12 report.
+# The only panels that may read raw indexes (spec §8 "Scale": the host-detail chart, plus three
+# single-entity, on-demand exceptions), each with the constraint its base search must carry: the
+# host terms subsearch (a token never reaches the SPL, see dh_ui_host_terms), or for Hyper-V the
+# Worker-Admin source and the host as a quoted term.
+HOST_TERMS = "[| makeresults | eval host=${tok}|s$ | `dh_ui_host_terms`]"
 RAW_OK = {
-    ("dh_host", "ds_chart"),
-    ("dh_host", "ds_errors"),
-    ("dh_host", "ds_hyperv"),
-    ("dh_manage", "ds_bk_sources"),
+    ("dh_host", "ds_chart"): HOST_TERMS.format(tok="host"),
+    ("dh_host", "ds_errors"): HOST_TERMS.format(tok="host"),
+    ("dh_host", "ds_hyperv"): 'source="XmlWinEventLog:Microsoft-Windows-Hyper-V-Worker-Admin" $host|s$ ',
+    ("dh_manage", "ds_bk_sources"): HOST_TERMS.format(tok="bk_host"),
 }
-KV_OR_SUMMARY = re.compile(r'^\s*(\| `dh_ui_[a-z_]+\(|\| inputlookup |\| makeresults|search index=data_health )')
+# Raw data anywhere in a query: tstats, or an index other than the summary index data_health.
+RAW = re.compile(r'\btstats\b|\bindex\s*(=|!=)\s*"?(?!data_health\b)[A-Za-z0-9_*]|\bindex\s+IN\s*\(', re.I)
 
 
 def load(path):
@@ -121,7 +128,9 @@ def check(app_dir):
         for k, ds in sources.items():
             q = ds["options"]["query"]
             full = resolve(k, sources)
-            for t, _ in TOKEN.findall(q):
+            for t, f in TOKEN.findall(q):
+                if f != "|s":
+                    p(f"{k} splices token ${t}$ raw: use ${t}|s$ (a quoted, escaped string)")
                 if t not in toks:
                     p(f"{k} uses token ${t}$, which no input sets")
                     continue
@@ -138,8 +147,12 @@ def check(app_dir):
                 writes.append(k)
                 if not re.search(r"\$[a-z]+_confirm\|s\$", q):
                     p(f"{k} writes without a confirmation token")
-            if ds["type"] == "ds.search" and (name, k) not in RAW_OK and not KV_OR_SUMMARY.match(q):
-                p(f"{k} reads raw data (spec §8: panels read KV or summary data)")
+            if RAW.search(q):
+                need = RAW_OK.get((name, k))
+                if need is None:
+                    p(f"{k} reads raw data (spec §8: panels read KV or summary data)")
+                elif need not in q:
+                    p(f"{k} reads raw data without its base-search constraint: {need}")
         if writes:
             if not submit or layout["options"].get("submitOnDashboardLoad") is not False:
                 p("writes need submitButton=true and submitOnDashboardLoad=false (spec §7.8)")
@@ -174,25 +187,30 @@ def check(app_dir):
     return 1 if problems else 0
 
 
-def queries(app_dir, view, pairs):
+def queries(app_dir, view, pairs, chains=False):
     _, d = load(views(app_dir)[view])
     sources = d.get("dataSources", {})
     toks = input_tokens(d)
     values = {t: i["options"]["defaultValue"] for t, i in toks.items() if "defaultValue" in i["options"]}
     values.update(dict(kv.split("=", 1) for kv in pairs))
-    for k in sources:
+
+    def sub(m):
+        v = values[m.group(1)]
+        return '"' + v.replace("\\", "\\\\").replace('"', '\\"') + '"' if m.group(2) == "|s" else v
+
+    for k, ds in sources.items():
         q = resolve(k, sources)
+        head = f"{k}\t" + ((ds["options"]["extend"] if ds["type"] == "ds.chain" else "-") + "\t" if chains else "")
         unset = [t for t, _ in TOKEN.findall(q) if t not in values]
         if unset:
-            print(f"{k}\t#unset {' '.join(sorted(set(unset)))}")
+            print(f"{head}#unset {' '.join(sorted(set(unset)))}")
             continue
-        def sub(m):
-            v = values[m.group(1)]
-            return '"' + v.replace("\\", "\\\\").replace('"', '\\"') + '"' if m.group(2) == "|s" else v
-        print(f"{k}\t{TOKEN.sub(sub, q)}")
+        print(head + TOKEN.sub(sub, ds["options"]["query"] if chains else q))
     return 0
 
 
 if __name__ == "__main__":
     mode, app = sys.argv[1], sys.argv[2]
-    sys.exit(check(app) if mode == "check" else queries(app, sys.argv[3], sys.argv[4:]))
+    if mode == "check":
+        sys.exit(check(app))
+    sys.exit(queries(app, sys.argv[3], sys.argv[4:], chains=(mode == "chains")))

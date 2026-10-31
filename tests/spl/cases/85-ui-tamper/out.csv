@@ -1,5 +1,8 @@
-pos,first_seen,time,host,indicator,events,finding_id
-1,2033-05-18 03:32,2033-05-15 19:59,h6,clock step 400 s (chrony),1,f6
-2,2033-05-18 03:32,2033-05-15 20:00,h5,audit key hl-x,1,f5
-3,2033-05-18 02:33,2033-05-18 02:31,h1,1102 security log cleared,1,f1
-4,2033-05-18 02:10,2033-05-18 02:08,h3,audit rules changed,3,f3
+c,pos,first_seen,time,host,indicator,events,finding_id,index,site
+all,1,2033-05-18 03:32,2033-05-15 19:59,h6,clock step 400 s (chrony),1,f6,linux,
+all,2,2033-05-18 03:32,2033-05-15 20:00,h5,audit key hl-x,1,f5,linux,
+all,3,2033-05-18 02:33,2033-05-18 02:31,h1,1102 security log cleared,1,f1,windows,lab
+all,4,2033-05-18 02:10,2033-05-18 02:08,h3,audit rules changed,3,f3,linux,home
+site,,2033-05-18 02:33,2033-05-18 02:31,h1,1102 security log cleared,1,f1,windows,lab
+index_status,,2033-05-18 02:10,2033-05-18 02:08,h3,audit rules changed,3,f3,linux,home
+text,,2033-05-18 03:32,2033-05-15 19:59,h6,clock step 400 s (chrony),1,f6,linux,

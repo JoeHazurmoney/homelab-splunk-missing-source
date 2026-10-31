@@ -17,5 +17,7 @@ rollup,sourcetype|windows|b1|XmlWinEventLog|*
 rollup,host|*|b1|*|*
 status,sourcetype|linux|a1|syslog|*
 text,sourcetype|windows|b1|XmlWinEventLog|*
+words,sourcetype|windows|b1|XmlWinEventLog|*
 text_id,sourcetype|linux|a1|syslog|*
+pct_literal,sourcetype|linux|c1|cpu|*
 combined,sourcetype|linux|a1|syslog|*

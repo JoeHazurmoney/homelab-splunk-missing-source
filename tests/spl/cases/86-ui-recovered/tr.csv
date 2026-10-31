@@ -6,3 +6,7 @@ NOW-100000,sourcetype|linux|h3|syslog|*,h3,MISSING,OK
 NOW-90000,sourcetype|linux|h3|syslog|*,h3,OK,MISSING
 NOW-500,host|*|h4|*|*,,MISSING,OK
 NOW-100,host|*|h4|*|*,,OK,MISSING
+NOW-1000,host|*|h5|*|*,h5,MISSING,OK
+NOW-200,host|*|h5|*|*,h5,MUTED,MISSING
+NOW-900,sourcetype|linux|h6|syslog|*,h6,LATE,OK
+NOW-300,sourcetype|linux|h6|syslog|*,h6,INFO,LATE

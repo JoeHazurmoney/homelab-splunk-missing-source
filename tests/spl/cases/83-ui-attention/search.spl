@@ -1,4 +1,7 @@
 | inputlookup @status@ | `dh_ui_attention(@NOW@)` | streamstats count as pos | eval c="main"
-| append [| inputlookup @ok@ | `dh_ui_attention(@NOW@)` | eval c="ok", pos=0]
-| append [| inputlookup @gate@ | `dh_ui_attention(@NOW@)` | eval c="gate", pos=0]
-| append [| inputlookup @ok@ | where 1==0 | `dh_ui_attention(@NOW@)` | eval c="none", pos=0]
+| append [| inputlookup @ok@ | `dh_ui_attention(@NOW@)` | eval c="ok_rows"]
+| append [| inputlookup @status@ | `dh_ui_attention_headline` | eval c="h_main"]
+| append [| inputlookup @ok@ | `dh_ui_attention_headline` | eval c="h_ok"]
+| append [| inputlookup @gate@ | `dh_ui_attention_headline` | eval c="h_gate"]
+| append [| inputlookup @one@ | `dh_ui_attention_headline` | eval c="h_one"]
+| append [| inputlookup @ok@ | where 1==0 | `dh_ui_attention_headline` | eval c="h_none"]

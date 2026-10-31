@@ -1,5 +1,7 @@
-entity_id,status
-sourcetype|linux|h1|syslog|*,OK
-sourcetype|linux|h2|syslog|*,MISSING
-sourcetype|linux|h3|syslog|*,OK
-host|*|h4|*|*,OK
+entity_id,status,site,owner,index,criticality,host_rollup,description,cause
+sourcetype|linux|h1|syslog|*,OK,lab,ops,linux,2,OK,,
+sourcetype|linux|h2|syslog|*,MISSING,lab,ops,linux,2,DEGRADED,,
+sourcetype|linux|h3|syslog|*,OK,lab,ops,linux,2,OK,,
+host|*|h4|*|*,OK,home,ops,*,1,OK,,
+host|*|h5|*|*,MUTED,home,ops,*,1,MUTED,,
+sourcetype|linux|h6|syslog|*,INFO,lab,ops,linux,4,OK,,

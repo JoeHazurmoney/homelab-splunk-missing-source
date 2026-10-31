@@ -1,0 +1,6 @@
+| makeresults | eval actor_roles="hl_ops", dh_role_imports=split("hl_ops=dh_admin;power#dh_admin=user#power=user#user=#admin=power;user", "#") | `dh_ui_roles_expand` | eval c="inherited", v=mvjoin(mvsort(actor_roles), " ") | table c v
+| append [| makeresults | eval actor_roles=split("admin", " "), dh_role_imports=split("admin=power;user#power=user#user=", "#") | `dh_ui_roles_expand` | eval c="admin", v=mvjoin(mvsort(actor_roles), " ") | table c v]
+| append [| makeresults | eval actor_roles="dh_analyst" | `dh_ui_roles_expand` | eval c="no_role_list", v=mvjoin(actor_roles, " ") | table c v]
+| append [| makeresults | eval host=" PI5 " | `dh_ui_host_terms` | eval c="host", v=mvjoin(host, " ") | table c v]
+| append [| makeresults | eval host="x OR index=*" | `dh_ui_host_terms` | eval c="host_injection", v=mvjoin(host, " ") | table c v]
+| append [| makeresults | eval host="pi5.mshome.net" | `dh_ui_host_terms` | eval c="host_fqdn", v=mvjoin(host, " ") | table c v]

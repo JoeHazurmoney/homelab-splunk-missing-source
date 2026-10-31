@@ -1,1 +1,4 @@
-| inputlookup @tp@ | `dh_ui_tamper_24h(@NOW@)` | streamstats count as pos
+| inputlookup @tp@ | `dh_ui_tamper_24h(@status@, @NOW@)` | streamstats count as pos | eval c="all"
+| append [| inputlookup @tp@ | `dh_ui_tamper_24h(@status@, @NOW@)` | eval f_site="lab", f_owner="*", f_index="*", f_crit="*", f_status="*", f_text="*" | `dh_ui_filter` | eval c="site"]
+| append [| inputlookup @tp@ | `dh_ui_tamper_24h(@status@, @NOW@)` | eval f_site="*", f_owner="*", f_index="linux", f_crit="*", f_status="DOWN", f_text="*" | `dh_ui_filter` | eval c="index_status"]
+| append [| inputlookup @tp@ | `dh_ui_tamper_24h(@status@, @NOW@)` | eval f_site="*", f_owner="*", f_index="*", f_crit="*", f_status="*", f_text="chrony" | `dh_ui_filter` | eval c="text"]
