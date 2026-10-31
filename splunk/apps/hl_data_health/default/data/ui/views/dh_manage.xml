@@ -45,7 +45,7 @@
         },
         "input_ov_entity": {
             "type": "input.dropdown",
-            "title": "1 Override: entity (a host row mutes its children)",
+            "title": "1 Override: item (the host's own row mutes everything it sends)",
             "options": {
                 "items": ">frame(label, value) | prepend(formattedStatics) | objects()",
                 "token": "ov_entity"
@@ -644,7 +644,7 @@
             "name": "Preview",
             "options": {
                 "extend": "ds_ov_plan",
-                "query": "| table action entity_id before after check"
+                "query": "| table action entity_id before after check | `dh_ui_headers`"
             }
         },
         "ds_ov_confirm": {
@@ -659,14 +659,14 @@
             "type": "ds.search",
             "name": "Override apply",
             "options": {
-                "query": "| makeresults | eval entity_id=$ov_entity|s$, dh_action=$ov_action|s$, dh_secs=if($ov_action|s$==\"mute\", $ov_duration|s$, $ov_threshold|s$), reason=$m_reason|s$, ticket=$m_ticket|s$ | `dh_ui_actor` | `dh_ui_override_plan(dh_overrides, now())` | eval dh_confirm=$ov_confirm|s$ | `dh_ui_override_write(dh_overrides, dh_admin_log, now())`"
+                "query": "| makeresults | eval entity_id=$ov_entity|s$, dh_action=$ov_action|s$, dh_secs=if($ov_action|s$==\"mute\", $ov_duration|s$, $ov_threshold|s$), reason=$m_reason|s$, ticket=$m_ticket|s$ | `dh_ui_actor` | `dh_ui_override_plan(dh_overrides, now())` | eval dh_confirm=$ov_confirm|s$ | `dh_ui_override_write(dh_overrides, dh_admin_log, now())` | `dh_ui_headers`"
             }
         },
         "ds_overrides": {
             "type": "ds.search",
             "name": "Current overrides",
             "options": {
-                "query": "| inputlookup dh_overrides | eval mute_until=if(isnull(mute_until), \"-\", strftime(tonumber(mute_until), \"%Y-%m-%d %H:%M\")), set_at=strftime(tonumber(set_at), \"%Y-%m-%d %H:%M\") | sort 0 entity_id | table entity_id mute_until reason ticket threshold_override_secs set_by set_at"
+                "query": "| inputlookup dh_overrides | eval mute_until=if(isnull(mute_until), \"-\", strftime(tonumber(mute_until), \"%Y-%m-%d %H:%M\")), set_at=strftime(tonumber(set_at), \"%Y-%m-%d %H:%M\") | sort 0 entity_id | table entity_id mute_until reason ticket threshold_override_secs set_by set_at | `dh_ui_headers`"
             }
         },
         "ds_ex_plan": {
@@ -681,7 +681,7 @@
             "name": "Preview",
             "options": {
                 "extend": "ds_ex_plan",
-                "query": "| table action entity_id before after check"
+                "query": "| table action entity_id before after check | `dh_ui_headers`"
             }
         },
         "ds_ex_confirm": {
@@ -696,7 +696,7 @@
             "type": "ds.search",
             "name": "Add-row apply",
             "options": {
-                "query": "| makeresults | eval dh_action=\"add\", level=$ex_level|s$, index=$ex_index|s$, host=$ex_host|s$, sourcetype=$ex_sourcetype|s$, source=$ex_source|s$, collection=$ex_collection|s$, via=$ex_via|s$, profile=$ex_profile|s$, interval_secs=$ex_interval|s$, criticality=$ex_crit|s$, owner=$ex_owner|s$, site=$ex_site|s$, runbook=$ex_runbook|s$, description=$ex_description|s$, reason=$m_reason|s$, ticket=$m_ticket|s$ | `dh_ui_actor` | `dh_ui_expected_plan(dh_expected, now())` | eval dh_confirm=$ex_confirm|s$ | `dh_ui_expected_write(dh_expected, dh_admin_log, now())`"
+                "query": "| makeresults | eval dh_action=\"add\", level=$ex_level|s$, index=$ex_index|s$, host=$ex_host|s$, sourcetype=$ex_sourcetype|s$, source=$ex_source|s$, collection=$ex_collection|s$, via=$ex_via|s$, profile=$ex_profile|s$, interval_secs=$ex_interval|s$, criticality=$ex_crit|s$, owner=$ex_owner|s$, site=$ex_site|s$, runbook=$ex_runbook|s$, description=$ex_description|s$, reason=$m_reason|s$, ticket=$m_ticket|s$ | `dh_ui_actor` | `dh_ui_expected_plan(dh_expected, now())` | eval dh_confirm=$ex_confirm|s$ | `dh_ui_expected_write(dh_expected, dh_admin_log, now())` | `dh_ui_headers`"
             }
         },
         "ds_unreg": {
@@ -726,7 +726,7 @@
             "name": "Preview",
             "options": {
                 "extend": "ds_ad_plan",
-                "query": "| table action entity_id before after check"
+                "query": "| table action entity_id before after check | `dh_ui_headers`"
             }
         },
         "ds_ad_confirm": {
@@ -741,14 +741,14 @@
             "type": "ds.search",
             "name": "Adopt apply",
             "options": {
-                "query": "| makeresults | eval entity_id=$ad_entity|s$ | `dh_ui_adopt_row(dh_baseline, dh_fwd)` | eval criticality=$ad_crit|s$, reason=$m_reason|s$, ticket=$m_ticket|s$ | `dh_ui_actor` | `dh_ui_expected_plan(dh_expected, now())` | eval dh_confirm=$ad_confirm|s$ | `dh_ui_expected_write(dh_expected, dh_admin_log, now())`"
+                "query": "| makeresults | eval entity_id=$ad_entity|s$ | `dh_ui_adopt_row(dh_baseline, dh_fwd)` | eval criticality=$ad_crit|s$, reason=$m_reason|s$, ticket=$m_ticket|s$ | `dh_ui_actor` | `dh_ui_expected_plan(dh_expected, now())` | eval dh_confirm=$ad_confirm|s$ | `dh_ui_expected_write(dh_expected, dh_admin_log, now())` | `dh_ui_headers`"
             }
         },
         "ds_thresholds": {
             "type": "ds.search",
             "name": "Learned against configured thresholds",
             "options": {
-                "query": "| `dh_ui_status(dh_status)` | eval f_site=\"*\", f_owner=\"*\", f_index=\"*\", f_crit=\"*\", f_status=\"*\", f_text=$th_text|s$ | `dh_ui_filter` | `dh_ui_thresholds(dh_baseline, dh_expected)`"
+                "query": "| `dh_ui_status(dh_status)` | eval f_site=\"*\", f_owner=\"*\", f_index=\"*\", f_crit=\"*\", f_status=\"*\", f_text=$th_text|s$ | `dh_ui_filter` | `dh_ui_thresholds(dh_baseline, dh_expected)` | `dh_ui_headers`"
             }
         },
         "ds_bk_sources": {
@@ -770,7 +770,7 @@
             "type": "ds.search",
             "name": "Current test blocks",
             "options": {
-                "query": "| makeresults | eval dh_seed=1 | inputlookup append=true hl_ingest_block | where isnull(dh_seed) AND isnotnull(k) AND k!=\"-\" | eval state=if(tonumber(until)>now(), \"test block until \".strftime(tonumber(until), \"%H:%M\"), \"expired (pruned within about 2 min)\"), until=strftime(tonumber(until), \"%Y-%m-%d %H:%M\") | table k until reason set_by state"
+                "query": "| makeresults | eval dh_seed=1 | inputlookup append=true hl_ingest_block | where isnull(dh_seed) AND isnotnull(k) AND k!=\"-\" | eval state=if(tonumber(until)>now(), \"test block until \".strftime(tonumber(until), \"%H:%M\"), \"expired (pruned within about 2 min)\"), until=strftime(tonumber(until), \"%Y-%m-%d %H:%M\") | table k until reason set_by state | `dh_ui_headers`"
             }
         },
         "ds_bk_plan": {
@@ -785,7 +785,7 @@
             "name": "Preview",
             "options": {
                 "extend": "ds_bk_plan",
-                "query": "| table action k source_norm before after check"
+                "query": "| table action k source_norm before after check | `dh_ui_headers`"
             }
         },
         "ds_bk_confirm": {
@@ -800,14 +800,30 @@
             "type": "ds.search",
             "name": "Test-block apply",
             "options": {
-                "query": "| makeresults | eval dh_action=$bk_action|s$, level=$bk_level|s$, host=$bk_host|s$, target=$bk_target|s$, dh_secs=$bk_duration|s$, reason=$m_reason|s$, ticket=$m_ticket|s$ | `dh_ui_actor` | `dh_ui_block_plan(hl_ingest_block, now())` | eval dh_confirm=$bk_confirm|s$ | `dh_ui_block_write(hl_ingest_block, dh_admin_log, now())`"
+                "query": "| makeresults | eval dh_action=$bk_action|s$, level=$bk_level|s$, host=$bk_host|s$, target=$bk_target|s$, dh_secs=$bk_duration|s$, reason=$m_reason|s$, ticket=$m_ticket|s$ | `dh_ui_actor` | `dh_ui_block_plan(hl_ingest_block, now())` | eval dh_confirm=$bk_confirm|s$ | `dh_ui_block_write(hl_ingest_block, dh_admin_log, now())` | `dh_ui_headers`"
             }
         },
         "ds_log": {
             "type": "ds.search",
             "name": "Admin log",
             "options": {
-                "query": "| inputlookup dh_admin_log | sort 0 -time | head 1000 | eval time=strftime(tonumber(time), \"%Y-%m-%d %H:%M:%S\") | table time actor action entity_id detail reason ticket"
+                "query": "| inputlookup dh_admin_log | sort 0 -time | head 1000 | eval time=strftime(tonumber(time), \"%Y-%m-%d %H:%M:%S\") | table time actor action entity_id detail reason ticket | `dh_ui_headers`"
+            }
+        },
+        "ds_unreg_view": {
+            "type": "ds.chain",
+            "name": "Unregistered (shown)",
+            "options": {
+                "extend": "ds_unreg",
+                "query": "| `dh_ui_headers`"
+            }
+        },
+        "ds_bk_sources_view": {
+            "type": "ds.chain",
+            "name": "Raw sources of the block host (24 h) (shown)",
+            "options": {
+                "extend": "ds_bk_sources",
+                "query": "| `dh_ui_headers`"
             }
         }
     },
@@ -816,7 +832,8 @@
             "type": "splunk.markdown",
             "options": {
                 "markdown": "**Manage** changes what the app expects and how it alerts. It never refreshes by itself, and nothing is written until you confirm. Each change takes three steps:\n1. Fill in one form (1 to 4) and the **Reason**, then press **Submit**. The *preview* shows the change, before and after, or why it is refused.\n2. In that form's *confirm* list choose **Apply**, then press **Submit** again. The change is written and recorded in the admin log at the bottom.\n3. Pressing Submit again, or reloading the page, does not repeat it. The confirmation only fits the state you previewed.\n\nA mute needs a reason and ends within 30 days; muting a host also mutes everything it sends. Adding or adopting a row and test blocks need the **dh_admin** role. A **test block** throws real data away at ingest (linux, windows and network only) within about a minute; a source block needs the exact raw source name. Guide: docs/data-health/dashboards.md, Manage."
-            }
+            },
+            "title": "How Manage works"
         },
         "viz_ov_preview": {
             "type": "splunk.table",
@@ -827,7 +844,7 @@
             "options": {
                 "count": 25
             },
-            "description": "The change you are about to make; nothing is written yet. Guide: docs/data-health/dashboards.md, Manage > 1 Override (mute or threshold): preview."
+            "description": "The change you are about to make; nothing is written yet. Guide: docs/data-health/dashboards.md, Manage > 1 Override (mute or threshold): preview"
         },
         "viz_ov_result": {
             "type": "splunk.table",
@@ -838,7 +855,7 @@
             "options": {
                 "count": 25
             },
-            "description": "What was written after you confirmed. Guide: docs/data-health/dashboards.md, Manage > 1 Override (mute or threshold): result."
+            "description": "What was written after you confirmed. Guide: docs/data-health/dashboards.md, Manage > 1 Override (mute or threshold): result"
         },
         "viz_overrides": {
             "type": "splunk.table",
@@ -849,7 +866,7 @@
             "options": {
                 "count": 25
             },
-            "description": "Every mute and threshold override in force. Guide: docs/data-health/dashboards.md, Manage > Current mutes and threshold overrides."
+            "description": "Every mute and threshold override in force. Guide: docs/data-health/dashboards.md, Manage > Current mutes and threshold overrides"
         },
         "viz_ex_preview": {
             "type": "splunk.table",
@@ -860,7 +877,7 @@
             "options": {
                 "count": 25
             },
-            "description": "The new or changed row of the expected list; nothing is written yet. Guide: docs/data-health/dashboards.md, Manage > 2 Add an expected row: preview."
+            "description": "The new or changed row of the expected list; nothing is written yet. Guide: docs/data-health/dashboards.md, Manage > 2 Add an expected row: preview"
         },
         "viz_ex_result": {
             "type": "splunk.table",
@@ -871,18 +888,18 @@
             "options": {
                 "count": 25
             },
-            "description": "What was written after you confirmed. Guide: docs/data-health/dashboards.md, Manage > 2 Add an expected row: result."
+            "description": "What was written after you confirmed. Guide: docs/data-health/dashboards.md, Manage > 2 Add an expected row: result"
         },
         "viz_unreg": {
             "type": "splunk.table",
             "title": "Unregistered: seen in the last 7 d but not expected",
             "dataSources": {
-                "primary": "ds_unreg"
+                "primary": "ds_unreg_view"
             },
             "options": {
                 "count": 25
             },
-            "description": "Data that arrives but that nobody listed as expected. Guide: docs/data-health/dashboards.md, Manage > Unregistered: seen in the last 7 d but not expected."
+            "description": "Data that arrives but that nobody listed as expected. Guide: docs/data-health/dashboards.md, Manage > Unregistered: seen in the last 7 d but not expected"
         },
         "viz_ad_preview": {
             "type": "splunk.table",
@@ -893,7 +910,7 @@
             "options": {
                 "count": 25
             },
-            "description": "The expected row that adopting this data would add; nothing is written yet. Guide: docs/data-health/dashboards.md, Manage > 3 Adopt: preview."
+            "description": "The expected row that adopting this data would add; nothing is written yet. Guide: docs/data-health/dashboards.md, Manage > 3 Adopt: preview"
         },
         "viz_ad_result": {
             "type": "splunk.table",
@@ -904,7 +921,7 @@
             "options": {
                 "count": 25
             },
-            "description": "What was written after you confirmed. Guide: docs/data-health/dashboards.md, Manage > 3 Adopt: result."
+            "description": "What was written after you confirmed. Guide: docs/data-health/dashboards.md, Manage > 3 Adopt: result"
         },
         "viz_thresholds": {
             "type": "splunk.table",
@@ -915,18 +932,18 @@
             "options": {
                 "count": 25
             },
-            "description": "How long each stream may stay silent and where that limit comes from. Guide: docs/data-health/dashboards.md, Manage > Thresholds: learned against configured."
+            "description": "How long each stream may stay silent and where that limit comes from. Guide: docs/data-health/dashboards.md, Manage > Thresholds: learned against configured"
         },
         "viz_bk_sources": {
             "type": "splunk.table",
             "title": "4 Test block: raw sources of the host (24 h)",
             "dataSources": {
-                "primary": "ds_bk_sources"
+                "primary": "ds_bk_sources_view"
             },
             "options": {
                 "count": 25
             },
-            "description": "The exact source names this host sent; a source block must use one of them. Guide: docs/data-health/dashboards.md, Manage > 4 Test block: raw sources of the host (24 h)."
+            "description": "The exact source names this host sent; a source block must use one of them. Guide: docs/data-health/dashboards.md, Manage > 4 Test block: raw sources of the host (24 h)"
         },
         "viz_blocks": {
             "type": "splunk.table",
@@ -937,7 +954,7 @@
             "options": {
                 "count": 25
             },
-            "description": "Data that is being dropped on purpose for a test. Guide: docs/data-health/dashboards.md, Manage > Current test blocks."
+            "description": "Data that is being dropped on purpose for a test. Guide: docs/data-health/dashboards.md, Manage > Current test blocks"
         },
         "viz_bk_preview": {
             "type": "splunk.table",
@@ -948,7 +965,7 @@
             "options": {
                 "count": 25
             },
-            "description": "The block you are about to add or remove; nothing is written yet. Guide: docs/data-health/dashboards.md, Manage > 4 Test block: preview."
+            "description": "The block you are about to add or remove; nothing is written yet. Guide: docs/data-health/dashboards.md, Manage > 4 Test block: preview"
         },
         "viz_bk_result": {
             "type": "splunk.table",
@@ -959,7 +976,7 @@
             "options": {
                 "count": 25
             },
-            "description": "What was written after you confirmed. Guide: docs/data-health/dashboards.md, Manage > 4 Test block: result."
+            "description": "What was written after you confirmed. Guide: docs/data-health/dashboards.md, Manage > 4 Test block: result"
         },
         "viz_log": {
             "type": "splunk.table",
@@ -970,7 +987,7 @@
             "options": {
                 "count": 25
             },
-            "description": "Who changed what and why. Guide: docs/data-health/dashboards.md, Manage > Admin log (every change made here)."
+            "description": "Who changed what and why. Guide: docs/data-health/dashboards.md, Manage > Admin log (every change made here)"
         }
     },
     "layout": {

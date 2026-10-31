@@ -54,7 +54,7 @@
             "type": "ds.search",
             "name": "Children",
             "options": {
-                "query": "| `dh_ui_status(dh_status)` | where host==$host|s$ | `dh_ui_host_children(dh_volume)`"
+                "query": "| `dh_ui_status(dh_status)` | where host==$host|s$ | `dh_ui_host_children(dh_volume)` | `dh_ui_headers`"
             }
         },
         "ds_chart": {
@@ -72,42 +72,42 @@
             "type": "ds.search",
             "name": "Forwarder",
             "options": {
-                "query": "| inputlookup dh_fwd where host=$host|s$ | `dh_ui_fwd(now())`"
+                "query": "| inputlookup dh_fwd where host=$host|s$ | `dh_ui_fwd(now())` | `dh_ui_headers`"
             }
         },
         "ds_errors": {
             "type": "ds.search",
             "name": "Latest splunkd errors",
             "options": {
-                "query": "search index=_internal sourcetype=splunkd (log_level=ERROR OR log_level=WARN) [| makeresults | eval host=$host|s$ | `dh_ui_host_terms`] earliest=-24h latest=now | head 25 | eval time=strftime(_time, \"%Y-%m-%d %H:%M:%S\"), message=coalesce(event_message, _raw) | table time log_level component message"
+                "query": "search index=_internal sourcetype=splunkd (log_level=ERROR OR log_level=WARN) [| makeresults | eval host=$host|s$ | `dh_ui_host_terms`] earliest=-24h latest=now | head 25 | eval time=strftime(_time, \"%Y-%m-%d %H:%M:%S\"), message=coalesce(event_message, _raw) | table time log_level component message | `dh_ui_headers`"
             }
         },
         "ds_tamper": {
             "type": "ds.search",
             "name": "Tamper findings",
             "options": {
-                "query": "| inputlookup dh_tamper where host=$host|s$ | where coalesce(tonumber(suppressed), 0)==0 | sort 0 -time | eval time=strftime(tonumber(time), \"%Y-%m-%d %H:%M\") | table time indicator events code detail finding_id"
+                "query": "| inputlookup dh_tamper where host=$host|s$ | where coalesce(tonumber(suppressed), 0)==0 | sort 0 -time | eval time=strftime(tonumber(time), \"%Y-%m-%d %H:%M\") | table time indicator events code detail finding_id | `dh_ui_headers`"
             }
         },
         "ds_transitions": {
             "type": "ds.search",
             "name": "Transitions (7 d)",
             "options": {
-                "query": "search index=data_health source=\"dh:transition\" sourcetype=stash dh_host=$host|s$ earliest=-7d latest=+1d | sort 0 -_time | head 200 | eval time=strftime(_time, \"%Y-%m-%d %H:%M\") | table time entity_id prev_status status cause"
+                "query": "search index=data_health source=\"dh:transition\" sourcetype=stash dh_host=$host|s$ earliest=-7d latest=+1d | sort 0 -_time | head 200 | eval time=strftime(_time, \"%Y-%m-%d %H:%M\") | table time entity_id prev_status status cause | `dh_ui_headers`"
             }
         },
         "ds_hyperv": {
             "type": "ds.search",
             "name": "Hyper-V events (7 d)",
             "options": {
-                "query": "search index=windows sourcetype=XmlWinEventLog source=\"XmlWinEventLog:Microsoft-Windows-Hyper-V-Worker-Admin\" $host|s$ earliest=-7d latest=now | `dh_ui_hyperv` | where host==$host|s$ | head 50"
+                "query": "search index=windows sourcetype=XmlWinEventLog source=\"XmlWinEventLog:Microsoft-Windows-Hyper-V-Worker-Admin\" $host|s$ earliest=-7d latest=now | `dh_ui_hyperv` | where host==$host|s$ | head 50 | `dh_ui_headers`"
             }
         },
         "ds_runbooks": {
             "type": "ds.search",
             "name": "Runbooks",
             "options": {
-                "query": "| `dh_ui_status(dh_status)` | where host==$host|s$ AND isnotnull(runbook) AND runbook!=\"\" | stats count as entities by runbook"
+                "query": "| `dh_ui_status(dh_status)` | where host==$host|s$ AND isnotnull(runbook) AND runbook!=\"\" | stats count as entities by runbook | `dh_ui_headers`"
             }
         }
     },
@@ -115,7 +115,7 @@
         "viz_children": {
             "type": "splunk.table",
             "title": "Expected data from this host",
-            "description": "Each stream this host should send: its status and how late it is against its limit. Guide: docs/data-health/dashboards.md, Host detail > Expected data from this host.",
+            "description": "Each stream this host should send: its status and how late it is against its limit. Guide: docs/data-health/dashboards.md, Host detail > Expected data from this host",
             "dataSources": {
                 "primary": "ds_children"
             },
@@ -132,7 +132,7 @@
             "options": {
                 "stackMode": "stacked"
             },
-            "description": "How much data arrived from this host over the day. Guide: docs/data-health/dashboards.md, Host detail > Events in the last 24 h by sourcetype."
+            "description": "How much data arrived from this host over the day. Guide: docs/data-health/dashboards.md, Host detail > Events in the last 24 h by sourcetype"
         },
         "viz_fwd": {
             "type": "splunk.table",
@@ -143,7 +143,7 @@
             "options": {
                 "count": 25
             },
-            "description": "Version and last contact of the Splunk agent and the last Ansible and VM events. Guide: docs/data-health/dashboards.md, Host detail > Forwarder (the Splunk agent on the host)."
+            "description": "Version and last contact of the Splunk agent and the last Ansible and VM events. Guide: docs/data-health/dashboards.md, Host detail > Forwarder (the Splunk agent on the host)"
         },
         "viz_errors": {
             "type": "splunk.table",
@@ -154,7 +154,7 @@
             "options": {
                 "count": 25
             },
-            "description": "What the Splunk agent on this host complained about. Guide: docs/data-health/dashboards.md, Host detail > Latest Splunk agent errors and warnings (24 h)."
+            "description": "What the Splunk agent on this host complained about. Guide: docs/data-health/dashboards.md, Host detail > Latest Splunk agent errors and warnings (24 h)"
         },
         "viz_tamper": {
             "type": "splunk.table",
@@ -165,7 +165,7 @@
             "options": {
                 "count": 25
             },
-            "description": "Signs that someone may have switched off logging here. Guide: docs/data-health/dashboards.md, Host detail > Tamper findings on this host."
+            "description": "Signs that someone may have switched off logging here. Guide: docs/data-health/dashboards.md, Host detail > Tamper findings on this host"
         },
         "viz_transitions": {
             "type": "splunk.table",
@@ -176,7 +176,7 @@
             "options": {
                 "count": 25
             },
-            "description": "When each stream went late or missing and when it came back. Guide: docs/data-health/dashboards.md, Host detail > Status changes (7 d)."
+            "description": "When each stream went late or missing and when it came back. Guide: docs/data-health/dashboards.md, Host detail > Status changes (7 d)"
         },
         "viz_hyperv": {
             "type": "splunk.table",
@@ -187,7 +187,7 @@
             "options": {
                 "count": 25
             },
-            "description": "When this VM was started or stopped on the Hyper-V host. Guide: docs/data-health/dashboards.md, Host detail > Hyper-V VM events (7 d)."
+            "description": "When this VM was started or stopped on the Hyper-V host. Guide: docs/data-health/dashboards.md, Host detail > Hyper-V VM events (7 d)"
         },
         "viz_runbooks": {
             "type": "splunk.table",
@@ -202,12 +202,12 @@
                 {
                     "type": "drilldown.customUrl",
                     "options": {
-                        "url": "$row.runbook.value$",
+                        "url": "$row.Runbook.value$",
                         "newTab": true
                     }
                 }
             ],
-            "description": "The how-to pages linked to this host. Guide: docs/data-health/dashboards.md, Host detail > Runbooks (click to open)."
+            "description": "The how-to pages linked to this host. Guide: docs/data-health/dashboards.md, Host detail > Runbooks (click to open)"
         }
     },
     "layout": {
