@@ -61,7 +61,7 @@
             "type": "ds.search",
             "name": "24 h by sourcetype (tstats)",
             "options": {
-                "query": "| tstats prestats=t count where index IN (`dh_indexes`) (host=$host|s$ OR host=$host$.*) earliest=-24h latest=now by _time span=10m sourcetype | timechart span=10m count by sourcetype",
+                "query": "| tstats prestats=t count where index IN (`dh_indexes`) [| makeresults | eval host=$host|s$ | `dh_ui_host_terms`] earliest=-24h latest=now by _time span=10m sourcetype | timechart span=10m count by sourcetype",
                 "queryParameters": {
                     "earliest": "-24h",
                     "latest": "now"
@@ -79,7 +79,7 @@
             "type": "ds.search",
             "name": "Latest splunkd errors",
             "options": {
-                "query": "search index=_internal sourcetype=splunkd (log_level=ERROR OR log_level=WARN) (host=$host|s$ OR host=$host$.*) earliest=-24h latest=now | head 25 | eval time=strftime(_time, \"%Y-%m-%d %H:%M:%S\"), message=coalesce(event_message, _raw) | table time log_level component message"
+                "query": "search index=_internal sourcetype=splunkd (log_level=ERROR OR log_level=WARN) [| makeresults | eval host=$host|s$ | `dh_ui_host_terms`] earliest=-24h latest=now | head 25 | eval time=strftime(_time, \"%Y-%m-%d %H:%M:%S\"), message=coalesce(event_message, _raw) | table time log_level component message"
             }
         },
         "ds_tamper": {
@@ -100,7 +100,7 @@
             "type": "ds.search",
             "name": "Hyper-V events (7 d)",
             "options": {
-                "query": "search index=windows sourcetype=XmlWinEventLog source=\"XmlWinEventLog:Microsoft-Windows-Hyper-V-Worker-Admin\" earliest=-7d latest=now | `dh_ui_hyperv` | where host==$host|s$ | head 50"
+                "query": "search index=windows sourcetype=XmlWinEventLog source=\"XmlWinEventLog:Microsoft-Windows-Hyper-V-Worker-Admin\" $host|s$ earliest=-7d latest=now | `dh_ui_hyperv` | where host==$host|s$ | head 50"
             }
         },
         "ds_runbooks": {

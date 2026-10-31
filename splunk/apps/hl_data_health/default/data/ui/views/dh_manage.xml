@@ -755,7 +755,7 @@
             "type": "ds.search",
             "name": "Raw sources of the block host (24 h)",
             "options": {
-                "query": "| tstats count max(_indextime) as it where index IN (linux, windows, network) (host=$bk_host|s$ OR host=$bk_host$.*) earliest=-24h latest=+1d by index sourcetype source | eval source_norm=`dh_source_norm(source)`, last_seen=strftime(it, \"%Y-%m-%d %H:%M\") | sort 0 sourcetype source | table index sourcetype source source_norm count last_seen"
+                "query": "| tstats count max(_indextime) as it where index IN (linux, windows, network) [| makeresults | eval host=$bk_host|s$ | `dh_ui_host_terms`] earliest=-24h latest=+1d by index sourcetype source | eval source_norm=`dh_source_norm(source)`, last_seen=strftime(it, \"%Y-%m-%d %H:%M\") | sort 0 sourcetype source | table index sourcetype source source_norm count last_seen"
             }
         },
         "ds_bk_targets": {
@@ -777,7 +777,7 @@
             "type": "ds.search",
             "name": "Test-block plan",
             "options": {
-                "query": "| makeresults | eval dh_action=$bk_action|s$, level=$bk_level|s$, host=$bk_host|s$, target=$bk_target|s$, dh_secs=$bk_duration|s$, reason=$m_reason|s$ | `dh_ui_actor` | `dh_ui_block_plan(hl_ingest_block, now())`"
+                "query": "| makeresults | eval dh_action=$bk_action|s$, level=$bk_level|s$, host=$bk_host|s$, target=$bk_target|s$, dh_secs=$bk_duration|s$, reason=$m_reason|s$, ticket=$m_ticket|s$ | `dh_ui_actor` | `dh_ui_block_plan(hl_ingest_block, now())`"
             }
         },
         "ds_bk_preview": {
@@ -800,7 +800,7 @@
             "type": "ds.search",
             "name": "Test-block apply",
             "options": {
-                "query": "| makeresults | eval dh_action=$bk_action|s$, level=$bk_level|s$, host=$bk_host|s$, target=$bk_target|s$, dh_secs=$bk_duration|s$, reason=$m_reason|s$ | `dh_ui_actor` | `dh_ui_block_plan(hl_ingest_block, now())` | eval dh_confirm=$bk_confirm|s$ | `dh_ui_block_write(hl_ingest_block, dh_admin_log, now())`"
+                "query": "| makeresults | eval dh_action=$bk_action|s$, level=$bk_level|s$, host=$bk_host|s$, target=$bk_target|s$, dh_secs=$bk_duration|s$, reason=$m_reason|s$, ticket=$m_ticket|s$ | `dh_ui_actor` | `dh_ui_block_plan(hl_ingest_block, now())` | eval dh_confirm=$bk_confirm|s$ | `dh_ui_block_write(hl_ingest_block, dh_admin_log, now())`"
             }
         },
         "ds_log": {

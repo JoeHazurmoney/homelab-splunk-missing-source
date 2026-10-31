@@ -23,7 +23,7 @@
             "type": "ds.search",
             "name": "Latest daily report (dh:soh)",
             "options": {
-                "query": "search index=data_health source=\"dh:soh\" sourcetype=stash earliest=-8d latest=+1d | eval report_time=tonumber(report_time) | eventstats max(report_time) as dh_latest | where report_time==dh_latest | fields - dh_latest"
+                "query": "search index=data_health source=\"dh:soh\" sourcetype=stash earliest=-8d latest=+1d | eval report_time=tonumber(report_time) | eventstats max(report_time) as dh_latest | where report_time==dh_latest | table report_time section item value start end open outages open_outages mttr_secs version last_seen day min_ratio reason ticket set_by"
             }
         },
         "ds_when": {
