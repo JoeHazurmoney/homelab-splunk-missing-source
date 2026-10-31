@@ -1,1 +1,1 @@
-finding_id,host,time,code,indicator,detail,events,bucket,suppressed,marker_action,marker_time,marker_by,marker_run_id,collected_suppressed,updated
+finding_id,host,time,code,indicator,detail,events,bucket,suppressed,marker_action,marker_time,marker_by,marker_run_id,updated

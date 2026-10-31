@@ -7,6 +7,3 @@ entity,NOW-185600,sourcetype|enclave1|h75a|syslog|*,0,215940,215940
 entity,NOW-99200,sourcetype|enclave1|h75a|syslog|*,1,259140,43140
 entity,NOW-99200,source|enclave1|h75a|syslog|/var/log/messages,1,43200,43140
 entity,NOW-99200,host|*|h75a|*|*,1,43200,43140
-entity,NOW-272000,sourcetype|enclave1|h75b|syslog|*,0,90000,90000
-entity,NOW-185600,sourcetype|enclave1|h75b|syslog|*,0,176400,176400
-entity,NOW-99200,sourcetype|enclave1|h75b|syslog|*,0,262800,262800

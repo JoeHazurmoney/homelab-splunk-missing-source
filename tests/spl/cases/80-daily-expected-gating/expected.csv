@@ -1,0 +1,4 @@
+level,index,host,sourcetype,source,profile,enabled,expected_since
+sourcetype,enclave1,h80n,syslog,,continuous,,NOW-63200
+sourcetype,enclave1,h80c,syslog,,continuous,,
+sourcetype,enclave1,h80r,syslog,,continuous,0,

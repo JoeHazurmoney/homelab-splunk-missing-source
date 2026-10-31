@@ -1,0 +1,7 @@
+dh_kind,day,entity_id,open_gap_secs
+todo,NOW-272000,,
+todo,NOW-185600,,
+todo,NOW-99200,,
+prev,NOW-358400,sourcetype|enclave1|h80r|syslog|*,50000
+prev,NOW-358400,sourcetype|enclave1|h80n|syslog|*,500000
+prev,NOW-358400,sourcetype|enclave1|h80c|syslog|*,10000

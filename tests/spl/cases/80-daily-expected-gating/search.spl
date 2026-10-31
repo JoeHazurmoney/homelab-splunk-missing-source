@@ -1,0 +1,5 @@
+| makeresults count=4320 | streamstats count as k | eval k=k-1, _time=@NOW@-272000+60*k, dh_kind="up"
+| append [| makeresults count=720 | streamstats count as k | eval _time=@NOW@-99200+60*(719+k), dh_kind="data", index="enclave1", host="h80n", sourcetype="syslog", source="/var/log/messages", count=1, it=_time, et=_time]
+| append [| inputlookup @rows@]
+| fields - k
+| `dh_daily_from_minutes(@fwd@, @expected@)`
