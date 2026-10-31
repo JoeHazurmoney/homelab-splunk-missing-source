@@ -1,0 +1,11 @@
+c,entity_id,dh_drop
+normal,host|*|h65a|*|*,0
+normal,sourcetype|linux|h65a|syslog|*,0
+normal,sourcetype|linux|h65a|disabled_st|*,1
+normal,sourcetype|linux|h65a|removed|*,1
+normal,source|linux|h65a|st|/var/log/x-*.log,0
+noexp,host|*|h65a|*|*,0
+noexp,sourcetype|linux|h65a|syslog|*,0
+noexp,sourcetype|linux|h65a|disabled_st|*,0
+noexp,sourcetype|linux|h65a|removed|*,0
+noexp,source|linux|h65a|st|/var/log/x-*.log,0

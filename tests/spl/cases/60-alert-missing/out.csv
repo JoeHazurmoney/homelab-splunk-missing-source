@@ -1,0 +1,4 @@
+entity_id,dh_host,status,alert_criticality
+a,h60,MISSING,1
+b,h60,MISSING,2
+d,h60,MISSING,2

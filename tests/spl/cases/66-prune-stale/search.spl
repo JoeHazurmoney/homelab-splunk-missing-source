@@ -1,0 +1,6 @@
+| inputlookup @state@ | `dh_prune_mark_state(@expected@, @NOW@)` | eval c="state", id=host."/".sourcetype
+| append [| inputlookup @fwd@ | `dh_prune_mark_fwd(@expected@, @NOW@)` | eval c="fwd", id=host]
+| append [| inputlookup @tamper@ | `dh_prune_mark_tamper(@NOW@)` | eval c="tamper", id=host]
+| append [| inputlookup @volume@ | `dh_prune_mark_volume(@NOW@)` | eval c="volume", id=entity_id]
+| append [| inputlookup @baseline@ | `dh_prune_mark_baseline(@NOW@)` | eval c="baseline", id=entity_id]
+| append [| inputlookup @admin@ | `dh_prune_mark_admin_log(@meta@, @NOW@)` | eval c="admin", id=action]

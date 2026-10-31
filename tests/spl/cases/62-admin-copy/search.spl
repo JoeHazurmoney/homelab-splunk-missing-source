@@ -1,0 +1,2 @@
+| inputlookup @admin@ | `dh_admin_copy_rows(@meta@, @NOW@)` | eval c="hwm"
+| append [| inputlookup @admin@ | `dh_admin_copy_rows(@nometa@, @NOW@)` | eval c="first"]

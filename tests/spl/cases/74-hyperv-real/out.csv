@@ -1,0 +1,4 @@
+host,last_vm_event,last_vm_event_time
+wd2l-recv,18502,NOW-100
+wd2l-logsrv,18504,NOW-300
+dc7199bc-91e7-4f4f-bde5-ce1967f196ea,18508,NOW-200

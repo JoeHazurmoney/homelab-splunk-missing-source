@@ -1,0 +1,5 @@
+time,entity_id,flagged
+NOW-3600,x1,1
+NOW-7200,x1,1
+NOW-3600,x2,0
+NOW-90000,x3,1

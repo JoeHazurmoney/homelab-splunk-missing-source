@@ -1,0 +1,6 @@
+level,index,host,sourcetype,source,enabled
+sourcetype,linux,h50b,linux_audit,,
+sourcetype,enclave1,h50c,syslog,,
+source,enclave1,h50a,syslog,/var/log/messages,1
+host,,h50b,,,
+sourcetype,linux,h50d,never,,0

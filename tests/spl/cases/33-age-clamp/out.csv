@@ -1,0 +1,3 @@
+entity_id,status,age_secs
+host|*|h33|*|*,OK,0
+sourcetype|linux|h33|syslog|*,OK,0

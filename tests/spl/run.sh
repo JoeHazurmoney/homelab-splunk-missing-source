@@ -12,6 +12,9 @@
 # The runner copies the tables into the app's lookups/ as dhtest_<case>_<table>.csv, runs the
 # search through REST, diffs the results and exits non-zero on any mismatch.
 # The dhtest_ files are removed afterwards. Nothing is written to KV or to an index.
+# A full run (no glob) first runs three checks: lookup-names (dh_evaluate vs dh_lookup_*),
+# lookup-names-static (every literal lookup name in the conf files is defined, and merge macros
+# get the collection their search writes) and savedsearch-settings (savedsearches.expect.csv).
 #
 # shellcheck disable=SC2016  # backticks here are Splunk macro calls, not shell expansions
 # Usage: tests/spl/run.sh [case-glob]     e.g. tests/spl/run.sh '1*'
@@ -133,10 +136,78 @@ names_check() {
   return 1
 }
 
+# The conf files with continuation lines joined: one "<file>|[stanza]|<key> = <value>" per setting.
+conf_lines() {
+  awk -v f="$(basename "$1")" '
+    { sub(/\r$/, "") }
+    /^\[/ { st = $0; next }
+    cont { buf = buf " " $0 } !cont { buf = $0 }
+    { cont = sub(/\\$/, "", buf) }
+    !cont && buf ~ /=/ && buf !~ /^[[:space:]]*#/ { print f "|" st "|" buf; buf = "" }' "$1"
+}
+
+# Static check of literal lookup names (macro arguments can't hold macros, so saved searches and
+# wrapper macros name lookups literally): every lookup a search reads or writes, and every
+# lookup-like macro argument, must be a lookup defined in transforms.conf (or hl_ingest_block, which
+# hl_server_base ships); and the macros that merge into a collection must be given the collection
+# that the same search writes (the dh_lookup_* definition).
+static_names_check() {
+  local app="$here/../../splunk/apps/$DH_APP/default" defs bad=0 line n s m l want got
+  defs=" hl_ingest_block $(sed -n 's/^\[\([^]]*\)\]\r\{0,1\}$/\1/p' "$app/transforms.conf" | tr '\n' ' ') "
+  while IFS= read -r line; do
+    for n in $(printf '%s\n' "$line" | grep -oE '(inputlookup|outputlookup|lookup)( +[a-z_]+=[^ ]+)* +[a-zA-Z_][a-zA-Z0-9_.]*( |$)' | awk '{ print $NF }'); do
+      case $n in *=* | append | dhtest_*) continue ;; esac
+      case $defs in *" $n "*) ;; *) echo "  unknown lookup '$n' in: ${line%%|*}"; bad=1 ;; esac
+    done
+    # (dh_host_norm/dh_source_norm take an eval expression, not a lookup)
+    for n in $(printf '%s\n' "$line" | grep -oE '`[a-z_]+\([^`]*\)`' | grep -vE '^`dh_(host|source)_norm\(' | sed 's/^`[a-z_]*(//; s/)`$//' | tr ',' '\n' | tr -d ' ' | grep -E '^(dh_[a-z_]+|hl_ingest_block)$' || true); do
+      case $defs in *" $n "*) ;; *) echo "  macro argument '$n' is not a lookup: ${line%%|*}"; bad=1 ;; esac
+    done
+  done < <(conf_lines "$app/savedsearches.conf" | grep '|search = '; conf_lines "$app/macros.conf" | grep '|definition = ' | grep -v '\$')
+  # <saved search>|<macro>|<dh_lookup_* suffix>: the macro's first argument names that lookup.
+  for s in "DH Tracker fast|dh_state_merge|state_fast" "DH Tracker fast|dh_fwd_fold|fwd" "DH Tracker fast|dh_meta_fast|meta" \
+    "DH Tracker slow|dh_state_merge|state_slow" "DH Baseline daily|dh_daily_from_minutes|fwd" \
+    "DH Volume hourly|dh_volume_flag|baseline" "DH Admin log copy|dh_admin_copy_rows|meta" "DH Tamper|dh_tamper_finish|" \
+    "DH Daily SoH report|dh_soh_outages|status"; do
+    IFS='|' read -r n m l <<<"$s"
+    line=$(conf_lines "$app/savedsearches.conf" | grep -F "|[$n]|search = " || true)
+    if [ -z "$line" ]; then echo "  saved search '$n' not found"; bad=1; continue; fi
+    case $line in *"\`$m("*) ;; *) echo "  '$n' does not call $m"; bad=1; continue ;; esac
+    [ -n "$l" ] || continue
+    want=$(conf_lines "$app/macros.conf" | grep -F "|[dh_lookup_$l]|" | sed 's/.*definition = //')
+    got=$(printf '%s\n' "$line" | grep -oE "\`$m\([a-z_]+" | head -1 | sed "s/^\`$m(//")
+    if [ "$got" != "$want" ]; then echo "  '$n' calls $m($got, ...) but dh_lookup_$l is $want"; bad=1; fi
+  done
+  if [ "$bad" -eq 0 ]; then echo "PASS lookup-names-static"; return 0; fi
+  echo "FAIL lookup-names-static"
+  return 1
+}
+
+# The deployed saved searches have the schedules and alert settings in savedsearches.expect.csv
+# (REST names: the conf keys counttype, relation and quantity read as alert_type,
+# alert_comparator and alert_threshold).
+conf_check() {
+  local keys spl
+  keys=$(tail -n +2 "$here/savedsearches.expect.csv" | tr -d '\r' | cut -d, -f2 | sort -u | tr '\n' ' ')
+  spl="| rest splunk_server=local count=0 /servicesNS/nobody/$DH_APP/saved/searches | search eai:acl.app=$DH_APP | fields title $keys"
+  spl="$spl | untable title key value | eval _raw=title.\",\".key.\",\".value | fields _raw"
+  tail -n +2 "$here/savedsearches.expect.csv" | tr -d '\r' | sed '/^$/d' | LC_ALL=C sort >"$work/conf.want"
+  dh_search "$spl" raw | tr -d '\r' | sed '/^$/d' | awk -F, 'NR == FNR { k[$1 "," $2] = 1; next } ($1 "," $2) in k' "$work/conf.want" - | LC_ALL=C sort >"$work/conf.got"
+  if diff -u --label want --label got "$work/conf.want" "$work/conf.got" >"$work/conf.diff"; then
+    echo "PASS savedsearch-settings"
+    return 0
+  fi
+  sed 's/^/  /' "$work/conf.diff"
+  echo "FAIL savedsearch-settings"
+  return 1
+}
+
 run_cases() {
   local pattern=${1:-*} pass=0 fail=0 dir name id ok
   if [ "$pattern" = "*" ]; then
     if names_check; then pass=$((pass + 1)); else fail=$((fail + 1)); fi
+    if static_names_check; then pass=$((pass + 1)); else fail=$((fail + 1)); fi
+    if conf_check; then pass=$((pass + 1)); else fail=$((fail + 1)); fi
   fi
   for dir in "$here"/cases/$pattern/; do
     [ -f "$dir/out.csv" ] || continue

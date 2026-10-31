@@ -1,0 +1,3 @@
+dh_kind,index,host,sourcetype,source,count,up_minutes,hour_start
+up,,,,,,30,NOW-3600
+data,linux,v1,syslog,/var/log/messages,150,

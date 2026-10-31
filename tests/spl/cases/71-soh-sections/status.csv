@@ -1,0 +1,4 @@
+entity_id,status,threshold_origin,threshold_note,expected_since
+s1,NEVER_SEEN,default,profile default (continuous),NOW-7200
+s2,OK,invalid_profile,invalid profile 'contnuous': treated as continuous,NOW-7200
+s3,OK,default,profile default (continuous),NOW-7200

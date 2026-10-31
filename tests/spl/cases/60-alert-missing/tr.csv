@@ -1,0 +1,8 @@
+time,entity_id,dh_host,status,prev_status,criticality,cause
+NOW-60,a,h60,MISSING,LATE,1,heartbeat missing
+NOW-60,b,h60,MISSING,OK,2,x
+NOW-60,c,h60,MISSING,LATE,3,x
+NOW-60,d,h60,MISSING,LATE,,x
+NOW-60,e,h60,LATE,OK,1,x
+NOW-60,f,h60,NEVER_SEEN,PENDING,1,x
+NOW-60,g,h60,OK,MISSING,1,x

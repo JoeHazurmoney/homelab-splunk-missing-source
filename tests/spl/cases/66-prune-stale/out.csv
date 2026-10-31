@@ -1,0 +1,16 @@
+c,id,dh_drop
+state,h66a/syslog,0
+state,h66z/syslog,1
+state,h66z/cron,0
+state,h66y/st,1
+fwd,h66a,0
+fwd,h66z,1
+fwd,h66w,0
+tamper,t1,1
+tamper,t2,0
+volume,v-old,1
+volume,v-new,0
+baseline,b-old,1
+baseline,b-new,0
+admin,old,1
+admin,new,0

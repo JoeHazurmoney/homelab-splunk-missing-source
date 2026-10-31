@@ -1,0 +1,2 @@
+entity_id,count,median,flagged,note
+sourcetype|linux|v1|syslog|*,150,1000,0,hour not covered (Splunk up 30 of 60 min)

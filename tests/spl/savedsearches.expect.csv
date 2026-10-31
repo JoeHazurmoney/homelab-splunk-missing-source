@@ -1,0 +1,48 @@
+title,key,value
+DH Baseline daily,cron_schedule,5 2 * * *
+DH Baseline daily,realtime_schedule,0
+DH Baseline daily,is_scheduled,1
+DH Baseline compute,cron_schedule,30 2 * * *
+DH Baseline compute,realtime_schedule,0
+DH Baseline compute,is_scheduled,1
+DH Volume hourly,cron_schedule,3 * * * *
+DH Volume hourly,is_scheduled,1
+DH Tamper,cron_schedule,*/5 * * * *
+DH Tamper,is_scheduled,1
+DH Admin log copy,cron_schedule,*/5 * * * *
+DH Admin log copy,is_scheduled,1
+DH Prune,cron_schedule,* * * * *
+DH Prune,max_concurrent,1
+DH Prune,is_scheduled,1
+DH Prune daily,cron_schedule,17 3 * * *
+DH Prune daily,is_scheduled,1
+DH Daily SoH report,cron_schedule,0 7 * * *
+DH Daily SoH report,is_scheduled,1
+DH Alert missing,cron_schedule,* * * * *
+DH Alert missing,is_scheduled,1
+DH Alert missing,alert_type,number of events
+DH Alert missing,alert_comparator,greater than
+DH Alert missing,alert_threshold,0
+DH Alert missing,alert.digest_mode,0
+DH Alert missing,alert.suppress,1
+DH Alert missing,alert.suppress.fields,entity_id
+DH Alert missing,alert.suppress.period,1h
+DH Alert missing,alert.track,1
+DH Alert missing,action.logevent,1
+DH Alert missing,action.logevent.param.index,data_health
+DH Alert missing,action.logevent.param.source,dh:alert
+DH Alert missing,action.logevent.param.sourcetype,stash
+DH Alert tamper,cron_schedule,1-59/5 * * * *
+DH Alert tamper,is_scheduled,1
+DH Alert tamper,alert_type,number of events
+DH Alert tamper,alert_comparator,greater than
+DH Alert tamper,alert_threshold,0
+DH Alert tamper,alert.digest_mode,0
+DH Alert tamper,alert.suppress,1
+DH Alert tamper,alert.suppress.fields,dh_host
+DH Alert tamper,alert.suppress.period,1h
+DH Alert tamper,alert.track,1
+DH Alert tamper,action.logevent,1
+DH Alert tamper,action.logevent.param.index,data_health
+DH Alert tamper,action.logevent.param.source,dh:alert
+DH Alert tamper,action.logevent.param.sourcetype,stash

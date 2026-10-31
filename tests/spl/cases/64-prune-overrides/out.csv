@@ -1,0 +1,7 @@
+entity_id,dh_drop,dh_change,mute_until,threshold_override_secs,reason
+o1,1,1,,,maint
+o2,0,1,,5000,maint
+o3,0,0,NOW+3600,,maint
+o4,0,0,,7200,noisy
+o5,1,1,,,maint
+o6,1,1,,,

@@ -1,0 +1,6 @@
+entity_id,status,expected_since
+host|*|h65a|*|*,OK,NOW-9000
+sourcetype|linux|h65a|syslog|*,OK,NOW-9000
+sourcetype|linux|h65a|disabled_st|*,MISSING,NOW-9000
+sourcetype|linux|h65a|removed|*,NEVER_SEEN,NOW-9000
+source|linux|h65a|st|/var/log/x-*.log,OK,NOW-9000

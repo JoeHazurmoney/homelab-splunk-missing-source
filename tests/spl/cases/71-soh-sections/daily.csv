@@ -1,0 +1,6 @@
+record,entity_id,level,day,lag_p95
+entity,l1,sourcetype,NOW-99200,120
+entity,l2,sourcetype,NOW-99200,5
+entity,l3,sourcetype,NOW-185600,500
+entity,l4,source,NOW-99200,900
+day,,,NOW-99200,

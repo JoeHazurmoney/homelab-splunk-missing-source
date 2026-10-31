@@ -1,0 +1,1 @@
+| inputlookup @tr@ | eval _time=tonumber(time) | fields - time | `dh_soh_outages(@status@, @NOW@)`

@@ -1,0 +1,1 @@
+| inputlookup @hour@ | `dh_volume_flag(@baseline@, @NOW@)`

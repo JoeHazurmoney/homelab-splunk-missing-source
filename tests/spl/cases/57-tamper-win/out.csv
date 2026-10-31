@@ -1,0 +1,12 @@
+host,time,code,indicator
+homepc,NOW-900,win1102,1102 security log cleared by taylo
+homepc,NOW-890,win104,104 event log HLTest cleared by taylo
+homepc,NOW-870,win1100,1100 event logging service shut down
+homepc,NOW-860,win4719,4719 audit policy changed by taylo
+homepc,NOW-850,win4697,4697 service installed: evilsvc
+homepc,NOW-840,win7045,7045 service installed: Microsoft Copilot Elevation Service (MicrosoftCopilotElevationService)
+homepc,NOW-830,win7036,7036 SplunkForwarder Service stopped
+homepc,NOW-820,win7036,7036 Windows Event Log stopped
+homepc,NOW-790,win7040,7040 SplunkForwarder Service start type changed to disabled
+homepc,NOW-770,win4616,4616 clock step 3600 s
+homepc,NOW-750,winkg1,Kernel-General 1 clock step 7200 s

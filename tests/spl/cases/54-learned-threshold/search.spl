@@ -1,0 +1,4 @@
+| inputlookup @daily@ | `dh_baseline_compute(14, @NOW@)`
+| rename learned_gap_secs AS bl_learned_gap_secs, days AS bl_days
+| lookup @expected@ entity_id OUTPUT profile interval_secs max_gap_secs
+| `dh_profile_defaults` | `dh_threshold`

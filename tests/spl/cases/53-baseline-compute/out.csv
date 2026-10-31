@@ -1,0 +1,5 @@
+_key,entity_id,days,skipped_days,p90_max_gap_secs,learned_gap_secs,suggested_profile,hourly_median,last_day,updated
+e1,e1,5,1,1380,2190,continuous,,NOW-99200,NOW
+e2,e2,2,0,1140,1830,,,NOW-99200,NOW
+e3,e3,4,0,5000,7620,sporadic,250;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;2.5,NOW-99200,NOW
+e4,e4,0,2,,,,,NOW-99200,NOW
