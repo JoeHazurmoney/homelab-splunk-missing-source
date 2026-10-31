@@ -123,10 +123,10 @@ Rolls a host's rows up to DOWN (its liveness is missing, or, for agentless hosts
 ## Likely cause and action
 
 ### `dh_eval_cause`
-Picks the most likely cause of a late or missing entity, in a fixed order: the hold, a mute, a test block, an Ansible stop, the VM being off, a tamper finding, a relay down, the device probe, the heartbeat, and finally "this stream stopped". Used by: `dh_eval`.
+Picks the most likely cause of an entity that is not OK, in a fixed order: the hold, a mute, "just added" (newly expected and not yet seen), a test block, an Ansible stop, the VM being off, a tamper finding, a relay down, the device probe, the heartbeat, and finally "this stream stopped". Used by: `dh_eval`.
 
 ### `dh_eval_cause_text`
-Turns each cause code into the sentence shown in the Cause column and the next step shown in the Action column (for example "ansible-playbook site.yml --tags start --limit wd2l-recv"). The full list is in [dashboards.md](dashboards.md#causes-what-the-cause-column-can-say). Used by: `dh_eval`.
+Turns each cause code into the plain sentence shown in the Cause column and the next step shown in the Action column (for example "Start it again with the role: ansible-playbook site.yml --tags start --limit wd2l-recv"). The texts use the names the panels use ("Splunk agent", not UF or splunkd) and say what any command does. The full list is in [dashboards.md](dashboards.md#causes-what-the-cause-column-can-say). Used by: `dh_eval`.
 
 ## Evaluator steps over lookups
 
@@ -194,10 +194,10 @@ Writes the arrival tracker's run record: this run's time, the previous run, the 
 **604800 seconds (7 days).** How far back DH Tamper re-checks each finding against Ansible markers on every run. Raise it to re-check older findings (slower); lower it to stop sooner. Keep it equal to `dh_tamper_finding_earliest`. Used by: `dh_tamper_finish`.
 
 ### `dh_tamper_finding_earliest`
-**`-7d`.** The event-time window DH Tamper reads findings from. It must match `dh_tamper_lookback_secs` (a test checks this). Used by: *DH Tamper*.
+**`-7d`.** The event-time window DH Tamper reads findings from. Widen it to catch findings that arrive later (slower runs); narrow it to read less. It must match `dh_tamper_lookback_secs` (a test checks this). Used by: *DH Tamper*.
 
 ### `dh_tamper_marker_earliest`
-**`-7d-15m`.** The window for Ansible markers: the findings' window plus `dh_tamper_window_secs`, so a finding at the edge still meets its marker. Used by: *DH Tamper*.
+**`-7d-15m`.** The window for Ansible markers: the findings' window plus `dh_tamper_window_secs`, so a finding at the edge still meets its marker. Change it only together with the findings' window: narrower and an old finding would lose its marker and be reported as tamper; wider only costs time. Used by: *DH Tamper*.
 
 ### `dh_volume_ratio`
 **0.2 (20 %).** An hour is a volume drop when it has fewer than this share of its usual count for that hour of day. Raise it to flag milder drops; lower it to flag only near-silence. Used by: `dh_volume_flag`.
@@ -209,34 +209,34 @@ Writes the arrival tracker's run record: this run's time, the previous run, the 
 **54 minutes.** An hour is judged only if Splunk was up for at least this many of its minutes; otherwise its low count is Splunk's fault. Raise it to judge only fully covered hours; lower it to judge partial ones. Used by: `dh_volume_flag`.
 
 ### `dh_suggest_continuous_secs`
-**1800 seconds.** In the baseline, an entity whose typical longest daily silence is at most this is suggested as `continuous`, otherwise `sporadic`. Used by: `dh_baseline_compute`.
+**1800 seconds.** In the baseline, an entity whose typical longest daily silence is at most this is suggested as `continuous`, otherwise `sporadic`. Raise it to suggest continuous for gappier streams; lower it to suggest sporadic more often. It is only a suggestion shown on Manage. Used by: `dh_baseline_compute`.
 
 ### `dh_state_retention_secs`
-**2592000 seconds (30 days).** Arrival rows older than this that no expected entity uses are pruned daily. Raise it to keep history of retired streams longer. Used by: `dh_prune_mark_state`.
+**2592000 seconds (30 days).** Arrival rows older than this that no expected entity uses are pruned daily. Raise it to keep history of retired streams longer; lower it to keep the tables smaller. Used by: `dh_prune_mark_state`.
 
 ### `dh_fwd_retention_secs`
-**2592000 seconds (30 days).** Forwarder rows not updated for this long, of hosts no longer expected, are pruned daily. Used by: `dh_prune_mark_fwd`.
+**2592000 seconds (30 days).** Forwarder rows not updated for this long, of hosts no longer expected, are pruned daily. Raise it to keep facts about retired hosts longer; lower it to forget them sooner. Used by: `dh_prune_mark_fwd`.
 
 ### `dh_tamper_retention_secs`
-**2592000 seconds (30 days).** Tamper findings older than this are pruned from the collection (the `data_health` index keeps them). Used by: `dh_prune_mark_tamper`.
+**2592000 seconds (30 days).** Tamper findings older than this are pruned from the collection (the `data_health` index keeps them). Raise it to keep them on Host detail longer; lower it to keep the collection smaller. Used by: `dh_prune_mark_tamper`.
 
 ### `dh_volume_retention_secs`
-**172800 seconds (2 days).** Volume rows not updated for this long are pruned. Used by: `dh_prune_mark_volume`.
+**172800 seconds (2 days).** Volume rows not updated for this long are pruned. Raise it to keep stale hourly rows longer (nothing reads them); lower it to clean up sooner. Used by: `dh_prune_mark_volume`.
 
 ### `dh_baseline_retention_secs`
-**2592000 seconds (30 days).** Baseline rows not recomputed for this long (the entity stopped sending) are pruned. Used by: `dh_prune_mark_baseline`.
+**2592000 seconds (30 days).** Baseline rows not recomputed for this long (the entity stopped sending) are pruned. Raise it to keep what was learned about a stream that comes back after a long break; lower it to forget it sooner. Used by: `dh_prune_mark_baseline`.
 
 ### `dh_admin_retention_secs`
-**7776000 seconds (90 days).** Admin-log rows older than this, already copied to the index, are pruned from the collection. Used by: `dh_prune_mark_admin_log`.
+**7776000 seconds (90 days).** Admin-log rows older than this, already copied to the index, are pruned from the collection. Raise it to see more history on Manage; lower it to keep the table small (the index keeps a copy either way). Used by: `dh_prune_mark_admin_log`.
 
 ### `dh_fwd_expected_version`
 **`10.6.1.1`.** The Splunk agent version the role installs. Agents on another version are listed in the daily report and flagged on Host detail. Change it when the role pins a new version. Used by: `dh_soh_fwd`, `dh_ui_fwd`.
 
 ### `dh_fwd_disconnect_secs`
-**900 seconds.** An agent with no heartbeat or connection for this long is listed as disconnected in the daily report. Used by: `dh_soh_fwd`.
+**900 seconds.** An agent with no heartbeat or connection for this long is listed as disconnected in the daily report. Raise it to list only longer silences; lower it to list shorter ones. Used by: `dh_soh_fwd`.
 
 ### `dh_lag_warn_secs`
-**60 seconds.** Sourcetypes whose data usually arrives at least this long after it was written (95th percentile) are listed as slow in the daily report. Used by: `dh_soh_lag`.
+**60 seconds.** Sourcetypes whose data usually arrives at least this long after it was written (95th percentile) are listed as slow in the daily report. Raise it to list only very slow ones; lower it to list more. Used by: `dh_soh_lag`.
 
 ## Summary writes
 
@@ -393,11 +393,14 @@ These macros hold the SPL behind the dashboard panels, so the tests run exactly 
 ### `dh_ui_time_fmt`
 **`%Y-%m-%d %H:%M`.** How dates are shown in dashboard tables. Used by: most `dh_ui_*` macros.
 
+### `dh_ui_headers`
+The plain column headers of every dashboard table ("Silent for / limit" instead of `age_vs_threshold`, "Host" instead of `host`). It is the last step of each table's search; the macros and tests keep the field names. Used by: every table panel.
+
 ### `dh_ui_current_secs`
 **150 seconds.** A `dh_status` row more than this behind the newest one is ignored by the dashboards: it belongs to an entity that is no longer expected and hasn't been cleaned up yet. The evaluator rewrites every row once a minute, so this is two and a half runs. Raise it if the evaluator is often slow; lower it to hide retired entities sooner. Used by: `dh_ui_status`, `dh_ui_status_attrs`.
 
 ### `dh_ui_eval_stale_secs`
-**180 seconds.** If the evaluator hasn't written statuses for this long, the banner says "Out of date". Used by: `dh_ui_banner`.
+**180 seconds.** If the evaluator hasn't written statuses for this long, the banner says "Out of date". Raise it to tolerate a slow scheduler; lower it to warn sooner (one late run may then trip it). Used by: `dh_ui_banner`.
 
 ### `dh_ui_status(status)`
 The current rows of `dh_status` (see `dh_ui_current_secs`). Used by: the Overview, Host detail and Manage panels.
@@ -469,7 +472,7 @@ Checks a new or changed expected row (dh_admin only; Ansible-managed rows are re
 Writes the expected row when the confirmation matches, and logs it. Used by: Manage, forms 2 and 3.
 
 ### `dh_ui_adopt_row(baseline, fwd)`
-Turns an unregistered entity into an expected-row request: agent hosts become `uf`, others `syslog`; the profile comes from the baseline's suggestion, else continuous. Used by: Manage, form 3.
+Turns an unregistered entity into an expected-row request: agent hosts become `uf`, others `syslog`. An agent host's own row gets the `heartbeat` profile; any other row takes the baseline's suggestion, else continuous. Used by: Manage, form 3.
 
 ### `dh_ui_block_plan(blocks, now)`
 Checks a test-block request (dh_admin only; 60 s to 24 h; a source block needs an exact raw source) and shows the block before and after, with the normalized source for reference and its confirmation code. Used by: Manage, form 4.
