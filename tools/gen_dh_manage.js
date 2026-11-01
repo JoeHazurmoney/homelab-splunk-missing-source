@@ -88,7 +88,6 @@ ddSearch('input_bk_target', 'Sourcetype or raw source', 'bk_target', 'ds_bk_targ
 dd('input_bk_duration', 'Block for', 'bk_duration', [it('5 minutes', '300'), it('15 minutes', '900'), it('1 hour', '3600'), it('4 hours', '14400'), it('24 hours (the most allowed)', '86400')], '900');
 text('input_bk_reason', 'Reason (required)', 'bk_reason', { ph: 'Why? For example: test that the app sees pi5 go missing' });
 text('input_bk_ticket', 'Ticket (optional, - for none)', 'bk_ticket', { def: '-' });
-ddSearch('input_bk_confirm', 'Confirm (writes the change)', 'bk_confirm', 'ds_bk_confirm', { cascade: true, show: ['cond_bk_ready'] });
 
 // ---------- inputs: Admin log
 text('input_lg_text', 'Search the log (words separated by *)', 'lg_text', { def: '*' });
@@ -105,7 +104,8 @@ const NAMES = { ov: 'Mute form', ex: 'Add-row form', ad: 'Adopt form', bk: 'Test
 const conditions = {};
 for (const p of Object.keys(R)) {
   conditions[`cond_${p}_ready`] = { name: `${NAMES[p]} filled in`, value: isSet(R[p]) };
-  conditions[`cond_${p}_done`] = { name: `${NAMES[p]} confirmed`, value: isSet([...R[p], `${p}_confirm`]) };
+  // The test block is set by the Ansible role (task 11b): its form ends in a command, not a write
+  if (p !== 'bk') conditions[`cond_${p}_done`] = { name: `${NAMES[p]} confirmed`, value: isSet([...R[p], `${p}_confirm`]) };
 }
 
 // ---------- data sources
@@ -146,8 +146,9 @@ C('ds_bk_targets', 'Block target choices', 'ds_bk_sources', '| eval lvl=$bk_leve
 const bkReq = '| makeresults | eval dh_action=$bk_action|s$, level=$bk_level|s$, host=$bk_host|s$, target=$bk_target|s$, dh_secs=$bk_duration|s$, reason=$bk_reason|s$, ticket=$bk_ticket|s$ | `dh_ui_actor` | `dh_ui_block_plan(hl_ingest_block, dh_admin_log, now())`';
 S('ds_bk_plan', 'Test block: plan', bkReq);
 C('ds_bk_preview', 'Test block: preview', 'ds_bk_plan', '| table ui_change ui_item ui_now ui_after check source_norm | `dh_ui_headers`');
-C('ds_bk_confirm', 'Test block: confirmation choice', 'ds_bk_plan', CONFIRM);
-S('ds_bk_apply', 'Test block: apply', bkReq + ' | eval dh_confirm=$bk_confirm|s$ | `dh_ui_block_write(hl_ingest_block, dh_admin_log, now())` | `dh_ui_headers`');
+// The block lives in Cribl (spec 7.7, 7.8; task 11b): the form checks the request and shows the
+// role's cribl_block command; it writes nothing itself.
+C('ds_bk_command', 'Test block: command', 'ds_bk_plan', '| `dh_ui_block_command` | eval Command=coalesce(command, "Not ready: ".check) | table Command');
 S('ds_blocks', 'Current test blocks', '| `dh_ui_blocks(hl_ingest_block, now())` | `dh_ui_headers`');
 
 S('ds_log', 'Admin log', '| `dh_ui_admin_log(dh_admin_log)` | eval f_text=$lg_text|s$ | `dh_ui_hay_filter` | head 1000 | `dh_ui_headers`');
@@ -180,11 +181,10 @@ table('viz_ad_preview', 'Adopt: preview', 'ds_ad_preview', 'The expected row tha
 md('viz_ad_wait', WAIT, { containerOptions: vis(null, ['cond_ad_done']) });
 table('viz_ad_result', 'Adopt: result', 'ds_ad_apply', 'What was written when you chose Apply.', { containerOptions: vis(['cond_ad_done']) });
 
-md('viz_bk_intro', 'A **test block** throws a host\'s real data away when it reaches Splunk (linux, windows and network indexes only), so you can check that the app notices the data going missing. It needs the dh_admin role, starts within about a minute and ends by itself. Remove it as soon as the test is over: in production, a block is a way to blind monitoring.');
+md('viz_bk_intro', 'A **test block** throws a host\'s real data away in Cribl Stream, before it reaches Splunk (linux, windows and network indexes only), so you can check that the app notices the data going missing. The Ansible role sets it: fill in the form, check the preview, then run the **command** it shows on pi5, in the repository\'s ansible folder. The block starts in Cribl about 20 seconds later and ends by itself; the table below lists it once the command has run. It needs the dh_admin role. Remove it as soon as the test is over: in production, a block is a way to blind monitoring.');
 md('viz_bk_steps', '**Preview: fill in the form above.** Choose **Add** or **Remove**, the **Host** and the **Block level**; for one sourcetype or source, choose it in the next list (it fills from the host\'s data of the last 24 h, shown below). Write a **Reason**. The preview of the change then appears here.', { containerOptions: vis(null, ['cond_bk_ready']) });
 table('viz_bk_preview', 'Test block: preview', 'ds_bk_preview', 'The block you are about to add or remove, and whether it can be applied. Nothing is written yet.', { containerOptions: vis(['cond_bk_ready']) });
-md('viz_bk_wait', WAIT, { containerOptions: vis(null, ['cond_bk_done']) });
-table('viz_bk_result', 'Test block: result', 'ds_bk_apply', 'What was written when you chose Apply.', { containerOptions: vis(['cond_bk_done']) });
+table('viz_bk_command', 'Test block: command', 'ds_bk_command', 'The command that sets or removes this block, once the preview says OK. Run it on pi5; nothing is written from here.', { containerOptions: vis(['cond_bk_ready']) });
 table('viz_bk_sources', 'Raw sources of the host (24 h)', 'ds_bk_sources_view', 'The exact source names the chosen host sent in the last 24 h; a source block must use one of them.');
 table('viz_blocks', 'Current test blocks', 'ds_blocks', 'Data that is being thrown away on purpose for a test.');
 
@@ -241,7 +241,8 @@ const blocks = rows([
   [90, [["viz_bk_intro", 1440]]],
   [IH, [["input_bk_action", 240], ["input_bk_host", 300], ["input_bk_level", 300], ["input_bk_target", 600]]],
   [IH, [["input_bk_duration", 240], ["input_bk_reason", 720], ["input_bk_ticket", 480]]],
-  ...form("bk"),
+  [150, [["viz_bk_steps", 480], ["viz_bk_preview", 960]]],
+  [110, [["viz_bk_command", 1440]]],
   [320, [["viz_bk_sources", 720], ["viz_blocks", 720]]],
 ]);
 const log = rows([

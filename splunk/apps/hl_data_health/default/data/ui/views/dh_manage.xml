@@ -34,10 +34,6 @@
             "cond_bk_ready": {
                 "name": "Test-block form filled in",
                 "value": "isSet($bk_action$) and isSet($bk_host$) and isSet($bk_level$) and isSet($bk_target$) and isSet($bk_duration$) and isSet($bk_reason$) and isSet($bk_ticket$)"
-            },
-            "cond_bk_done": {
-                "name": "Test-block form confirmed",
-                "value": "isSet($bk_action$) and isSet($bk_host$) and isSet($bk_level$) and isSet($bk_target$) and isSet($bk_duration$) and isSet($bk_reason$) and isSet($bk_ticket$) and isSet($bk_confirm$)"
             }
         }
     },
@@ -676,36 +672,6 @@
                 "defaultValue": "-"
             }
         },
-        "input_bk_confirm": {
-            "type": "input.dropdown",
-            "title": "Confirm (writes the change)",
-            "options": {
-                "items": ">frame(label, value) | prepend(formattedStatics) | objects()",
-                "token": "bk_confirm",
-                "isCascadingInput": true
-            },
-            "dataSources": {
-                "primary": "ds_bk_confirm"
-            },
-            "context": {
-                "formattedConfig": {
-                    "number": {
-                        "prefix": ""
-                    }
-                },
-                "formattedStatics": ">statics | formatByType(formattedConfig)",
-                "statics": [],
-                "label": ">primary | seriesByName(\"label\") | renameSeries(\"label\") | formatByType(formattedConfig)",
-                "value": ">primary | seriesByName(\"value\") | renameSeries(\"value\") | formatByType(formattedConfig)"
-            },
-            "containerOptions": {
-                "visibility": {
-                    "showConditions": [
-                        "cond_bk_ready"
-                    ]
-                }
-            }
-        },
         "input_lg_text": {
             "type": "input.text",
             "title": "Search the log (words separated by *)",
@@ -914,19 +880,12 @@
                 "query": "| table ui_change ui_item ui_now ui_after check source_norm | `dh_ui_headers`"
             }
         },
-        "ds_bk_confirm": {
+        "ds_bk_command": {
             "type": "ds.chain",
-            "name": "Test block: confirmation choice",
+            "name": "Test block: command",
             "options": {
                 "extend": "ds_bk_plan",
-                "query": "| where dh_ok==1 | eval label=dh_label, value=dh_token | table label value"
-            }
-        },
-        "ds_bk_apply": {
-            "type": "ds.search",
-            "name": "Test block: apply",
-            "options": {
-                "query": "| makeresults | eval dh_action=$bk_action|s$, level=$bk_level|s$, host=$bk_host|s$, target=$bk_target|s$, dh_secs=$bk_duration|s$, reason=$bk_reason|s$, ticket=$bk_ticket|s$ | `dh_ui_actor` | `dh_ui_block_plan(hl_ingest_block, dh_admin_log, now())` | eval dh_confirm=$bk_confirm|s$ | `dh_ui_block_write(hl_ingest_block, dh_admin_log, now())` | `dh_ui_headers`"
+                "query": "| `dh_ui_block_command` | eval Command=coalesce(command, \"Not ready: \".check) | table Command"
             }
         },
         "ds_blocks": {
@@ -1185,7 +1144,7 @@
         "viz_bk_intro": {
             "type": "splunk.markdown",
             "options": {
-                "markdown": "A **test block** throws a host's real data away when it reaches Splunk (linux, windows and network indexes only), so you can check that the app notices the data going missing. It needs the dh_admin role, starts within about a minute and ends by itself. Remove it as soon as the test is over: in production, a block is a way to blind monitoring."
+                "markdown": "A **test block** throws a host's real data away in Cribl Stream, before it reaches Splunk (linux, windows and network indexes only), so you can check that the app notices the data going missing. The Ansible role sets it: fill in the form, check the preview, then run the **command** it shows on pi5, in the repository's ansible folder. The block starts in Cribl about 20 seconds later and ends by itself; the table below lists it once the command has run. It needs the dh_admin role. Remove it as soon as the test is over: in production, a block is a way to blind monitoring."
             }
         },
         "viz_bk_steps": {
@@ -1219,33 +1178,20 @@
                 }
             }
         },
-        "viz_bk_wait": {
-            "type": "splunk.markdown",
-            "options": {
-                "markdown": "**Nothing written yet.** When the Check column of the preview says OK, open **Confirm** and choose the line that starts with **Apply**. That writes the change at once and records it on the Admin log tab."
-            },
-            "containerOptions": {
-                "visibility": {
-                    "hideConditions": [
-                        "cond_bk_done"
-                    ]
-                }
-            }
-        },
-        "viz_bk_result": {
+        "viz_bk_command": {
             "type": "splunk.table",
-            "title": "Test block: result",
+            "title": "Test block: command",
             "dataSources": {
-                "primary": "ds_bk_apply"
+                "primary": "ds_bk_command"
             },
             "options": {
                 "count": 25
             },
-            "description": "What was written when you chose Apply. Guide (project repo): docs/data-health/dashboards.md > Manage > Test block: result",
+            "description": "The command that sets or removes this block, once the preview says OK. Run it on pi5; nothing is written from here. Guide (project repo): docs/data-health/dashboards.md > Manage > Test block: command",
             "containerOptions": {
                 "visibility": {
                     "showConditions": [
-                        "cond_bk_done"
+                        "cond_bk_ready"
                     ]
                 }
             }
@@ -1818,7 +1764,7 @@
                 "type": "grid",
                 "options": {
                     "width": 1440,
-                    "height": 998
+                    "height": 862
                 },
                 "structure": [
                     {
@@ -1922,33 +1868,13 @@
                         }
                     },
                     {
-                        "item": "input_bk_confirm",
-                        "type": "input",
-                        "position": {
-                            "x": 0,
-                            "y": 432,
-                            "w": 600,
-                            "h": 96
-                        }
-                    },
-                    {
-                        "item": "viz_bk_wait",
-                        "type": "block",
-                        "position": {
-                            "x": 600,
-                            "y": 432,
-                            "w": 840,
-                            "h": 96
-                        }
-                    },
-                    {
-                        "item": "viz_bk_result",
+                        "item": "viz_bk_command",
                         "type": "block",
                         "position": {
                             "x": 0,
-                            "y": 528,
+                            "y": 432,
                             "w": 1440,
-                            "h": 150
+                            "h": 110
                         }
                     },
                     {
@@ -1956,7 +1882,7 @@
                         "type": "block",
                         "position": {
                             "x": 0,
-                            "y": 678,
+                            "y": 542,
                             "w": 720,
                             "h": 320
                         }
@@ -1966,7 +1892,7 @@
                         "type": "block",
                         "position": {
                             "x": 720,
-                            "y": 678,
+                            "y": 542,
                             "w": 720,
                             "h": 320
                         }

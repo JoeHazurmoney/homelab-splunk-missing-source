@@ -11,8 +11,8 @@
 #                  last result) must be under 3 s, and the KPIs and Needs attention must match the
 #                  generated mix.
 #   writes         the Manage writes end to end on throwaway KV collections and a throwaway CSV:
-#                  preview -> confirm -> apply, the stored rows, the admin log, the k-first test-block
-#                  file with the raw source, and that a repeated or stale confirmation applies nothing.
+#                  preview -> confirm -> apply, the stored rows, the admin log, that a repeated or
+#                  stale confirmation applies nothing, and the test-block command (task 11b).
 #
 # Throwaway collections, lookup definitions and files are named dhtest_* and removed on exit.
 # Usage: tests/spl/dash.sh panels | load [hosts] | writes
@@ -200,7 +200,7 @@ kv_get() { dh_search "| inputlookup $1 | $2" csv | tr -d '\r'; }
 
 writes() {
   WFAIL=0
-  local ov tok res ex ad bk file tok0
+  local ov tok res ex ad bk tok0
   kv_make dhtest_kv_overrides dh_overrides
   kv_make dhtest_kv_admin_log dh_admin_log
   kv_make dhtest_kv_expected dh_expected
@@ -260,38 +260,20 @@ writes() {
   expect "adopt applied" "$res" '^Done: Adopt dhtest-w3 .{1,3} cpu \(linux\)$'
   res=$(kv_get dhtest_kv_expected 'search host=dhtest-w3 | table managed_by profile collection criticality')
   expect "adopted row stored" "$(printf '%s' "$res" | sed -n 2p)" '^ui,continuous,syslog,3$'
-  # Test block on an exact raw source: the file is rewritten with k first and the raw source in k.
+  # Test block (task 11b): the block lives in Cribl, so the form writes nothing; it shows the role's
+  # cribl_block command. The block file and the admin log stay as they were.
   bk=("bk_action=add" "bk_host=dhtest-w4" "bk_level=source" "bk_target=linux_secure|/var/log/secure.1" "bk_duration=900" "bk_reason=writes test" "bk_ticket=CHG-B")
   res=$(w_run ds_bk_plan "${bk[@]}" | col source_norm)
   expect "block preview shows the normalized source" "$res" '^/var/log/secure\.\*$'
-  tok=$(w_run ds_bk_plan "${bk[@]}" | col dh_token)
-  res=$(w_run ds_bk_apply "${bk[@]}" "bk_confirm=$tok" | col Result)
-  expect "block applied" "$res" '^Done: Add test block dhtest-w4 .{1,3} linux_secure .{1,3} /var/log/secure\.1 \(exact source\)$'
-  file=$(dh_docker exec -u root "$DH_CONTAINER" sh -c "cat $DH_APP_DIR/lookups/dhtest_w_blocks.csv" | tr -d '\r')
-  expect "block file header is k first" "$(printf '%s\n' "$file" | sed -n 1p)" '^k,until,reason,"?set_by"?$'
-  expect "block row keys the raw source" "$(printf '%s\n' "$file" | sed -n 2p)" '^"?dhtest-w4\|linux_secure\|/var/log/secure\.1"?,[0-9]+,"?writes test"?,"?admin"?$'
-  res=$(w_run ds_bk_apply "${bk[@]}" "bk_confirm=$tok" | col Result)
-  expect "block repeat applies nothing" "$res" '^Nothing written'
-  # DH Prune drops the expired block, which restores the file the block was previewed on: the
-  # confirmation must still not fit, or a reload would silently drop real data again.
-  printf '%s\n' "$file" >"$work/blocks.keep"
-  dh_docker exec -u root "$DH_CONTAINER" rm -f "$DH_APP_DIR/lookups/dhtest_w_blocks.csv"
-  dh_curl -o "$work/reload.out" -X POST "$DH_MGMT/services/data/lookup-table-files/_reload"
-  res=$(w_run ds_bk_apply "${bk[@]}" "bk_confirm=$tok" | col Result)
-  expect "block after a prune of the file applies nothing" "$res" '^Nothing written'
-  dh_docker cp "$(dh_hostpath "$work/blocks.keep")" "$DH_CONTAINER:$DH_APP_DIR/lookups/dhtest_w_blocks.csv"
-  dh_docker exec -u root "$DH_CONTAINER" chown splunk:splunk "$DH_APP_DIR/lookups/dhtest_w_blocks.csv"
-  dh_curl -o "$work/reload.out" -X POST "$DH_MGMT/services/data/lookup-table-files/_reload"
+  res=$(w_run ds_bk_command "${bk[@]}" | col Command)
+  expect "block command sets the exact-source block" "$res" "^ansible-playbook site.yml --tags cribl_block --limit homepc -e \"hl_block_key='dhtest-w4\\|linux_secure\\|/var/log/secure\\.1'\" -e hl_block_minutes=15 -e \"hl_block_reason='writes test'\"\$"
   bk[0]="bk_action=remove"
-  tok=$(w_run ds_bk_plan "${bk[@]}" | col dh_token)
-  res=$(w_run ds_bk_apply "${bk[@]}" "bk_confirm=$tok" | col Result)
-  expect "block removed" "$res" '^Done: Remove test block'
-  res=$(kv_get dhtest_kv_admin_log 'search action=block_* | stats values(ticket) as t, count | eval t=mvjoin(t, " ") | table count t')
-  expect "block admin-log rows carry the ticket" "$(printf '%s' "$res" | sed -n 2p)" '^2,"?CHG-B"?$'
-  file=$(dh_docker exec -u root "$DH_CONTAINER" sh -c "cat $DH_APP_DIR/lookups/dhtest_w_blocks.csv" | tr -d '\r')
-  expect "last block removed leaves the placeholder" "$(printf '%s\n' "$file" | sed -n 1,2p | tr '\n' ' ')" '^k,until,reason,"?set_by"? "?-"?,0,'
+  res=$(w_run ds_bk_command "${bk[@]}" | col Command)
+  expect "block command clears it" "$res" "^ansible-playbook site.yml --tags cribl_block --limit homepc -e \"hl_block_key='dhtest-w4\\|linux_secure\\|/var/log/secure\\.1'\" -e hl_block_clear=true\$"
+  res=$(dh_docker exec -u root "$DH_CONTAINER" sh -c "test -e $DH_APP_DIR/lookups/dhtest_w_blocks.csv && echo present || echo absent")
+  expect "the block form wrote no file" "$res" '^absent$'
   res=$(kv_get dhtest_kv_admin_log 'stats count')
-  expect "admin log: every applied change, nothing for the refused ones" "$(printf '%s' "$res" | sed -n 2p)" '^8$'
+  expect "admin log: every applied change, nothing for the refused ones (no block rows: task 11b)" "$(printf '%s' "$res" | sed -n 2p)" '^6$'
   [ "$WFAIL" -eq 0 ] && echo "writes: PASS"
   [ "$WFAIL" -eq 0 ]
 }

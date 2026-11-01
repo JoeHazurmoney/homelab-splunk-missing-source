@@ -58,7 +58,7 @@ When something is late or missing, the app picks the most likely reason, checkin
 | On hold: catching up after a pause (sleep or restart) at … | Splunk or the PC paused; statuses are held for 5 minutes while data catches up. | None: wait 5 min. |
 | Muted until …: *reason* | Muted on Manage. | None while muted. |
 | Added less than 1 h ago: waiting for its first data | Just added to the expected list; no data yet. | None yet: wait up to 1 h for its first data. |
-| Test block until … (data dropped on purpose): *reason* | A test is deliberately dropping this data at ingest. | Remove the test block on Manage when the test ends. |
+| Test block until … (data dropped on purpose): *reason* | A test is deliberately dropping this data in Cribl. | Remove the test block when the test ends (Manage, Test blocks tab, gives the command). |
 | Stopped with Ansible at … by … and not started again | Someone ran the role's `stop` and no `start` followed. | Start it again with the role: *ansible-playbook site.yml --tags start --limit host* (this starts the Splunk agent on that host). |
 | The VM is off: Hyper-V event … | Hyper-V reports the VM was turned off, shut down or saved. | Start the VM in Hyper-V, or mute it if it is meant to be off. |
 | Possible deliberate blinding: … just before the data stopped | A tamper sign (a log cleared, auditd stopped, the agent stopped, a big clock step) appeared close to when the data stopped, and not during Ansible work. | Escalate: someone may be hiding activity. |
@@ -419,9 +419,9 @@ The adopt form's **Criticality** is the same list as the add form's.
 
 ### Test blocks (admin) tab
 
-A **test block** throws a host's real data away when it reaches Splunk, before it is indexed, so you can check that the app notices the data going missing. It applies only to the linux, windows and network indexes, needs the **dh_admin** role, starts within about a minute and ends by itself. The affected items show their real status (late, then missing) with the label "test block until hh:mm". Remove a block as soon as the test is over: in production, a block control is itself a way to blind monitoring.
+A **test block** throws a host's real data away in **Cribl Stream**, before it reaches Splunk, so you can check that the app notices the data going missing. It applies only to the linux, windows and network indexes and needs the **dh_admin** role. It starts in Cribl about 20 seconds after the command runs, and it ends by itself. The affected items show their real status (late, then missing) with the label "test block until hh:mm". Remove a block as soon as the test is over: in production, a block control is itself a way to blind monitoring.
 
-This tab writes the block table that Splunk reads at ingest. When the data flows through Cribl, the block moves into Cribl and this tab will change to show the command to run instead (task 11b).
+This tab writes nothing. It checks your request and shows the Ansible command that sets or removes the block (the role's *cribl_block* tag). The role writes Cribl's block table and a copy that Splunk reads for the label and for **Current test blocks**.
 
 #### Recipe: Run a test block
 
@@ -429,10 +429,10 @@ This tab writes the block table that Splunk reads at ingest. When the data flows
 2. **Action**: Add a test block. **Host**: choose the host. The table **Raw sources of the host (24 h)** fills with what it sent.
 3. **Block level**: Whole host, One sourcetype, or One exact raw source. For the last two, choose it in **Sourcetype or raw source**.
 4. **Block for**: 5 minutes to 24 hours. Write a **Reason** and press Enter.
-5. Check **Test block: preview**: **After the change** says "Blocked until … ; Splunk applies it within about a minute".
-6. **Confirm (writes the change)**: choose "Apply: block pi5: whole host for 15 minutes". **Test block: result** says "Done: Add test block …".
-7. Watch the Overview: the blocked items turn LATE, then MISSING, labelled "test block until hh:mm".
-8. To end it early: **Action** Remove a test block, the same host and level, a reason, then the Apply line. After a reload, **Current test blocks** no longer lists it.
+5. Check **Test block: preview**: **Check** says OK.
+6. Copy the line in **Test block: command** and run it on pi5, in the repository's `ansible` folder. When it finishes, it lists the active blocks.
+7. Reload the page: **Current test blocks** lists the block. Watch the Overview: the blocked items turn LATE, then MISSING, labelled "test block until hh:mm".
+8. To end it early: **Action** Remove a test block, with the same host and level and a reason, then run the new command.
 
 A source block needs the **exact raw source** name, as listed in the raw sources table; a rotated or dated file name won't match later files, so block that file's sourcetype instead.
 
@@ -446,17 +446,17 @@ A source block needs the **exact raw source** name, as listed in the raw sources
 | Sourcetype or raw source | For the lower levels: the sourcetype, or the exact raw source name (listed with its normalized form). Not needed for a whole-host block. |
 | Block for | How long: 5 minutes to 24 hours (the most allowed). |
 
-The form also has its own **Reason (required)**, **Ticket (optional, - for none)** and **Confirm (writes the change)**, as above.
+The form also has its own **Reason (required)** and **Ticket (optional, - for none)**, as above. It has no Confirm: nothing is written from here.
 
 #### Test block: preview
 - **What it shows:** the block you are about to add or remove. Columns: **Change**, **Item** (the block key in words), **Now**, **After the change**, **Check** and **Normalized source** (for reference only).
 - **Where it comes from:** your form checked against the current block table. Nothing is written.
-- **How to read it:** when Check says OK, choose Apply under Confirm.
+- **How to read it:** when Check says OK, the command below is ready.
 
-#### Test block: result
-- **What it shows:** "Done: Add test block …" or "Nothing written: …", with the details of the change.
-- **Where it comes from:** the rewrite of the block table, which also adds the admin-log row.
-- **How to read it:** Splunk picks up the change within about a minute.
+#### Test block: command
+- **What it shows:** the one command to run, or "Not ready: …" with the reason the preview gave.
+- **Where it comes from:** the checked request, turned into the role's *cribl_block* command (the reason keeps only plain characters).
+- **How to read it:** run it on pi5. The role posts a maintenance marker before and after, so the Cribl change doesn't count as tampering.
 
 #### Raw sources of the host (24 h)
 - **What it shows:** the exact source names the chosen host sent to the linux, windows and network indexes in the last 24 hours. Columns: **Index**, **Sourcetype**, **Source (raw name)**, **Normalized source** (the name with dates and rotation numbers as `*`), **Events**, **Last seen**.
@@ -465,8 +465,8 @@ The form also has its own **Reason (required)**, **Ticket (optional, - for none)
 
 #### Current test blocks
 - **What it shows:** every block in the test-block table. Columns: **Item** (the block key in words), **Until**, **Reason**, **Set by**, **State** ("test block until hh:mm", or "expired (removed within about 2 min)"), **Block key**.
-- **Where it comes from:** the test-block table that Splunk reads at ingest.
-- **How to read it:** blocked data is **thrown away** before indexing, so a block is a real outage, on purpose. Remove blocks as soon as a test ends.
+- **Where it comes from:** the copy of Cribl's block table that the role's *cribl_block* tag writes into Splunk.
+- **How to read it:** blocked data is **thrown away** in Cribl before it reaches Splunk, so a block is a real outage, on purpose. Remove blocks as soon as a test ends.
 
 ### Admin log tab
 
