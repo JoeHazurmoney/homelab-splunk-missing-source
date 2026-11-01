@@ -30,6 +30,7 @@
 - name: Install the Linux UF
   ansible.builtin.import_tasks: uf_linux_install.yml
   when: "'uf_linux' in group_names"
+  become: true
   tags: [deploy, install]
 
 - name: Install the Windows UF
@@ -40,6 +41,7 @@
 - name: Sync the Linux forwarder apps
   ansible.builtin.import_tasks: uf_linux_apps.yml
   when: "'uf_linux' in group_names"
+  become: true
   tags: [deploy, apps]
 
 - name: Sync the Windows forwarder apps
@@ -51,6 +53,7 @@
 - name: Load the STIG audit rules
   ansible.builtin.import_tasks: audit_rules.yml
   when: "'uf_linux' in group_names"
+  become: true
   tags: [deploy, audit_rules]
 
 - name: Apply the Windows audit policy
@@ -75,24 +78,28 @@
   ansible.builtin.import_tasks: uf_linux_service.yml
   vars: {hl_service_action: start}
   when: "'uf_linux' in group_names"
+  become: true
   tags: [never, start]
 
 - name: Stop the Linux UF
   ansible.builtin.import_tasks: uf_linux_service.yml
   vars: {hl_service_action: stop}
   when: "'uf_linux' in group_names"
+  become: true
   tags: [never, stop]
 
 - name: Restart the Linux UF
   ansible.builtin.import_tasks: uf_linux_service.yml
   vars: {hl_service_action: restart}
   when: "'uf_linux' in group_names"
+  become: true
   tags: [never, restart]
 
 - name: Report the Linux UF status
   ansible.builtin.import_tasks: uf_linux_service.yml
   vars: {hl_service_action: status}
   when: "'uf_linux' in group_names"
+  become: true
   tags: [never, status]
 
 - name: Start the Windows UF
@@ -122,6 +129,7 @@
 # --- Read-only checks and package download ---
 - name: Verify collection end to end
   ansible.builtin.import_tasks: verify.yml
+  become: "{{ 'uf_linux' in group_names }}"
   tags: [never, verify]
 
 - name: Download the UF packages
@@ -137,6 +145,7 @@
 - name: Remove the STIG audit rules
   ansible.builtin.import_tasks: audit_rules_remove.yml
   when: "'uf_linux' in group_names"
+  become: true
   tags: [never, audit_rules_remove]
 
 - name: Remove the syslog relay
@@ -147,6 +156,7 @@
 - name: Remove the Linux forwarder apps
   ansible.builtin.import_tasks: uf_linux_apps_remove.yml
   when: "'uf_linux' in group_names"
+  become: true
   tags: [never, apps_remove]
 
 - name: Remove the Windows forwarder apps
@@ -157,6 +167,7 @@
 - name: Uninstall the Linux UF
   ansible.builtin.import_tasks: uf_linux_uninstall.yml
   when: "'uf_linux' in group_names"
+  become: true
   tags: [never, uninstall]
 
 - name: Uninstall the Windows UF

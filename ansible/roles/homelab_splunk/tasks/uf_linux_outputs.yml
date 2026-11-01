@@ -1,0 +1,38 @@
+# hl_uf_outputs on a Linux UF (spec 5.5): outputs.conf (Cribl, token, useACK), limits.conf, web.conf.
+# Imported by install (before the first start) and by apps (task 6). Sets hl_uf_outputs_changed.
+# The UF writes the token, encrypted, to the app's local/outputs.conf on start, and local beats
+# default; the role compares only default/, so a rerun doesn't flap, and when default/outputs.conf
+# changes (a rotated token or collector) the stale local token goes before the restart.
+- name: Create hl_uf_outputs/default
+  ansible.builtin.file:
+    path: "{{ hl_uf_home }}/etc/apps/hl_uf_outputs/default"
+    state: directory
+    owner: "{{ hl_uf_user }}"
+    group: "{{ hl_uf_user }}"
+    mode: "0700"
+
+- name: Render hl_uf_outputs
+  ansible.builtin.template:
+    src: "uf/hl_uf_outputs/default/{{ item }}.j2"
+    dest: "{{ hl_uf_home }}/etc/apps/hl_uf_outputs/default/{{ item }}"
+    owner: "{{ hl_uf_user }}"
+    group: "{{ hl_uf_user }}"
+    mode: "0600"
+  loop: "{{ hl_uf_outputs_files }}"
+  register: hl_uf_outputs_render
+  diff: false
+  no_log: true    # outputs.conf holds the token
+
+- name: Note whether hl_uf_outputs changed
+  ansible.builtin.set_fact:
+    hl_uf_outputs_changed: "{{ hl_uf_outputs_render.results | selectattr('changed') | list | length > 0 }}"
+    hl_uf_outputs_token_changed: "{{ hl_uf_outputs_render.results | selectattr('changed') | map(attribute='item')
+      | select('equalto', 'outputs.conf') | list | length > 0 }}"
+
+- name: Drop the UF's stale encrypted token copy (outputs.conf changed)
+  ansible.builtin.lineinfile:
+    path: "{{ hl_uf_home }}/etc/apps/hl_uf_outputs/local/outputs.conf"
+    regexp: '^\s*token\s*='
+    state: absent
+  when: hl_uf_outputs_token_changed | bool
+  failed_when: false

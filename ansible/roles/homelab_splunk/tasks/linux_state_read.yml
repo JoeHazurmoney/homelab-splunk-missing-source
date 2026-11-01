@@ -1,0 +1,15 @@
+# Read the Linux state file (spec 5.2) into hl_state ({} when there is none yet).
+- name: Look for the state file
+  ansible.builtin.stat:
+    path: "{{ hl_linux_state_dir }}/state.json"
+  register: hl_state_stat
+
+- name: Read the state file
+  ansible.builtin.slurp:
+    src: "{{ hl_linux_state_dir }}/state.json"
+  register: hl_state_raw
+  when: hl_state_stat.stat.exists
+
+- name: Parse the state file
+  ansible.builtin.set_fact:
+    hl_state: "{{ (hl_state_raw.content | b64decode | from_json) if hl_state_stat.stat.exists else {} }}"

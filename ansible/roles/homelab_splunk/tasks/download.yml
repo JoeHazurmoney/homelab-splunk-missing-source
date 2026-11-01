@@ -1,8 +1,25 @@
-# download (localhost, once): fetch the UF packages from download.splunk.com into
-# ansible/files/packages/ and check their sha256 against the pins in defaults.
-# Placeholder until the UF install tasks (4, 5; spec 11) fill it in.
-- name: Placeholder for download
-  ansible.builtin.debug:
-    msg: "download on localhost: not implemented yet"
+# download (localhost, once; spec 5.3, 14.3): fetch the UF packages from download.splunk.com into
+# ansible/files/packages/ and check each against its pinned sha256 (a mismatch fails and leaves
+# no file). Run on the controller: ansible-playbook site.yml --tags download --limit pi5
+- name: Create the packages folder
+  ansible.builtin.file:
+    path: "{{ hl_uf_packages_dir }}"
+    state: directory
+    mode: "0755"
   delegate_to: localhost
+  become: false
+  run_once: true
+
+- name: Download and check each UF package
+  ansible.builtin.get_url:
+    url: "{{ item.value.url }}"
+    dest: "{{ hl_uf_packages_dir }}/{{ item.value.file }}"
+    checksum: "sha256:{{ item.value.sha256 }}"
+    mode: "0644"
+    timeout: 120
+  loop: "{{ hl_uf_packages | dict2items }}"
+  loop_control:
+    label: "{{ item.value.file }}"
+  delegate_to: localhost
+  become: false
   run_once: true

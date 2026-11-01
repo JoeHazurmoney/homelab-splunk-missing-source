@@ -1,0 +1,33 @@
+# Write hl_state back to the Linux state file; with nothing left in it, delete the file and, when
+# empty, its folder (the uninstall contract, spec 5.6).
+- name: Create the state folder
+  ansible.builtin.file:
+    path: "{{ hl_linux_state_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0700"
+  when: hl_state | length > 0
+
+- name: Write the state file
+  ansible.builtin.copy:
+    content: "{{ hl_state | to_nice_json(sort_keys=true) }}\n"
+    dest: "{{ hl_linux_state_dir }}/state.json"
+    owner: root
+    group: root
+    mode: "0600"
+  when: hl_state | length > 0
+
+- name: Remove the empty state file
+  ansible.builtin.file:
+    path: "{{ hl_linux_state_dir }}/state.json"
+    state: absent
+  when: hl_state | length == 0
+
+- name: Remove the state folder if it is empty
+  ansible.builtin.command:
+    argv: [rmdir, --ignore-fail-on-non-empty, "{{ hl_linux_state_dir }}"]
+  when: hl_state | length == 0
+  register: hl_state_rmdir
+  changed_when: false
+  failed_when: false

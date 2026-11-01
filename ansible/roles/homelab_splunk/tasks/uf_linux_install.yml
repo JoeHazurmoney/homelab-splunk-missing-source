@@ -1,5 +1,243 @@
-# install (uf_linux): check sha256, install the UF rpm, configure before first start, boot-start, tamper rules, start, marker
-# Placeholder until task 4 (spec 11) fills it in.
-- name: Placeholder for install
-  ansible.builtin.debug:
-    msg: "install on {{ inventory_hostname }}: not implemented yet (task 4)"
+# install (uf_linux, spec 5.3/5.4/5.6, spike 14 d, 14.7 a/i): baselines for the uninstall contract
+# → sysstat → the pinned rpm (sha256 checked) → before the first start: FIPS, user-seed.conf,
+# hl_uf_outputs (Cribl, token, useACK; mgmt on loopback; no thruput cap) → boot-start as splunkfwd
+# → the tamper audit rules → start → connected through Cribl and seen in Splunk → marker.
+# A host where the pinned version is already installed only gets its outputs and rules checked.
+- name: Pick the package for this host
+  ansible.builtin.set_fact:
+    hl_uf_pkg: "{{ hl_uf_packages[ansible_facts['architecture']] }}"
+
+- name: Read the state file
+  ansible.builtin.import_tasks: linux_state_read.yml
+
+- name: Look for an installed UF
+  ansible.builtin.command:
+    argv: [rpm, -q, --qf, "%{VERSION}", splunkforwarder]
+  register: hl_uf_rpm
+  changed_when: false
+  failed_when: false
+
+- name: Note whether this run installs the UF
+  ansible.builtin.set_fact:
+    hl_uf_fresh: "{{ hl_uf_rpm.rc != 0 }}"
+
+- name: Refuse an installed UF the role didn't install or doesn't pin
+  ansible.builtin.assert:
+    that: hl_uf_fresh or (hl_uf_rpm.stdout == hl_uf_version and (hl_state.uf | default({})).installed | default(false))
+    fail_msg: >-
+      splunkforwarder {{ hl_uf_rpm.stdout }} is installed but the role {{ 'pins ' ~ hl_uf_version
+      if hl_uf_rpm.stdout != hl_uf_version else 'did not install it (no state record)' }}.
+      Remove it by hand or with --tags uninstall first.
+    quiet: true
+
+# --- Baselines for the uninstall contract (spec 5.6), taken once, before anything is installed ---
+- name: Take the install baselines
+  when: hl_uf_fresh | bool
+  block:
+    - name: Create the state folder
+      ansible.builtin.file:
+        path: "{{ hl_linux_state_dir }}"
+        state: directory
+        owner: root
+        group: root
+        mode: "0700"
+
+    - name: Save the paths with no owner or group (wd2l-recv has 1,435 in rootless podman storage)
+      ansible.builtin.shell: |
+        set -o pipefail
+        find / -xdev \( -nouser -o -nogroup \) -print 2>/dev/null | LC_ALL=C sort > {{ hl_linux_state_dir }}/nouser.before
+      args:
+        executable: /bin/bash
+      changed_when: true
+
+    - name: Save the loaded audit rules
+      ansible.builtin.shell: |
+        set -o pipefail
+        auditctl -l | LC_ALL=C sort > {{ hl_linux_state_dir }}/auditctl.before
+      args:
+        executable: /bin/bash
+      changed_when: true
+
+    - name: Save the systemd unit list
+      ansible.builtin.shell: |
+        set -o pipefail
+        systemctl list-unit-files --no-legend | awk '{print $1}' | LC_ALL=C sort > {{ hl_linux_state_dir }}/units.before
+      args:
+        executable: /bin/bash
+      changed_when: true
+
+# --- Packages the UF needs ---
+- name: Check which needed packages are missing
+  ansible.builtin.command:
+    argv: [rpm, -q, "{{ item }}"]
+  loop: "{{ hl_uf_linux_packages }}"
+  register: hl_uf_pkgs_before
+  changed_when: false
+  failed_when: false
+
+- name: Install the missing packages
+  ansible.builtin.dnf:
+    name: "{{ hl_uf_pkgs_missing }}"
+    state: present
+  when: hl_uf_pkgs_missing | length > 0
+  vars:
+    hl_uf_pkgs_missing: "{{ hl_uf_pkgs_before.results | selectattr('rc', 'ne', 0) | map(attribute='item') | list }}"
+
+- name: Record the packages the role added
+  ansible.builtin.set_fact:
+    hl_state: "{{ hl_state | combine({'packages_added': ((hl_state.packages_added | default([]))
+      + (hl_uf_pkgs_before.results | selectattr('rc', 'ne', 0) | map(attribute='item') | list)) | unique | sort}) }}"
+
+# --- The package ---
+- name: Install the UF package
+  when: hl_uf_fresh | bool
+  block:
+    - name: Check the package on the controller (--tags download fetches it)
+      ansible.builtin.stat:
+        path: "{{ hl_uf_packages_dir }}/{{ hl_uf_pkg.file }}"
+        checksum_algorithm: sha256
+      delegate_to: localhost
+      become: false
+      register: hl_uf_pkg_local
+      failed_when: not hl_uf_pkg_local.stat.exists or hl_uf_pkg_local.stat.checksum != hl_uf_pkg.sha256
+
+    - name: Create the staging folder
+      ansible.builtin.file:
+        path: /var/tmp/hl_splunk
+        state: directory
+        owner: root
+        group: root
+        mode: "0700"
+
+    - name: Copy the package to the host
+      ansible.builtin.copy:
+        src: "{{ hl_uf_packages_dir }}/{{ hl_uf_pkg.file }}"
+        dest: "/var/tmp/hl_splunk/{{ hl_uf_pkg.file }}"
+        owner: root
+        group: root
+        mode: "0600"
+
+    - name: Check the copied package's sha256
+      ansible.builtin.stat:
+        path: "/var/tmp/hl_splunk/{{ hl_uf_pkg.file }}"
+        checksum_algorithm: sha256
+      register: hl_uf_pkg_remote
+      failed_when: hl_uf_pkg_remote.stat.checksum != hl_uf_pkg.sha256
+
+    # The sha256 is pinned (spec 14.3), so the rpm's signature (key b3cd4420, not imported) isn't needed
+    - name: Install the rpm
+      ansible.builtin.dnf:
+        name: "/var/tmp/hl_splunk/{{ hl_uf_pkg.file }}"
+        state: present
+        disable_gpg_check: true
+
+  always:
+    - name: Remove the staging folder
+      ansible.builtin.file:
+        path: /var/tmp/hl_splunk
+        state: absent
+
+- name: Record the UF install
+  ansible.builtin.set_fact:
+    hl_state: "{{ hl_state | combine({'uf': {'installed': true, 'version': hl_uf_version, 'build': hl_uf_build,
+      'installed_at': (hl_state.uf | default({})).installed_at | default(now(utc=true).isoformat())}}) }}"
+
+- name: Write the state file
+  ansible.builtin.import_tasks: linux_state_write.yml
+
+# --- Before the first start (spec 5.3) ---
+- name: Look for the kernel's FIPS switch (pi5's Raspberry Pi kernel has no /proc/sys/crypto)
+  ansible.builtin.slurp:
+    src: /proc/sys/crypto/fips_enabled
+  register: hl_uf_fips
+  failed_when: false
+
+- name: Turn on the UF's FIPS mode before its first start (FIPS hosts only)
+  ansible.builtin.lineinfile:
+    path: "{{ hl_uf_home }}/etc/splunk-launch.conf"
+    regexp: "^{{ item.split('=')[0] }}="
+    line: "{{ item }}"
+    owner: "{{ hl_uf_user }}"
+    group: "{{ hl_uf_user }}"
+    mode: "0644"
+  loop: [SPLUNK_FIPS=1, SPLUNK_FIPS_VERSION=140-3]
+  when: (hl_uf_fips.content | default('MA==') | b64decode | trim) == '1'
+
+- name: Look for the UF's passwd file (user-seed.conf is read only when it is absent)
+  ansible.builtin.stat:
+    path: "{{ hl_uf_home }}/etc/passwd"
+  register: hl_uf_passwd
+
+- name: Seed the UF admin account (consumed on the first start)
+  ansible.builtin.copy:
+    content: |
+      [user_info]
+      USERNAME = admin
+      PASSWORD = {{ vault_hl_uf_admin_password }}
+    dest: "{{ hl_uf_home }}/etc/system/local/user-seed.conf"
+    owner: "{{ hl_uf_user }}"
+    group: "{{ hl_uf_user }}"
+    mode: "0600"
+  when: not hl_uf_passwd.stat.exists
+  no_log: true
+
+- name: Deploy hl_uf_outputs
+  ansible.builtin.import_tasks: uf_linux_outputs.yml
+
+# --- Boot-start (systemd, as splunkfwd; spike 14 d) ---
+- name: Enable boot-start
+  ansible.builtin.command:
+    argv: [
+      "{{ hl_uf_cli }}", enable, boot-start, -systemd-managed, "1", -user, "{{ hl_uf_user }}", -group, "{{ hl_uf_user }}",
+      --accept-license, --answer-yes, --no-prompt
+    ]
+    creates: /etc/systemd/system/SplunkForwarder.service
+
+- name: Reload systemd
+  ansible.builtin.systemd_service:
+    daemon_reload: true
+  changed_when: false
+
+# --- The tamper audit rules (spec 5.4) ---
+- name: Load the tamper audit rules
+  ansible.builtin.import_tasks: uf_linux_tamper.yml
+
+# --- Start, then prove the path through Cribl ---
+- name: Note where splunkd.log ends before the start
+  ansible.builtin.shell: |
+    set -o pipefail
+    f={{ hl_uf_home }}/var/log/splunk/splunkd.log
+    if [ -f "$f" ]; then wc -l < "$f"; else echo 0; fi
+  args:
+    executable: /bin/bash
+  register: hl_uf_log_lines
+  changed_when: false
+
+- name: Start the UF (restart when its outputs changed on a running UF)
+  ansible.builtin.systemd_service:
+    name: SplunkForwarder
+    state: "{{ 'restarted' if (hl_uf_outputs_changed | bool and not hl_uf_fresh | bool) else 'started' }}"
+    enabled: true
+  register: hl_uf_started
+
+- name: Check the UF is connected through Cribl
+  ansible.builtin.include_tasks: uf_linux_connected.yml
+  vars:
+    hl_uf_log_from: "{{ hl_uf_log_lines.stdout | trim | int }}"
+  when: hl_uf_started is changed or hl_uf_fresh | bool
+
+- name: Check the UF runs in FIPS mode (FIPS hosts only)
+  ansible.builtin.command:
+    argv: ["{{ hl_uf_cli }}", show, fips-mode]
+  become: true
+  become_user: "{{ hl_uf_user }}"
+  register: hl_uf_fips_mode
+  changed_when: false
+  failed_when: "'FIPS mode enabled' not in hl_uf_fips_mode.stdout"
+  when: (hl_uf_fips.content | default('MA==') | b64decode | trim) == '1'
+
+- name: Marker for the install
+  ansible.builtin.include_tasks: marker.yml
+  vars:
+    hl_marker_action: install
+  when: hl_uf_fresh | bool or hl_uf_started is changed

@@ -1,2 +1,2 @@
-# The Windows UF sends to the container on the same PC (spec 4: 127.0.0.1:9997).
-splunk_indexer: 127.0.0.1
+# The Windows UF sends to Cribl on the same PC (spec 5.2: hl_collector is 127.0.0.1 on HOMEPC).
+hl_collector: 127.0.0.1

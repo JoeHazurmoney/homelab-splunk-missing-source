@@ -1,0 +1,14 @@
+# Managed by the homelab_splunk role (install / apps tags); local edits are overwritten.
+# UF -> Cribl's Splunk TCP source (spec 5.5, spike 14.7 a): S2S v4 with the token, useACK (Cribl
+# ACKs on receipt, so this covers the UF->Cribl hop and Cribl restarts). No enableOldS2SProtocol.
+# On its first start the UF writes the token, encrypted, to this app's local/outputs.conf, and local
+# beats default. The role compares only this file, so it doesn't flap, and it drops the local copy
+# when this file changes (a rotated token).
+[tcpout]
+defaultGroup = hl_cribl
+indexAndForward = false
+
+[tcpout:hl_cribl]
+server = {{ hl_collector }}:{{ hl_s2s_port }}
+token = {{ vault_hl_s2s_token }}
+useACK = true

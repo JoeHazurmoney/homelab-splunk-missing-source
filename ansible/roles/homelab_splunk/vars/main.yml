@@ -116,3 +116,16 @@ hl_cribl_ps_prelude: |
 
 # One Cribl syslog source per syslog_devices entry, merged into cribl/local/cribl/inputs.yml
 hl_cribl_device_inputs: "{{ lookup('ansible.builtin.template', 'cribl/device_inputs.yml.j2') | from_yaml }}"
+
+# The Linux UF's tamper audit rules (spec 5.4): b32 and b64 forms of each, keyed hl-*
+hl_uf_tamper_rules:
+  - {kind: dir, path: "{{ hl_uf_home }}/etc", key: hl-uf-config}
+  - {kind: dir, path: "{{ hl_uf_home }}/bin", key: hl-uf-config}
+  - {kind: path, path: /etc/rsyslog.conf, key: hl-syslog-config}
+  - {kind: dir, path: /etc/rsyslog.d, key: hl-syslog-config}
+  - {kind: dir, path: /etc/audit, key: hl-audit-config}
+hl_uf_tamper_file: /etc/audit/rules.d/zz-hl-uf-tamper.rules
+# The files of hl_uf_outputs (templates/uf/hl_uf_outputs/default/<name>.j2)
+hl_uf_outputs_files: [app.conf, outputs.conf, limits.conf, web.conf]
+# The UF's CLI, run as its own user (running it as root warns about SPLUNK_HOME ownership, spike 14 d)
+hl_uf_cli: "{{ hl_uf_home }}/bin/splunk"
