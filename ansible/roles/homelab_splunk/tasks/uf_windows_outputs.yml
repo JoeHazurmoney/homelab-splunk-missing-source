@@ -1,0 +1,34 @@
+# hl_uf_outputs on the Windows UF (spec 5.5): the same templates as Linux, hl_collector = 127.0.0.1.
+# Imported by install and by apps (task 6). Sets hl_uf_outputs_changed. As on Linux, the UF writes
+# the token encrypted to local/outputs.conf; the role compares only default/, and drops the stale
+# local token when default/outputs.conf changes.
+- name: Create hl_uf_outputs\default
+  ansible.windows.win_file:
+    path: "{{ hl_uf_win_home }}\\etc\\apps\\hl_uf_outputs\\default"
+    state: directory
+
+- name: Render hl_uf_outputs
+  ansible.windows.win_template:
+    src: "uf/hl_uf_outputs/default/{{ item }}.j2"
+    dest: "{{ hl_uf_win_home }}\\etc\\apps\\hl_uf_outputs\\default\\{{ item }}"
+  loop: "{{ hl_uf_outputs_files }}"
+  register: hl_uf_outputs_render
+  no_log: true    # outputs.conf holds the token
+
+- name: Note whether hl_uf_outputs changed
+  ansible.builtin.set_fact:
+    hl_uf_outputs_changed: "{{ hl_uf_outputs_render.results | selectattr('changed') | list | length > 0 }}"
+    hl_uf_outputs_token_changed: "{{ hl_uf_outputs_render.results | selectattr('changed') | map(attribute='item')
+      | select('equalto', 'outputs.conf') | list | length > 0 }}"
+
+- name: Drop the UF's stale encrypted token copy (outputs.conf changed)
+  ansible.windows.win_shell: |
+    $f = '{{ hl_uf_win_home }}\etc\apps\hl_uf_outputs\local\outputs.conf'
+    if (Test-Path -LiteralPath $f) {
+      $keep = @(Get-Content -LiteralPath $f | Where-Object { $_ -notmatch '^\s*token\s*=' })
+      Set-Content -LiteralPath $f -Value $keep
+      'HL_DROPPED'
+    }
+  register: hl_ufw_token_drop
+  changed_when: "'HL_DROPPED' in hl_ufw_token_drop.stdout"
+  when: hl_uf_outputs_token_changed | bool

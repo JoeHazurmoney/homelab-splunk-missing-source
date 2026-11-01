@@ -14,6 +14,20 @@
       vars:
         hl_uf_log_from: 0
 
+- name: Verify the Windows UF
+  when: "'uf_windows' in group_names"
+  block:
+    - name: Check the service is running
+      ansible.windows.win_shell: (Get-Service -Name '{{ hl_uf_win_service }}').Status
+      register: hl_verify_ufw
+      changed_when: false
+      failed_when: hl_verify_ufw.stdout | trim != 'Running'
+
+    - name: Check the UF is connected through Cribl (the whole log; the latest state counts)
+      ansible.builtin.include_tasks: uf_windows_connected.yml
+      vars:
+        hl_uf_log_from: 0
+
 - name: Verify Cribl
   when: "'splunk_server' in group_names"
   block:

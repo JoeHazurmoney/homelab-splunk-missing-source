@@ -1,6 +1,57 @@
-# start / stop / restart / status (uf_windows): service control + marker; status = state, version,
-# apps, outputs connection. main.yml imports this file once per action, with hl_service_action set.
-# Placeholder until task 5 (spec 11) fills it in.
-- name: Placeholder for the service action
+# start / stop / restart / status (uf_windows, spec 5.3): service control + marker, as on Linux.
+# main.yml imports this file once per action, with hl_service_action set.
+- name: Marker before the stop
+  ansible.builtin.include_tasks: marker.yml
+  vars:
+    hl_marker_action: stop
+  when: hl_service_action == 'stop'
+
+- name: Note where splunkd.log ends
+  ansible.windows.win_shell: |
+    $f = '{{ hl_uf_win_home }}\var\log\splunk\splunkd.log'
+    if (Test-Path -LiteralPath $f) { @(Get-Content -LiteralPath $f).Count } else { 0 }
+  register: hl_svcw_log_lines
+  changed_when: false
+  when: hl_service_action in ['start', 'restart']
+
+- name: "Run the service action: {{ hl_service_action }}"
+  ansible.windows.win_service:
+    name: "{{ hl_uf_win_service }}"
+    state: "{{ {'start': 'started', 'stop': 'stopped', 'restart': 'restarted'}[hl_service_action] }}"
+  when: hl_service_action in ['start', 'stop', 'restart']
+
+- name: Check the UF is connected through Cribl
+  ansible.builtin.include_tasks: uf_windows_connected.yml
+  vars:
+    hl_uf_log_from: "{{ hl_svcw_log_lines.stdout | trim | int }}"
+  when: hl_service_action in ['start', 'restart']
+
+- name: Marker after the start
+  ansible.builtin.include_tasks: marker.yml
+  vars:
+    hl_marker_action: "{{ hl_service_action }}"
+  when: hl_service_action in ['start', 'restart']
+
+- name: Read the UF's status
+  ansible.windows.win_shell: |
+    $log = '{{ hl_uf_win_home }}\var\log\splunk\splunkd.log'
+    $svc = Get-Service -Name '{{ hl_uf_win_service }}' -ErrorAction SilentlyContinue
+    $lines = if (Test-Path -LiteralPath $log) { Get-Content -LiteralPath $log -Tail 5000 } else { @() }
+    $b = ($lines | Select-String -Pattern 'Splunkd starting \(build ([0-9a-f]+)\)' | Select-Object -Last 1)
+    $c = ($lines | Select-String -SimpleMatch 'Connected to idx=' | Select-Object -Last 1)
+    $r = ($lines | Select-String -Pattern 'Invalid S2S token|Connection closed by server' | Select-Object -Last 1)
+    [ordered]@{
+      service = $(if ($svc) { [string]$svc.Status } else { 'absent' })
+      build = $(if ($b) { $b.Matches[0].Groups[1].Value } else { '' })
+      last_connect = $(if ($c) { $c.Line.Substring(0, [Math]::Min(23, $c.Line.Length)) } else { '' })
+      last_refusal = $(if ($r) { $r.Line.Substring(0, [Math]::Min(23, $r.Line.Length)) } else { '' })
+      apps = @(Get-ChildItem -LiteralPath '{{ hl_uf_win_home }}\etc\apps' -Directory -ErrorAction SilentlyContinue | ForEach-Object Name)
+    } | ConvertTo-Json -Compress
+  register: hl_svcw_status
+  changed_when: false
+  when: hl_service_action == 'status'
+
+- name: Show the UF's status
   ansible.builtin.debug:
-    msg: "{{ hl_service_action }} on {{ inventory_hostname }}: not implemented yet (task 5)"
+    msg: "{{ hl_svcw_status.stdout | from_json }}"
+  when: hl_service_action == 'status'

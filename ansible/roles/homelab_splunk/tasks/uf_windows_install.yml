@@ -1,5 +1,210 @@
-# install (uf_windows): check sha256, install the UF msi (LAUNCHSPLUNK=0), configure before first start, start, marker
-# Placeholder until task 5 (spec 11) fills it in.
-- name: Placeholder for install
-  ansible.builtin.debug:
-    msg: "install on {{ inventory_hostname }}: not implemented yet (task 5)"
+# install (uf_windows, spec 5.3/5.6): the pinned MSI (sha256 on both ends) with LAUNCHSPLUNK=0 →
+# before the first start: FIPS (only if Windows' FIPS policy is on), user-seed.conf,
+# hl_uf_outputs (Cribl on 127.0.0.1:9997, token, useACK; mgmt 127.0.0.1:8090) → the virtual
+# account into Event Log Readers and Performance Monitor Users → start → connected through Cribl
+# and seen in Splunk → the mgmt listener checked → marker. Needs the elevated SSH session
+# (administrators_authorized_keys, spec 5.1).
+- name: Read the state file
+  ansible.builtin.import_tasks: win_state_read.yml
+
+- name: Look for an installed UF (uninstall keys)
+  ansible.windows.win_shell: |
+    $keys = @('HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*',
+              'HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*')
+    $p = Get-ItemProperty $keys -ErrorAction SilentlyContinue | Where-Object { $_.DisplayName -like 'UniversalForwarder*' } | Select-Object -First 1
+    if ($p) { @{ installed = $true; version = [string]$p.DisplayVersion; product_code = [string]$p.PSChildName } | ConvertTo-Json -Compress }
+    else { @{ installed = $false } | ConvertTo-Json -Compress }
+  register: hl_ufw_rpm
+  changed_when: false
+
+- name: Note whether this run installs the UF
+  ansible.builtin.set_fact:
+    hl_ufw_fresh: "{{ not (hl_ufw_rpm.stdout | from_json).installed }}"
+
+- name: Refuse an installed UF the role didn't install or doesn't pin
+  ansible.builtin.assert:
+    that: >-
+      hl_ufw_fresh or ((hl_ufw_rpm.stdout | from_json).version is match(hl_uf_version | regex_escape)
+      and (hl_state.uf | default({})).installed | default(false))
+    fail_msg: >-
+      UniversalForwarder {{ (hl_ufw_rpm.stdout | from_json).version | default('?') }} is installed, but the role
+      pins {{ hl_uf_version }} or has no record of installing it. Remove it first (--tags uninstall or Apps & features).
+    quiet: true
+
+- name: Install the UF package
+  when: hl_ufw_fresh | bool
+  block:
+    - name: Check the package on the controller (--tags download fetches it)
+      ansible.builtin.stat:
+        path: "{{ hl_uf_packages_dir }}/{{ hl_uf_packages.windows.file }}"
+        checksum_algorithm: sha256
+      delegate_to: localhost
+      register: hl_ufw_pkg_local
+      failed_when: not hl_ufw_pkg_local.stat.exists or hl_ufw_pkg_local.stat.checksum != hl_uf_packages.windows.sha256
+
+    - name: Create the role's folder
+      ansible.windows.win_file:
+        path: "{{ hl_win_state_dir }}\\stage"
+        state: directory
+
+    - name: Copy the MSI to HOMEPC
+      ansible.windows.win_copy:
+        src: "{{ hl_uf_packages_dir }}/{{ hl_uf_packages.windows.file }}"
+        dest: "{{ hl_win_state_dir }}\\stage\\{{ hl_uf_packages.windows.file }}"
+
+    - name: Check the copied MSI's sha256
+      ansible.windows.win_stat:
+        path: "{{ hl_win_state_dir }}\\stage\\{{ hl_uf_packages.windows.file }}"
+        checksum_algorithm: sha256
+      register: hl_ufw_pkg_remote
+      failed_when: hl_ufw_pkg_remote.stat.checksum | lower != hl_uf_packages.windows.sha256
+
+    # No credentials on the command line (they'd land in the MSI log): user-seed.conf instead
+    - name: Install the MSI (LAUNCHSPLUNK=0)
+      ansible.windows.win_package:
+        path: "{{ hl_win_state_dir }}\\stage\\{{ hl_uf_packages.windows.file }}"
+        arguments:
+          - AGREETOLICENSE=Yes
+          - LAUNCHSPLUNK=0
+          - SERVICESTARTTYPE=auto
+          - "INSTALLDIR={{ hl_uf_win_home }}"
+        log_path: "{{ hl_win_state_dir }}\\uf-msi-install.log"
+        creates_path: "{{ hl_uf_win_home }}\\bin\\splunkd.exe"
+        state: present
+
+  always:
+    - name: Remove the staged MSI
+      ansible.windows.win_file:
+        path: "{{ hl_win_state_dir }}\\stage"
+        state: absent
+
+- name: Read the installed product code and the service SID
+  ansible.windows.win_shell: |
+    $keys = @('HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*',
+              'HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*')
+    $p = Get-ItemProperty $keys -ErrorAction SilentlyContinue | Where-Object { $_.DisplayName -like 'UniversalForwarder*' } | Select-Object -First 1
+    $sid = ((sc.exe showsid {{ hl_uf_win_service }}) -match 'SERVICE SID' | ForEach-Object { ($_ -split ':\s*')[1].Trim() } | Select-Object -First 1)
+    $svc = Get-CimInstance Win32_Service -Filter "Name='{{ hl_uf_win_service }}'"
+    @{ product_code = [string]$p.PSChildName; version = [string]$p.DisplayVersion
+       service_sid = [string]$sid; account = [string]$svc.StartName } | ConvertTo-Json -Compress
+  register: hl_ufw_ids
+  changed_when: false
+  failed_when: hl_ufw_ids.rc != 0 or (hl_ufw_ids.stdout | from_json).product_code | length == 0
+
+- name: Record the UF install
+  ansible.builtin.set_fact:
+    hl_state: "{{ hl_state | combine({'uf': {'installed': true, 'version': hl_uf_version, 'build': hl_uf_build,
+      'product_code': (hl_ufw_ids.stdout | from_json).product_code, 'service_sid': (hl_ufw_ids.stdout | from_json).service_sid,
+      'account': (hl_ufw_ids.stdout | from_json).account, 'msi_log': hl_win_state_dir ~ '\\uf-msi-install.log'}}) }}"
+
+- name: Write the state file
+  ansible.builtin.import_tasks: win_state_write.yml
+
+# --- Before the first start ---
+- name: Read Windows' FIPS policy
+  ansible.windows.win_reg_stat:
+    path: HKLM:\SYSTEM\CurrentControlSet\Control\Lsa\FipsAlgorithmPolicy
+    name: Enabled
+  register: hl_ufw_fips
+
+- name: Turn on the UF's FIPS mode before its first start (only when Windows' FIPS policy is on)
+  ansible.windows.win_shell: |
+    $f = '{{ hl_uf_win_home }}\etc\splunk-launch.conf'
+    $text = if (Test-Path -LiteralPath $f) { [IO.File]::ReadAllText($f) } else { '' }
+    $added = @()
+    foreach ($l in 'SPLUNK_FIPS=1', 'SPLUNK_FIPS_VERSION=140-3') {
+      if ($text -notmatch ('(?m)^' + [regex]::Escape($l) + '\s*$')) { Add-Content -LiteralPath $f -Value $l; $added += $l }
+    }
+    "HL_ADDED=$($added -join ',')"
+  register: hl_ufw_fips_lines
+  changed_when: hl_ufw_fips_lines.stdout is search('HL_ADDED=\\S')
+  when: hl_ufw_fips.exists | default(false) and (hl_ufw_fips.value | default(0) | int) == 1
+
+- name: Look for the UF's passwd file (user-seed.conf is read only when it is absent)
+  ansible.windows.win_stat:
+    path: "{{ hl_uf_win_home }}\\etc\\passwd"
+  register: hl_ufw_passwd
+
+- name: Seed the UF admin account (consumed on the first start)
+  ansible.windows.win_copy:
+    content: |
+      [user_info]
+      USERNAME = admin
+      PASSWORD = {{ vault_hl_uf_admin_password }}
+    dest: "{{ hl_uf_win_home }}\\etc\\system\\local\\user-seed.conf"
+  when: not hl_ufw_passwd.stat.exists
+  no_log: true
+
+- name: Deploy hl_uf_outputs
+  ansible.builtin.import_tasks: uf_windows_outputs.yml
+
+# --- The virtual account's groups (spec 5.3: Event Log Readers; perfmon needs Performance Monitor Users) ---
+- name: Add the virtual account to its groups
+  ansible.windows.win_shell: |
+    $acct = '{{ hl_uf_win_account }}'
+    $sid = (New-Object System.Security.Principal.NTAccount($acct)).Translate([System.Security.Principal.SecurityIdentifier]).Value
+    $added = @()
+    foreach ($g in @({{ hl_uf_win_groups | map(attribute='sid') | map('to_json') | join(', ') }})) {
+      $m = @(Get-LocalGroupMember -SID $g -ErrorAction SilentlyContinue | Where-Object { $_.SID.Value -eq $sid })
+      if ($m.Count -eq 0) { Add-LocalGroupMember -SID $g -Member $sid; $added += $g }
+    }
+    @{ added = $added; account_sid = $sid } | ConvertTo-Json -Compress
+  register: hl_ufw_groups
+  changed_when: (hl_ufw_groups.stdout | from_json).added | length > 0
+
+- name: Record the groups
+  ansible.builtin.set_fact:
+    hl_state: "{{ hl_state | combine({'uf': hl_state.uf | combine({'groups': hl_uf_win_groups | map(attribute='sid') | list,
+      'account_sid': (hl_ufw_groups.stdout | from_json).account_sid})}) }}"
+
+- name: Write the state file
+  ansible.builtin.import_tasks: win_state_write.yml
+
+# --- Start, then prove the path through Cribl ---
+- name: Note where splunkd.log ends before the start
+  ansible.windows.win_shell: |
+    $f = '{{ hl_uf_win_home }}\var\log\splunk\splunkd.log'
+    if (Test-Path -LiteralPath $f) { @(Get-Content -LiteralPath $f).Count } else { 0 }
+  register: hl_ufw_log_lines
+  changed_when: false
+
+- name: Start the UF (restart when its outputs changed on a running UF)
+  ansible.windows.win_service:
+    name: "{{ hl_uf_win_service }}"
+    start_mode: auto
+    state: "{{ 'restarted' if (hl_uf_outputs_changed | bool and not hl_ufw_fresh | bool) else 'started' }}"
+  register: hl_ufw_started
+
+- name: Check the UF is connected through Cribl
+  ansible.builtin.include_tasks: uf_windows_connected.yml
+  vars:
+    hl_uf_log_from: "{{ hl_ufw_log_lines.stdout | trim | int }}"
+  when: hl_ufw_started is changed or hl_ufw_fresh | bool
+
+- name: Read the UF's management listener (spec 4.1, "to verify in task 5")
+  ansible.windows.win_shell: |
+    $port = {{ hl_uf_mgmt.split(':')[1] | int }}
+    $l = @(Get-NetTCPConnection -State Listen -LocalPort $port -ErrorAction SilentlyContinue | Select-Object -ExpandProperty LocalAddress)
+    $c = @(Get-NetTCPConnection -State Listen -LocalPort 8089 -ErrorAction SilentlyContinue |
+      Where-Object { (Get-Process -Id $_.OwningProcess).Name -eq 'splunkd' })
+    @{ mgmt = $l; uf_on_8089 = $c.Count } | ConvertTo-Json -Compress
+  register: hl_ufw_mgmt
+  changed_when: false
+  # The UF must never take 8089 (the container's REST on HOMEPC); anything on 8090 must be loopback
+  failed_when: >-
+    hl_ufw_mgmt.rc != 0 or (hl_ufw_mgmt.stdout | from_json).uf_on_8089 > 0
+    or ((hl_ufw_mgmt.stdout | from_json).mgmt | reject('equalto', '127.0.0.1') | list | length > 0)
+
+- name: Check the UF runs in FIPS mode (only when Windows' FIPS policy is on)
+  ansible.windows.win_command:
+    argv: ["{{ hl_uf_win_home }}\\bin\\splunk.exe", show, fips-mode]
+  register: hl_ufw_fips_mode
+  changed_when: false
+  failed_when: "'FIPS mode enabled' not in hl_ufw_fips_mode.stdout"
+  when: hl_ufw_fips.exists | default(false) and (hl_ufw_fips.value | default(0) | int) == 1
+
+- name: Marker for the install
+  ansible.builtin.include_tasks: marker.yml
+  vars:
+    hl_marker_action: install
+  when: hl_ufw_fresh | bool or hl_ufw_started is changed
