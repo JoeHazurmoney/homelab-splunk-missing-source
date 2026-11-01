@@ -1,2 +1,2 @@
-| inputlookup @req@ | `dh_ui_override_plan(@ov@, @NOW@)` | eval has_token=if(isnotnull(dh_token), 1, 0)
-| append [| inputlookup @tok@ | `dh_ui_override_plan(@ov@, @NOW@)` | append [| inputlookup @tok@ | `dh_ui_override_plan(@ov@, @NOW@)`] | append [| inputlookup @tok@ | `dh_ui_override_plan(@ovb@, @NOW@)`] | stats dc(dh_token) as n, count as m | eval c="tok", check=n." tokens for ".m." plans"]
+| inputlookup @req@ | `dh_ui_override_plan(@ov@, @log@, @NOW@)` | eval has_token=if(isnotnull(dh_token), 1, 0)
+| append [| inputlookup @tok@ | `dh_ui_override_plan(@ov@, @log@, @NOW@)` | append [| inputlookup @tok@ | `dh_ui_override_plan(@ov@, @log@, @NOW@)`] | append [| inputlookup @tok@ | `dh_ui_override_plan(@ovb@, @log@, @NOW@)`] | append [| inputlookup @tok@ | `dh_ui_override_plan(@ov@, @nolog@, @NOW@)`] | stats dc(dh_token) as n, count as m | eval c="tok", check=n." tokens for ".m." plans"]
