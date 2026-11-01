@@ -147,3 +147,6 @@ hl_inputs_enabled: "{{ hl_inputs_effective | selectattr('enabled') | list }}"
 
 # The syslog devices the probe pings, from the Splunk server's group_vars (pi5 isn't in that group)
 hl_probe_devices: "{{ hostvars[groups['splunk_server'][0]]['syslog_devices'] | default([]) }}"
+
+# Where the expected tag writes the Ansible rows (a seed lookup of hl_data_health, never shipped over)
+hl_exp_path: "{{ hl_splunk_home }}/etc/apps/hl_data_health/lookups/dh_expected_ansible.csv"

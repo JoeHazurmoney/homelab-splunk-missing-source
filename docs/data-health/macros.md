@@ -485,3 +485,21 @@ Rewrites the test-block table (key column first, as the ingest rule needs) and l
 
 ### `dh_ui_log(admin_log, now)`
 Adds one admin-log row per applied change and returns the result line ("applied: …" or "nothing applied: …"). Used by: the three write macros.
+
+## The expected list (task 10)
+
+The role's `expected` tag writes `dh_expected_ansible.csv` from the inventory. *DH Sync expected*
+merges it into `dh_expected` every 5 minutes, and right after each push. Rows added on the Manage
+dashboard are never touched.
+
+### `dh_sync_rows(ansible)`
+The Ansible rows, cleaned up the way a Manage row is: level and host in lowercase, the host's domain dropped, index and sourcetype only below host level, the raw source kept for a source row, and the entity id built from them. Rows with an unknown level or no host are dropped. Arguments: `ansible`, the Ansible file. Used by: `dh_sync_plan`.
+
+### `dh_sync_sig`
+One fingerprint of the fields Ansible owns (level, index, host, sourcetype, source, collection, via, hypervisor, profile, interval, maximum gap, criticality, owner, site, runbook, description), so an unchanged row is never rewritten. Used by: `dh_sync_plan`.
+
+### `dh_sync_plan(ansible, expected, now)`
+The rows *DH Sync expected* writes, each with its reason: **add** (new, disabled before, or a Manage row that Ansible now takes over), **update** (a field Ansible owns changed; the "expected since" time is kept), **retire** (an Ansible row that left the file: switched off, so its status goes and a later re-add starts a fresh grace period). Manage rows are never touched, and nothing is written while the Ansible file has no valid rows, so an empty or broken file can't retire the list. Arguments: the Ansible file, the expected list, `now`. Used by: *DH Sync expected*.
+
+### `dh_discover_summary(expected, state_fast, state_slow, baseline, now)`
+One summary row of what arrives without being expected: how many entities, how many hosts, and up to 50 of their ids. The same rows as Manage's "adopt" list and the Daily report's "unregistered" section. Used by: *DH Discover unregistered*.

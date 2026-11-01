@@ -1,5 +1,93 @@
-# expected (splunk_server, once): render dh_expected_ansible.csv from hostvars and syslog_devices, push it, run the sync search
-# Placeholder until task 10 (spec 11) fills it in.
-- name: Placeholder for expected
+# expected (splunk_server, spec 5.3/7.2): render dh_expected_ansible.csv from the whole inventory
+# (hostvars: every UF host, even one that is off or outside --limit), push it into hl_data_health's
+# lookups, then run DH Sync expected so dh_expected reflects it within seconds (the schedule runs it
+# every 5 min anyway). Rows retire when the input leaves the inventory or is disabled.
+- name: Create the controller build directory
+  ansible.builtin.tempfile:
+    state: directory
+    prefix: hl_expected.
+  delegate_to: localhost
+  register: hl_exp_build
+  changed_when: false
+
+- name: Render and push the file
+  block:
+    - name: Render dh_expected_ansible.csv
+      ansible.builtin.template:
+        src: expected/dh_expected_ansible.csv.j2
+        dest: "{{ hl_exp_build.path }}/dh_expected_ansible.csv"
+        mode: "0644"
+      delegate_to: localhost
+      changed_when: false
+
+    - name: Read the rendered file
+      ansible.builtin.slurp:
+        src: "{{ hl_exp_build.path }}/dh_expected_ansible.csv"
+      delegate_to: localhost
+      register: hl_exp_csv
+
+    - name: Refuse a file without rows
+      ansible.builtin.assert:
+        that: (hl_exp_csv.content | b64decode).splitlines() | length > 1
+        fail_msg: the rendered expected list has no rows
+        quiet: true
+
+    - name: Stage it on HOMEPC
+      ansible.windows.win_tempfile:
+        state: directory
+        prefix: hl_expected.
+      register: hl_exp_stage
+      changed_when: false
+
+    - name: Copy it to HOMEPC
+      ansible.windows.win_copy:
+        src: "{{ hl_exp_build.path }}/dh_expected_ansible.csv"
+        dest: "{{ hl_exp_stage.path }}\\dh_expected_ansible.csv"
+      changed_when: false
+
+    - name: Read the current file in the container
+      ansible.windows.win_command:
+        argv: [docker, exec, -u, splunk, "{{ hl_splunk_container }}", sha256sum, "{{ hl_exp_path }}"]
+      register: hl_exp_cur
+      changed_when: false
+      failed_when: false
+
+    - name: Copy it into the container
+      ansible.windows.win_command:
+        argv: [docker, cp, "{{ hl_exp_stage.path }}\\dh_expected_ansible.csv", "{{ hl_splunk_container }}:{{ hl_exp_path }}"]
+      when: (hl_exp_cur.stdout.split(' ') | first) != (hl_exp_csv.content | b64decode | hash('sha256'))
+      register: hl_exp_cp
+      changed_when: true
+
+    - name: Give it back to splunk
+      ansible.windows.win_command:
+        argv: [docker, exec, -u, root, "{{ hl_splunk_container }}", chown, "splunk:splunk", "{{ hl_exp_path }}"]
+      changed_when: false
+
+  always:
+    - name: Remove the staging directory on HOMEPC
+      ansible.windows.win_file:
+        path: "{{ hl_exp_stage.path }}"
+        state: absent
+      when: hl_exp_stage.path is defined
+      changed_when: false
+
+    - name: Remove the controller build directory
+      ansible.builtin.file:
+        path: "{{ hl_exp_build.path }}"
+        state: absent
+      delegate_to: localhost
+      changed_when: false
+
+- name: Run DH Sync expected now
+  ansible.windows.win_shell: |
+    {{ hl_ps_prelude }}
+    $rows = Invoke-HlSearch '| savedsearch "DH Sync expected"'
+    $r = $rows | Select-Object -First 1
+    @{ written = [int]$r.written; changes = @($r.changes) } | ConvertTo-Json -Compress
+  register: hl_exp_sync
+  changed_when: (hl_exp_sync.stdout | from_json).written > 0
+
+- name: Show what the sync wrote
   ansible.builtin.debug:
-    msg: "expected on {{ inventory_hostname }}: not implemented yet (task 10)"
+    msg: "{{ hl_exp_sync.stdout | from_json }}"

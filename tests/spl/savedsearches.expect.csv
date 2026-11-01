@@ -48,3 +48,8 @@ DH Alert tamper,action.logevent.param.source,dh:alert
 DH Alert tamper,action.logevent.param.sourcetype,stash
 DH Prune,schedule_priority,highest
 DH Alert missing,schedule_priority,highest
+DH Sync expected,cron_schedule,*/5 * * * *
+DH Sync expected,max_concurrent,1
+DH Sync expected,is_scheduled,1
+DH Discover unregistered,cron_schedule,*/15 * * * *
+DH Discover unregistered,is_scheduled,1

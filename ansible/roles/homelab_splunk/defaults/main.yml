@@ -314,3 +314,10 @@ hl_audit_immutable: false
 hl_probe_host: pi5
 hl_probe_interval: 60
 hl_probe_dir: /var/log/hl-devprobe
+
+# --- The expected list (spec 2.1, 7.2; task 10) ---
+# Extra expected rows Ansible can't derive (e.g. the hosts whose syslog reaches Splunk through wd2l),
+# each a dict with the dh_expected_ansible.csv columns, e.g.
+#   - {level: sourcetype, index: enclave1, host: wd2l-recv, sourcetype: syslog, collection: hec,
+#      via: wd2l-recv, profile: continuous, criticality: 3}
+dh_extra_expected: []
