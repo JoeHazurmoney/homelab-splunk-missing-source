@@ -1,0 +1,5 @@
+level,index,host,sourcetype,source,collection,via,profile,interval_secs,max_gap_secs,criticality,enabled,expected_since
+host,,cribl,,,syslog,,heartbeat,,120,1,,
+sourcetype,cribl,cribl,cribl,,syslog,,heartbeat,,120,1,,
+host,,wd2l-recv,,,uf,cribl,heartbeat,,,2,,
+sourcetype,linux,wd2l-recv,syslog,,uf,cribl,continuous,,600,2,,

@@ -1,0 +1,5 @@
+entity_id,status,cause_code,action,host_rollup
+host|*|cribl|*|*,MISSING,host_no_data,Check the cribl container on HOMEPC (docker ps --filter name=cribl) and then run: ansible-playbook site.yml --tags verify --limit homepc,DOWN
+sourcetype|cribl|cribl|cribl|*,MISSING,host_no_data,Check the cribl container on HOMEPC (docker ps --filter name=cribl) and then run: ansible-playbook site.yml --tags verify --limit homepc,DOWN
+host|*|wd2l-recv|*|*,MISSING,relay_down,Check the cribl container on HOMEPC (docker ps --filter name=cribl) and then run: ansible-playbook site.yml --tags verify --limit homepc,DOWN
+sourcetype|linux|wd2l-recv|syslog|*,MISSING,relay_down,Check the cribl container on HOMEPC (docker ps --filter name=cribl) and then run: ansible-playbook site.yml --tags verify --limit homepc,DOWN

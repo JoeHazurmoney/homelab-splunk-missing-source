@@ -71,6 +71,9 @@ The enabled rows of the expected list, normalized, one per entity. Only `0`, `fa
 
 Fixed numbers the pipeline uses. Change them in `local/macros.conf`, never in `default/`.
 
+### `dh_probe_host`
+The host that runs the device probe (*hl-devprobe*): `pi5`, the role's `hl_probe_host`. The probe causes name it ("check hl-devprobe on pi5"). Change both together.
+
 ### `dh_skew_secs`
 **600 seconds.** When data arrives more than this long after (or before) its own timestamp, the entity is flagged for clock skew. Raise it to tolerate slower or more backfilled sources; lower it to catch smaller clock errors (more noise). Used by: `dh_state_merge`, `dh_eval_load`.
 
@@ -167,8 +170,8 @@ Merges a minute's arrival counts with what the table already holds: latest times
 ### `dh_fwd_from_hb`
 Forwarder heartbeats (each Splunk agent reports its own metrics every 30 s), per host; the indexer's own host is left out. Used by: *DH Tracker fast*.
 
-### `dh_fwd_from_tcpin`
-The indexer's record of each forwarder connection: time, guid, version, OS and type. Used by: *DH Tracker fast*.
+### `dh_fwd_from_ufint`
+Each agent's own log lines: its last connection to Cribl ("Connected to idx=", every 30 s), and from the lines it writes at each start, its operating system and processor type and its build, turned into a version by the `dh_uf_builds` table. Splunk now sees only Cribl's connection, so it can't name the agents itself. Splunk's own lines are left out. Used by: *DH Tracker fast*.
 
 ### `dh_fwd_from_markers`
 The latest Ansible marker per host (`stop`, `start`, …, with who ran it and the run id). Used by: *DH Tracker fast*.
@@ -283,6 +286,9 @@ Finds Windows tamper indicators: security or event log cleared (1102, 104), even
 
 ### `dh_tamper_linux`
 Finds Linux tamper indicators: auditd stopped or aborted, audit rules changed, the Splunk agent, auditd or rsyslog stopped, events of the `hl-*` and `wd2l-*` audit keys, and big clock steps. Used by: *DH Tamper*.
+
+### `dh_tamper_cribl`
+Cribl's audit log: any create, update, delete, reorder or upload of routes, pipelines, outputs, inputs or lookups is a finding on the host *cribl*. The log can't tell a Drop function from any other pipeline edit, so every such change counts. The role's own changes fall inside its *cribl* and *cribl_block* marker windows and are suppressed. Used by: *DH Tamper*.
 
 ### `dh_tamper_finish(tamper, now)`
 Groups indicators into findings (one per host, kind and 5-minute bucket), re-checks each finding of the last 7 days against every Ansible marker (a finding within `dh_tamper_window_secs` of a marker is the role's own work and is suppressed), and marks which ones still need writing to the index. Used by: *DH Tamper*.
@@ -473,6 +479,9 @@ Writes the expected row when the confirmation matches, and logs it. Used by: Man
 
 ### `dh_ui_adopt_row(baseline, fwd)`
 Turns an unregistered entity into an expected-row request: agent hosts become `uf`, others `syslog`. An agent host's own row gets the `heartbeat` profile; any other row takes the baseline's suggestion, else continuous. Used by: Manage, form 3.
+
+### `dh_ui_block_command`
+The test block lives in Cribl, so Manage shows the command to run instead of writing it: the role's *cribl_block* line for a checked request (setting with minutes and reason, or clearing), with the reason reduced to plain characters. Used by: Manage, form 4 (once the redesigned Manage is merged, task 12e).
 
 ### `dh_ui_block_plan(blocks, now)`
 Checks a test-block request (dh_admin only; 60 s to 24 h; a source block needs an exact raw source) and shows the block before and after, with the normalized source for reference and its confirmation code. Used by: Manage, form 4.

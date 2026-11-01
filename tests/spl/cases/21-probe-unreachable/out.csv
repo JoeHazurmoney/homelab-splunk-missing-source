@@ -4,4 +4,4 @@ sourcetype|linux|pi5|syslog|*,OK,,,OK
 host|*|udm|*|*,MISSING,probe_unreachable,Check the power and network of udm,DOWN
 sourcetype|network|udm|unifi:syslog|*,OK,,,DOWN
 sourcetype|network|udm|hl:devprobe|*,OK,,,DOWN
-host|*|udm2|*|*,MISSING,probe_stale,Check the device probe service (hl-devprobe) on the relay pi5,DOWN
+host|*|udm2|*|*,MISSING,probe_stale,Check hl-devprobe on pi5: systemctl status hl-devprobe.timer (or rerun: ansible-playbook site.yml --tags probe --limit pi5),DOWN
