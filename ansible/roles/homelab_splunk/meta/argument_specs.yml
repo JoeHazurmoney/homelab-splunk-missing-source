@@ -309,6 +309,17 @@ argument_specs:
             type: bool
             required: true
             description: Audit failure.
+      hl_tas:
+        type: dict
+        description: The pinned TAs (version, package file in ansible/files/packages/, sha256).
+      hl_uf_input_apps_linux:
+        type: list
+        elements: str
+        description: Role-owned input apps on Linux UFs.
+      hl_uf_input_apps_windows:
+        type: list
+        elements: str
+        description: Role-owned input apps on the Windows UF.
       hl_server_host:
         type: str
         default: homepc
@@ -408,6 +419,10 @@ argument_specs:
             type: bool
             required: true
             description: Also expect each source (level=source), not only the sourcetype.
+          hosts:
+            type: list
+            elements: str
+            description: Only these inventory hosts get the input and its expectation (default all in the group).
       hl_windows_inputs:
         type: list
         elements: dict

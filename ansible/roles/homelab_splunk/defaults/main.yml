@@ -119,6 +119,7 @@ hl_cribl_config_files:
   - inputs.yml
   - outputs.yml
   - cribl.yml
+  - breakers.yml
   - pipelines/route.yml
   - pipelines/pl_test_block/conf.yml
   - pipelines/pl_syslog_pre/conf.yml
@@ -158,6 +159,7 @@ syslog_devices: []
 #   criticality   1 (most critical) .. 4
 #   enabled       false keeps the row documented but neither rendered nor expected
 #   track_source  also expect each source (level=source), not only the sourcetype
+#   hosts         optional: only these inventory hosts get the input (and its expectation)
 
 # wd2l's audit sourcetype differs per host (host_vars); hosts without wd2l disable its stanza.
 hl_wd2l_audit_sourcetype: "wd2l:audit"
@@ -210,6 +212,11 @@ hl_linux_inputs:
      source: "Unix:Uptime", interval: 86400, profile: periodic, criticality: 4, enabled: true, track_source: false}
   - {stanza: "script://./bin/version.sh", app: Splunk_TA_nix, index: linux, sourcetype: "Unix:Version",
      source: "Unix:Version", interval: 86400, profile: periodic, criticality: 4, enabled: true, track_source: false}
+
+  # pi5 only: the device probe's file (task 8 writes it)
+  - {stanza: "monitor:///var/log/hl-devprobe/probe.log", app: hl_uf_linux_inputs, index: network, sourcetype: "hl:devprobe",
+     source: /var/log/hl-devprobe/probe.log, interval: 60, profile: periodic, criticality: 2, enabled: true, track_source: false,
+     hosts: [pi5]}
 
 hl_windows_inputs:
   # Event log channels (app hl_uf_windows_inputs), renderXml=true, so sourcetype XmlWinEventLog and
@@ -275,3 +282,21 @@ hl_audit_policy:
   - {name: System Integrity, guid: "{0CCE9212-69AE-11D9-BED3-505054503030}", success: true, failure: true}
   # No command line: ProcessCreationIncludeCmdLine_Enabled is left alone (spec 5.3)
   - {name: Process Creation, guid: "{0CCE922B-69AE-11D9-BED3-505054503030}", success: true, failure: false}
+
+# --- Forwarder apps (spec 5.5; task 6). The TAs are deployed unmodified; the role owns only their
+# local/inputs.conf. Put the TA packages in ansible/files/packages/ and pin their sha256 here
+# (docs/handoff/task-6-forwarder-apps.md, "Before running" 2).
+hl_tas:
+  Splunk_TA_nix:
+    version: 10.3.4
+    file: splunk-add-on-for-unix-and-linux_1034.tgz
+    sha256: ""
+  Splunk_TA_windows:
+    version: 11.0.3
+    file: splunk-add-on-for-microsoft-windows_1103.tgz
+    sha256: ""
+# The role-owned input apps; every stanza is written to the app's local/inputs.conf, because local/
+# beats every app's default/ (Splunk_TA_windows sorts before hl_uf_windows_inputs, and its default
+# stanzas say disabled = 1).
+hl_uf_input_apps_linux: [hl_uf_linux_inputs, hl_uf_wd2l_inputs]
+hl_uf_input_apps_windows: [hl_uf_windows_inputs]

@@ -1,0 +1,49 @@
+# Cribl event breakers for UF data (spec §13, §11 row 6). Splunk applies no index-time rule to
+# what Cribl delivers (spike §14.7 c), so Cribl, not Splunk, now breaks and timestamps UF data,
+# and Splunk_TA_nix's props.conf on the indexer no longer apply. This ruleset reproduces them:
+# - the TA_nix scripted inputs (tables such as ps, top, df): one event per script run, stamped with
+#   the current time (TA_nix: LINE_BREAKER = ^((?!))$, DATETIME_CONFIG = CURRENT). The run ends when the
+#   channel goes quiet (in_splunk_tcp staleChannelFlushMs) or at maxEventBytes;
+# - linux_audit: one event per record, time from msg=audit(<epoch>);
+# - everything else: Cribl's default (one event per line, timestamp found automatically).
+# Task 6 checks it against the TA's props.conf (docs/handoff/task-6-forwarder-apps.md, check 3).
+# Managed by the homelab_splunk role (`cribl` tag).
+hl_uf_breakers:
+  lib: custom
+  description: Homelab UF data - TA_nix tables as one event per run, auditd per record
+  tags: homelab
+  minRawLength: 256
+  rules:
+    - name: TA_nix scripted output, one event per run
+      condition: >-
+        ['cpu','ps','top','vmstat','interfaces','netstat','df','openPorts','lastlog','package','Unix:Service',
+        'Linux:SELinuxConfig','Unix:SSHDConfig','Unix:UserAccounts','Unix:Uptime','Unix:Version'].includes(sourcetype)
+      type: regex
+      # Never matches: nothing inside one run's output breaks it
+      eventBreakerRegex: /(?!)/
+      timestampAnchorRegex: /^/
+      timestamp:
+        type: current
+        length: 150
+      timestampTimezone: local
+      timestampEarliest: -420weeks
+      timestampLatest: +1week
+      maxEventBytes: 1048576
+      parserEnabled: false
+      shouldUseDataRaw: false
+      disabled: false
+    - name: linux_audit, one event per record
+      condition: "sourcetype=='linux_audit'"
+      type: regex
+      eventBreakerRegex: /[\n\r]+(?=type=)/
+      timestampAnchorRegex: /msg=audit\(/
+      timestamp:
+        type: auto
+        length: 150
+      timestampTimezone: local
+      timestampEarliest: -420weeks
+      timestampLatest: +1week
+      maxEventBytes: 51200
+      parserEnabled: false
+      shouldUseDataRaw: false
+      disabled: false

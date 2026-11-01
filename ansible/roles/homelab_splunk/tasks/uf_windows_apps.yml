@@ -1,5 +1,115 @@
-# apps (uf_windows): sync the role-owned apps; restart only on change; marker
-# Placeholder until task 6 (spec 11) fills it in.
-- name: Placeholder for apps
-  ansible.builtin.debug:
-    msg: "apps on {{ inventory_hostname }}: not implemented yet (task 6)"
+# apps (uf_windows, spec 5.3/5.5): Splunk_TA_windows unmodified (its local/inputs.conf is the
+# role's: perfmon CPU/Memory at 60 s), hl_uf_windows_inputs (the event log channels, renderXml, in
+# local/) and hl_uf_outputs; restart only on change, prove the path, marker.
+- name: Check the TA package is pinned and on the controller
+  ansible.builtin.stat:
+    path: "{{ hl_uf_packages_dir }}/{{ hl_tas.Splunk_TA_windows.file }}"
+    checksum_algorithm: sha256
+  delegate_to: localhost
+  register: hl_ta_win_pkg
+  failed_when: >-
+    hl_tas.Splunk_TA_windows.sha256 | length != 64 or not hl_ta_win_pkg.stat.exists
+    or hl_ta_win_pkg.stat.checksum != hl_tas.Splunk_TA_windows.sha256
+
+- name: Read the installed TA's version
+  ansible.windows.win_shell: |
+    $f = '{{ hl_uf_win_home }}\etc\apps\Splunk_TA_windows\default\app.conf'
+    if (-not (Test-Path -LiteralPath $f)) { exit 0 }
+    $l = $false
+    foreach ($line in Get-Content -LiteralPath $f) {
+      if ($line -match '^\[launcher\]') { $l = $true; continue }
+      if ($line -match '^\[') { $l = $false }
+      if ($l -and $line -match '^\s*version\s*=\s*(\S+)') { $Matches[1]; break }
+    }
+  register: hl_ta_win_ver
+  changed_when: false
+
+- name: Install Splunk_TA_windows (unmodified; local/ kept)
+  when: hl_ta_win_ver.stdout | trim != hl_tas.Splunk_TA_windows.version
+  block:
+    - name: Create the staging folder
+      ansible.windows.win_file:
+        path: "{{ hl_win_state_dir }}\\ta"
+        state: directory
+
+    - name: Copy the TA to HOMEPC
+      ansible.windows.win_copy:
+        src: "{{ hl_uf_packages_dir }}/{{ hl_tas.Splunk_TA_windows.file }}"
+        dest: "{{ hl_win_state_dir }}\\ta\\{{ hl_tas.Splunk_TA_windows.file }}"
+
+    - name: Unpack it and swap its shipped files in (everything but local/)
+      ansible.windows.win_shell: |
+        $stage = '{{ hl_win_state_dir }}\ta'
+        tar.exe -xzf (Join-Path $stage '{{ hl_tas.Splunk_TA_windows.file }}') -C $stage
+        if ($LASTEXITCODE -ne 0) { throw "tar failed ($LASTEXITCODE)" }
+        $src = Join-Path $stage 'Splunk_TA_windows'
+        $dst = '{{ hl_uf_win_home }}\etc\apps\Splunk_TA_windows'
+        New-Item -ItemType Directory -Force -Path $dst | Out-Null
+        Get-ChildItem -LiteralPath $dst -Force | Where-Object Name -ne 'local' | Remove-Item -Recurse -Force
+        Get-ChildItem -LiteralPath $src -Force | Where-Object Name -ne 'local' | Copy-Item -Destination $dst -Recurse -Force
+      changed_when: true
+
+  always:
+    - name: Remove the staging folder
+      ansible.windows.win_file:
+        path: "{{ hl_win_state_dir }}\\ta"
+        state: absent
+
+- name: Create the role-owned apps' folders
+  ansible.windows.win_file:
+    path: "{{ hl_uf_win_home }}\\etc\\apps\\{{ item.0 }}\\{{ item.1 }}"
+    state: directory
+  loop: "{{ (hl_uf_input_apps_windows + ['Splunk_TA_windows']) | product(['default', 'local']) | list }}"
+
+- name: Render the role-owned apps' app.conf
+  ansible.windows.win_template:
+    src: uf/input_app.conf.j2
+    dest: "{{ hl_uf_win_home }}\\etc\\apps\\{{ hl_app }}\\default\\app.conf"
+  loop: "{{ hl_uf_input_apps_windows }}"
+  loop_control:
+    loop_var: hl_app
+  register: hl_appsw_appconf
+
+- name: Render each app's local/inputs.conf
+  ansible.windows.win_template:
+    src: uf/inputs.conf.j2
+    dest: "{{ hl_uf_win_home }}\\etc\\apps\\{{ hl_app }}\\local\\inputs.conf"
+  loop: "{{ hl_uf_input_apps_windows + ['Splunk_TA_windows'] }}"
+  loop_control:
+    loop_var: hl_app
+  register: hl_appsw_inputs
+
+- name: Deploy hl_uf_outputs
+  ansible.builtin.import_tasks: uf_windows_outputs.yml
+
+- name: Note whether the UF must restart
+  ansible.builtin.set_fact:
+    hl_appsw_restart: >-
+      {{ (hl_ta_win_ver.stdout | trim != hl_tas.Splunk_TA_windows.version) or hl_appsw_appconf is changed
+         or hl_appsw_inputs is changed or hl_uf_outputs_changed | bool }}
+
+- name: Note where splunkd.log ends
+  ansible.windows.win_shell: |
+    $f = '{{ hl_uf_win_home }}\var\log\splunk\splunkd.log'
+    if (Test-Path -LiteralPath $f) { @(Get-Content -LiteralPath $f).Count } else { 0 }
+  register: hl_appsw_log_lines
+  changed_when: false
+  when: hl_appsw_restart | bool
+
+- name: Marker before the restart
+  ansible.builtin.include_tasks: marker.yml
+  vars:
+    hl_marker_action: apps
+  when: hl_appsw_restart | bool
+
+- name: Restart the UF
+  ansible.windows.win_service:
+    name: "{{ hl_uf_win_service }}"
+    state: restarted
+  when: hl_appsw_restart | bool
+
+- name: Check the UF is connected through Cribl
+  ansible.builtin.include_tasks: uf_windows_connected.yml
+  vars:
+    hl_uf_log_from: "{{ hl_appsw_log_lines.stdout | default('0') | trim | int }}"
+  when: hl_appsw_restart | bool

@@ -1,0 +1,20 @@
+# Managed by the homelab_splunk role (apps tag); local edits are overwritten.
+[install]
+state = enabled
+
+[ui]
+is_visible = false
+label = {{ hl_app }}
+
+[launcher]
+author = homelab
+description = Role-owned inputs (spec 5.5); the stanzas are in local/inputs.conf.
+version = 0.1.0
+
+[package]
+id = {{ hl_app }}
+check_for_updates = false
+
+# Role-owned marker: apps_remove and uninstall delete only apps with this flag (spec 5.5).
+[hl]
+managed = true

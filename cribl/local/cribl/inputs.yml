@@ -18,6 +18,9 @@ inputs:
       disabled: true
     maxActiveCxn: 1000
     staleChannelFlushMs: 10000
+    # Cribl breaks UF data now (spike 14.7 c); TA_nix tables stay whole (breakers.yml, task 6)
+    breakerRulesets:
+      - hl_uf_breakers
     useFwdTimezone: true
     dropControlFields: true
     extractMetrics: false

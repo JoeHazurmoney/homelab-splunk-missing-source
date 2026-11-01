@@ -1,0 +1,22 @@
+# Managed by the homelab_splunk role (apps tag); local edits are overwritten.
+# {{ hl_app }}: the enabled rows of the shared input schema for this host (spec 4, 5.5), after
+# hl_input_overrides and hl_disabled_inputs. Written to local/, which beats every app's default/.
+# The same rows render the expected list (task 10), so every input here is also expected.
+{% for r in hl_inputs_enabled if r.app == hl_app %}
+
+[{{ r.stanza }}]
+disabled = 0
+index = {{ r.index }}
+{% if r.stanza.startswith('monitor://') %}
+sourcetype = {{ r.sourcetype }}
+{% endif %}
+{% if r.stanza.startswith('script://') or r.stanza.startswith('perfmon://') %}
+interval = {{ r.interval }}
+{% endif %}
+{% if r.stanza.startswith('WinEventLog://') %}
+renderXml = true
+start_from = oldest
+current_only = 0
+evt_resolve_ad_obj = 0
+{% endif %}
+{% endfor %}

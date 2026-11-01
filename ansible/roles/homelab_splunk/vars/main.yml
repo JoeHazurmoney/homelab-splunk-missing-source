@@ -129,3 +129,18 @@ hl_uf_tamper_file: /etc/audit/rules.d/zz-hl-uf-tamper.rules
 hl_uf_outputs_files: [app.conf, outputs.conf, limits.conf, web.conf]
 # The UF's CLI, run as its own user (running it as root warns about SPLUNK_HOME ownership, spike 14 d)
 hl_uf_cli: "{{ hl_uf_home }}/bin/splunk"
+
+# This host's inputs after hl_input_overrides, hl_disabled_inputs and the rows' `hosts` (spec 5.2,
+# 5.3 "turn off receipt"). The forwarder apps render only the enabled rows; `expected` (task 10)
+# applies the same rules per host.
+hl_inputs_all: "{{ hl_linux_inputs if 'uf_linux' in group_names else (hl_windows_inputs if 'uf_windows' in group_names else []) }}"
+hl_inputs_effective: >-
+  {%- set out = [] -%}
+  {%- for r in hl_inputs_all -%}
+  {%- set r2 = r | combine(hl_input_overrides.get(r.stanza, {})) -%}
+  {%- if r2.hosts | default([]) | length == 0 or inventory_hostname in r2.hosts -%}
+  {%- set _ = out.append(r2 | combine({'enabled': (r2.enabled | bool) and r2.stanza not in hl_disabled_inputs})) -%}
+  {%- endif -%}
+  {%- endfor -%}
+  {{ out }}
+hl_inputs_enabled: "{{ hl_inputs_effective | selectattr('enabled') | list }}"
