@@ -34,7 +34,10 @@
     {{ hl_ps_prelude }}
     $v = Invoke-HlRest -Path '/servicesNS/nobody/{{ hl_wd2l_app }}/data/ui/views/{{ hl_wd2l_dashboard }}?output_mode=json'
     $rows = Invoke-HlSearch '| tstats latest(_time) as t where index=wd2l sourcetype=wd2l:health | eval age_s=round(now()-t)'
-    @{ view = $v.Code; health_age_s = [int]($rows | Select-Object -First 1).age_s } | ConvertTo-Json -Compress
+    # No health record gives a row without age_s (or no row), and [int]$null is 0: treat it as stale.
+    $age = ($rows | Select-Object -First 1).age_s
+    $age = if ("$age" -match '^-?\d+$') { [int]$age } else { [int]::MaxValue }
+    @{ view = $v.Code; health_age_s = $age } | ConvertTo-Json -Compress
   register: hl_server_wd2l_dash
   until: >-
     hl_server_wd2l_dash.rc == 0 and (hl_server_wd2l_dash.stdout | from_json).view == 200
