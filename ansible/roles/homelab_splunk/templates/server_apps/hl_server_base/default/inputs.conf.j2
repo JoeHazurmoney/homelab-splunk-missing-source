@@ -1,0 +1,18 @@
+# Managed by the homelab_splunk role (server tag); local edits are overwritten.
+# hl_server_base inputs (spec 5.5), rendered from the vault by the `server` tag; the tokens are
+# never committed. The listener [splunktcp://9997] already exists in etc/system/local from the
+# image's provisioning (spec 14.7 h, re-checked in task 3), so only the token is added here. Once
+# a splunktcptoken exists, splunktcp accepts only senders that present a token: Cribl, over hl-net.
+[splunktcptoken://hl_cribl]
+token = {{ vault_hl_s2s_token }}
+
+# HEC token for the Ansible maintenance markers (spec 5.3 Markers): index=data_health
+# source=dh:marker sourcetype=hl:marker, read by hl_data_health.
+[http://hl_markers]
+token = {{ vault_hl_markers_token }}
+disabled = 0
+index = data_health
+indexes = data_health
+source = dh:marker
+sourcetype = hl:marker
+useACK = false

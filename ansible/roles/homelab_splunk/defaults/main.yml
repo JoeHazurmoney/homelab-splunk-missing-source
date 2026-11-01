@@ -18,6 +18,55 @@ hl_disabled_inputs: []
 #   hl_input_overrides: {"monitor:///var/log/cron": {profile: sporadic, criticality: 4}}
 hl_input_overrides: {}
 
+# --- Splunk server (splunk_server: spec 5.3 server/server_remove/server_network, 5.5, 6.1) ---
+hl_splunk_container: wd2l-splunk
+hl_splunk_home: /opt/splunk
+# Read on HOMEPC at the moment of each REST call, never copied (spec 5.2)
+hl_splunk_admin_password_file: 'C:\Users\taylo\wd2l-splunk\secrets\splunk-admin-password'
+hl_splunk_mgmt_url: https://127.0.0.1:8089
+hl_splunk_hec_url: https://127.0.0.1:8088
+# The server apps, in deploy order. seed_lookups are shipped once and then left to whoever rewrites
+# them (the Manage form, DH Prune, the `expected` tag); templates are rendered from the role's
+# templates/server_apps/<app>/<path>.j2 into the app (tokens from the vault).
+hl_server_apps_src: "{{ playbook_dir }}/../splunk/apps"
+hl_server_apps:
+  - name: hl_server_base
+    seed_lookups: [hl_ingest_block.csv]
+    templates: [default/inputs.conf]
+  - name: hl_data_health
+    seed_lookups: [dh_expected_ansible.csv]
+# Limit server, server_remove (and, from task 6, apps/apps_remove) to these apps; [] = all
+hl_apps_only: []
+# A change to one of these files restarts splunkd; anything else is reloaded over REST
+hl_server_restart_confs: [indexes.conf, inputs.conf, props.conf]
+hl_server_reload_endpoints:
+  - apps/local
+  - admin/conf-collections
+  - admin/macros
+  - admin/conf-macros
+  - saved/searches
+  - admin/conf-savedsearches
+  - data/transforms/lookups
+  - admin/conf-transforms
+  - data/ui/views
+  - data/ui/nav
+  - authentication/providers/services   # reloads authorize.conf (roles)
+  - admin/conf-authorize
+# server_remove: also delete the removed indexes' data on disk
+hl_purge_index_data: false
+# Docker network Cribl reaches splunktcp on (spec 4.3: 9997 is not published)
+hl_net_name: hl-net
+# Container-side staging directory (root-only, removed after each run)
+hl_server_container_stage: /tmp/hl_server_stage
+# wd2l must keep working: its HEC, its dashboard and its data (spec 5.6)
+hl_wd2l_app: wd2l
+hl_wd2l_dashboard: wd2l_state_of_health
+hl_server_wd2l_indexes: [enclave1, wd2l]
+hl_server_wd2l_max_age: 300          # seconds; wd2l's newest health record must be younger
+hl_server_health_timeout: 300        # seconds to wait for HEC and wd2l data after a change
+# The role's state file on Windows hosts (spec 5.2), shared by the server and UF parts
+hl_win_state_file: 'C:\ProgramData\hl_splunk\state.json'
+
 # --- Syslog devices on the relay (set in group_vars/syslog_relay.yml) ---
 syslog_devices: []
 

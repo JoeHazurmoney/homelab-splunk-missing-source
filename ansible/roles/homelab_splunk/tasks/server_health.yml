@@ -1,0 +1,47 @@
+# wd2l must keep working after anything that touches splunkd or its networks (spec 5.6, 6.1):
+# HEC healthy, its dashboard's data source current and, after a restart (hl_health_since set to
+# the epoch the restart started), new wd2l events indexed since then.
+- name: Wait for wd2l HEC to report healthy
+  ansible.windows.win_shell: |
+    {{ hl_ps_prelude }}
+    Get-HlHecHealth | ConvertTo-Json -Compress
+  register: hl_server_hec
+  until: >-
+    hl_server_hec.rc == 0 and (hl_server_hec.stdout | from_json).Code == 200
+    and 'HEC is healthy' in (hl_server_hec.stdout | from_json).Content
+  retries: "{{ (hl_server_health_timeout / 10) | int }}"
+  delay: 10
+  changed_when: false
+
+- name: Wait for wd2l data indexed since the restart
+  ansible.windows.win_shell: |
+    {{ hl_ps_prelude }}
+    $spl = '| tstats count where index IN ({{ hl_server_wd2l_indexes | join(", ") }})'
+    $spl += ' _index_earliest={{ hl_health_since }} earliest=-7d latest=+1d by index'
+    $rows = Invoke-HlSearch $spl
+    @{ rows = $rows } | ConvertTo-Json -Compress -Depth 4
+  register: hl_server_wd2l_lands
+  when: hl_health_since | default("") | string | length > 0
+  until: >-
+    hl_server_wd2l_lands.rc == 0
+    and (hl_server_wd2l_lands.stdout | from_json).rows | map(attribute='count') | map('int') | sum > 0
+  retries: "{{ (hl_server_health_timeout / 10) | int }}"
+  delay: 10
+  changed_when: false
+
+- name: Check wd2l's dashboard and its latest health record
+  ansible.windows.win_shell: |
+    {{ hl_ps_prelude }}
+    $v = Invoke-HlRest -Path '/servicesNS/nobody/{{ hl_wd2l_app }}/data/ui/views/{{ hl_wd2l_dashboard }}?output_mode=json'
+    $rows = Invoke-HlSearch '| tstats latest(_time) as t where index=wd2l sourcetype=wd2l:health | eval age_s=round(now()-t)'
+    # No health record gives a row without age_s (or no row), and [int]$null is 0: treat it as stale.
+    $age = ($rows | Select-Object -First 1).age_s
+    $age = if ("$age" -match '^-?\d+$') { [int]$age } else { [int]::MaxValue }
+    @{ view = $v.Code; health_age_s = $age } | ConvertTo-Json -Compress
+  register: hl_server_wd2l_dash
+  until: >-
+    hl_server_wd2l_dash.rc == 0 and (hl_server_wd2l_dash.stdout | from_json).view == 200
+    and (hl_server_wd2l_dash.stdout | from_json).health_age_s < hl_server_wd2l_max_age
+  retries: "{{ (hl_server_health_timeout / 10) | int }}"
+  delay: 10
+  changed_when: false

@@ -1,0 +1,29 @@
+# Write hl_state back to the Windows state file; with nothing left in it, delete the file (and its
+# folder when empty), as the uninstall contract asks (spec 5.6).
+- name: Create the state folder
+  ansible.windows.win_file:
+    path: "{{ hl_win_state_file | win_dirname }}"
+    state: directory
+  when: hl_state | length > 0
+
+- name: Write the state file
+  ansible.windows.win_copy:
+    content: "{{ hl_state | to_nice_json(sort_keys=true) }}\n"
+    dest: "{{ hl_win_state_file }}"
+  when: hl_state | length > 0
+
+- name: Remove the empty state file
+  ansible.windows.win_file:
+    path: "{{ hl_win_state_file }}"
+    state: absent
+  when: hl_state | length == 0
+
+- name: Remove the state folder if it is empty
+  ansible.windows.win_shell: |
+    $d = '{{ hl_win_state_file | win_dirname }}'
+    if ((Test-Path -LiteralPath $d) -and -not (Get-ChildItem -LiteralPath $d -Force)) {
+      Remove-Item -LiteralPath $d; 'removed'
+    }
+  register: hl_state_dir_rm
+  when: hl_state | length == 0
+  changed_when: "'removed' in hl_state_dir_rm.stdout"
