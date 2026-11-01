@@ -66,3 +66,53 @@ hl_ps_prelude: |
   function Get-HlHecHealth {
     return Invoke-HlWeb -Method GET -Uri ($HlHec + '/services/collector/health')
   }
+
+# PowerShell prepended to the Cribl win_shell tasks (cribl, cribl_block, cribl_remove). The Cribl
+# admin password arrives in the environment variable HL_CRIBL_PW (the task's `environment`, with
+# no_log), never in the script text.
+#   Connect-HlCribl [-Password <pw>]  -> logs in, keeps the bearer token for Invoke-HlCribl ($true/$false)
+#   Invoke-HlCribl -Method GET|POST|PATCH|PUT|DELETE -Path /system/... [-Json <object>] [-Raw <string> -ContentType <type>]
+#                                     -> {Code, Content}
+#   Get-HlCriblHealth                 -> {Code, Content} of /api/v1/health (no login)
+hl_cribl_ps_prelude: |
+  $ErrorActionPreference = 'Stop'
+  $ProgressPreference = 'SilentlyContinue'
+  $HlCriblApi = '{{ hl_cribl_api_url }}'
+  $script:HlCriblToken = $null
+  function Invoke-HlCriblWeb {
+    param([string]$Method, [string]$Uri, [hashtable]$Headers = @{}, $Body = $null, [string]$ContentType = 'application/json')
+    try {
+      $p = @{ UseBasicParsing = $true; Method = $Method; Uri = $Uri; Headers = $Headers; TimeoutSec = 60 }
+      if ($null -ne $Body) { $p.Body = $Body; $p.ContentType = $ContentType }
+      $r = Invoke-WebRequest @p
+      return [pscustomobject]@{ Code = [int]$r.StatusCode; Content = [string]$r.Content }
+    } catch [System.Net.WebException] {
+      $resp = $_.Exception.Response
+      if ($null -eq $resp) { return [pscustomobject]@{ Code = 0; Content = $_.Exception.Message } }
+      $sr = New-Object System.IO.StreamReader($resp.GetResponseStream())
+      return [pscustomobject]@{ Code = [int]$resp.StatusCode; Content = $sr.ReadToEnd() }
+    }
+  }
+  function Connect-HlCribl {
+    param([string]$Password = $env:HL_CRIBL_PW)
+    $body = @{ username = 'admin'; password = $Password } | ConvertTo-Json -Compress
+    $r = Invoke-HlCriblWeb -Method POST -Uri ($HlCriblApi + '/auth/login') -Body $body
+    if ($r.Code -ne 200) { return $false }
+    $script:HlCriblToken = ($r.Content | ConvertFrom-Json).token
+    return $true
+  }
+  function Invoke-HlCribl {
+    param([string]$Method = 'GET', [string]$Path, $Json = $null, [string]$Raw = $null, [string]$ContentType = 'application/json')
+    if (-not $script:HlCriblToken) { throw 'Invoke-HlCribl: not logged in (Connect-HlCribl)' }
+    $h = @{ Authorization = 'Bearer ' + $script:HlCriblToken }
+    $body = $null
+    if ($null -ne $Json) { $body = $Json | ConvertTo-Json -Depth 20 -Compress }
+    elseif ($null -ne $Raw) { $body = [Text.Encoding]::UTF8.GetBytes($Raw) }
+    return Invoke-HlCriblWeb -Method $Method -Uri ($HlCriblApi + $Path) -Headers $h -Body $body -ContentType $ContentType
+  }
+  function Get-HlCriblHealth {
+    return Invoke-HlCriblWeb -Method GET -Uri ($HlCriblApi + '/health')
+  }
+
+# One Cribl syslog source per syslog_devices entry, merged into cribl/local/cribl/inputs.yml
+hl_cribl_device_inputs: "{{ lookup('ansible.builtin.template', 'cribl/device_inputs.yml.j2') | from_yaml }}"

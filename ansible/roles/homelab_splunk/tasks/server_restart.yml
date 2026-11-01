@@ -1,16 +1,60 @@
 # Restart splunkd inside the container (not the container: no recreate, no provisioning run), then
 # wait until wd2l's HEC is healthy and wd2l's data lands again (imported by server and
-# server_remove). Cribl's in-flight data during Splunk's shutdown is lost (spec 14.7 g, task 3b).
+# server_remove). Cribl's in-flight data during Splunk's shutdown is lost (spec 14.7 g) unless
+# hl_cribl_hold_on_splunk_restart pauses Cribl around the restart (task 3b decides which).
 - name: Note when the restart starts
   ansible.windows.win_shell: "[DateTimeOffset]::UtcNow.ToUnixTimeSeconds()"
   register: hl_server_restart_t0
   changed_when: false
 
-- name: Restart splunkd in the container
+- name: Look for a running Cribl container to hold
   ansible.windows.win_command:
-    argv: [docker, exec, -u, splunk, "{{ hl_splunk_container }}", "{{ hl_splunk_home }}/bin/splunk", restart]
-  register: hl_server_restart
-  changed_when: true
+    argv: [docker, inspect, --format, "{{ '{{.State.Running}}' }}", "{{ hl_cribl_container }}"]
+  register: hl_server_cribl_running
+  changed_when: false
+  failed_when: false
+  when: hl_cribl_hold_on_splunk_restart | bool
+
+- name: Restart splunkd, holding Cribl when asked
+  block:
+    - name: Pause Cribl (its UFs keep their unACKed data)
+      ansible.windows.win_command:
+        argv: [docker, pause, "{{ hl_cribl_container }}"]
+      register: hl_server_cribl_paused
+      when:
+        - hl_cribl_hold_on_splunk_restart | bool
+        - hl_server_cribl_running.stdout | default('') | trim == 'true'
+      changed_when: true
+
+    - name: Note whether Cribl is held
+      ansible.builtin.set_fact:
+        hl_server_cribl_held: "{{ hl_server_cribl_paused is changed }}"
+
+    - name: Restart splunkd in the container
+      ansible.windows.win_command:
+        argv: [docker, exec, -u, splunk, "{{ hl_splunk_container }}", "{{ hl_splunk_home }}/bin/splunk", restart]
+      register: hl_server_restart
+      changed_when: true
+
+    - name: Wait for HEC before letting Cribl send again
+      ansible.windows.win_shell: |
+        {{ hl_ps_prelude }}
+        Get-HlHecHealth | ConvertTo-Json -Compress
+      register: hl_server_hec_hold
+      until: >-
+        hl_server_hec_hold.rc == 0 and (hl_server_hec_hold.stdout | from_json).Code == 200
+      retries: "{{ (hl_server_health_timeout / 10) | int }}"
+      delay: 10
+      when: hl_server_cribl_held | bool
+      changed_when: false
+
+  always:
+    - name: Unpause Cribl
+      ansible.windows.win_command:
+        argv: [docker, unpause, "{{ hl_cribl_container }}"]
+      # Also after a failed restart: never leave Cribl paused
+      when: hl_server_cribl_held | default(false) | bool
+      changed_when: true
 
 - name: Check wd2l after the restart
   ansible.builtin.import_tasks: server_health.yml

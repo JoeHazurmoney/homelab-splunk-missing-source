@@ -1,0 +1,32 @@
+# Managed by the homelab_splunk role (`cribl` tag); local edits are overwritten.
+# Cribl Stream on HOMEPC's Docker Desktop (spec 5.3, 6.2). No secrets here: the admin password is
+# set over the API, the S2S token is in the config the role pushes into the volume.
+name: {{ hl_cribl_project }}
+services:
+  cribl:
+    image: {{ hl_cribl_image }}
+    container_name: {{ hl_cribl_container }}
+    # Cribl's own events carry host=cribl (spike 14.7 f)
+    hostname: cribl
+    restart: unless-stopped
+    environment:
+      CRIBL_VOLUME_DIR: {{ hl_cribl_volume_dir }}
+    volumes:
+      - {{ hl_cribl_volume }}:{{ hl_cribl_volume_dir }}
+    ports:
+      - "{{ hl_cribl_s2s_port }}:9997/tcp"
+{% for d in syslog_devices %}
+      - "{{ d.port }}:{{ d.port }}/udp"
+{% endfor %}
+      - "127.0.0.1:{{ hl_cribl_api_port }}:9000/tcp"
+    networks:
+      - {{ hl_net_name }}
+volumes:
+  {{ hl_cribl_volume }}:
+    name: {{ hl_cribl_volume }}
+    labels:
+      hl_splunk.managed: "true"
+networks:
+  {{ hl_net_name }}:
+    # Created by server_network (wd2l-splunk is attached to it); compose never creates or deletes it
+    external: true

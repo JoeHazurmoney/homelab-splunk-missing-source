@@ -1,0 +1,50 @@
+# Cribl Stream routes, first match wins (spec §4.2). Cribl 4.20 keeps them in this file; there is
+# no routes.yml (spike §14.7). Managed by the homelab_splunk role (`cribl` tag). Every
+# collected route runs pl_test_block; Cribl's own data does not (the block never applies to it).
+# Input ids are "<type>:<id>", and the UDP syslog id carries a ":udp" suffix, so every filter
+# uses startsWith (spike §14.7 d).
+id: default
+groups: {}
+comments: []
+routes:
+  - id: r_cribl_self
+    name: cribl_self
+    description: Cribl's own logs, metrics and audit log -> index cribl / cribl_metrics
+    filter: "__inputId.startsWith('cribl:') || __inputId.startsWith('cribl_metrics:') || __inputId.startsWith('file:in_cribl_audit')"
+    pipeline: passthru
+    output: out_splunk
+    final: true
+    disabled: false
+    enableOutputExpression: false
+    clones: []
+  - id: r_syslog_devices
+    name: syslog_devices
+    description: Agentless devices (the UDM), one syslog source per device -> pl_test_block
+    filter: "__inputId.startsWith('syslog:in_')"
+    pipeline: pl_test_block
+    output: out_splunk
+    final: true
+    disabled: false
+    enableOutputExpression: false
+    clones: []
+  - id: r_uf
+    name: uf
+    description: Every UF, index/host/sourcetype/source unchanged -> pl_test_block
+    filter: "__inputId.startsWith('splunk:in_splunk_tcp')"
+    pipeline: pl_test_block
+    output: out_splunk
+    final: true
+    disabled: false
+    enableOutputExpression: false
+    clones: []
+  # Anything else still reaches Splunk unchanged, so a new source is never dropped silently.
+  - id: r_default
+    name: default
+    description: Catch-all, unchanged
+    filter: "true"
+    pipeline: passthru
+    output: out_splunk
+    final: true
+    disabled: false
+    enableOutputExpression: false
+    clones: []

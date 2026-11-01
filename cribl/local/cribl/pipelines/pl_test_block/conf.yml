@@ -1,0 +1,29 @@
+# The ingest test block (spec §7.7, as tested in spike §14.7 c). Keys: h|*|* (host), h|<st>|*
+# (sourcetype), h|<st>|<source> (exact raw source), h = host lowercased, domain stripped. A row
+# blocks while `until` (epoch seconds) is in the future; expiry is checked per event. Only the
+# indexes linux, windows and network: never _internal, cribl, cribl_metrics, wd2l's or
+# wd2l_uf_audit. Eval/filter expressions reject arrow functions, so the key logic is a Code
+# function. Managed by the homelab_splunk role (`cribl` tag); the lookup by `cribl_block`.
+output: default
+streamtags: []
+groups: {}
+asyncFuncTimeout: 1000
+description: Drop events matching an unexpired row of hl_ingest_block.csv (the Ansible cribl_block tag)
+functions:
+  - id: code
+    filter: "index=='linux' || index=='windows' || index=='network'"
+    disabled: false
+    description: Find the first matching block key, set __hl_block
+    conf:
+      maxNumOfIterations: 5000
+      code: |-
+        const h = String(__e.host || '').toLowerCase().replace(/[.].*$/, '');
+        const L = C.Lookup('hl_ingest_block.csv', 'k');
+        const now = Date.now() / 1000;
+        const keys = [h + '|*|*', h + '|' + __e.sourcetype + '|*', h + '|' + __e.sourcetype + '|' + __e.source];
+        for (const k of keys) { const u = L.match(k, 'until'); if (u && Number(u) > now) { __e.__hl_block = k; break; } }
+  - id: drop
+    filter: "__hl_block != null"
+    disabled: false
+    description: Drop what the block matched (dropped events are not licence-metered)
+    conf: {}

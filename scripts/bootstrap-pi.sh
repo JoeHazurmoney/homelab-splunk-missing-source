@@ -131,6 +131,10 @@ if [ -f "$vault" ]; then
   head -n1 "$vault" | grep -q '^\$ANSIBLE_VAULT;' || die "$vault is not encrypted; encrypt it: ansible-vault encrypt $vault"
   "$ansible_bin/ansible-vault" view "$vault" > /dev/null || die "$vault does not decrypt with $vault_pass"
   log "vault: $vault exists and decrypts"
+  for k in vault_hl_uf_admin_password vault_hl_s2s_token vault_hl_markers_token vault_hl_cribl_admin_password; do
+    "$ansible_bin/ansible-vault" view "$vault" | grep -q "^$k:" ||
+      log "vault: $k is missing; add it with: ansible-vault edit ${vault#"$repo"/} (see group_vars/all/vault.yml.example)"
+  done
 else
   log "vault: generating $vault with random values"
   {
@@ -138,6 +142,7 @@ else
     printf 'vault_hl_uf_admin_password: "%s"\n' "$(python3 -c 'import secrets; print(secrets.token_urlsafe(24))')"
     printf 'vault_hl_s2s_token: "%s"\n' "$(python3 -c 'import uuid; print(uuid.uuid4())')"
     printf 'vault_hl_markers_token: "%s"\n' "$(python3 -c 'import uuid; print(uuid.uuid4())')"
+    printf 'vault_hl_cribl_admin_password: "%s"\n' "$(python3 -c 'import secrets; print(secrets.token_urlsafe(24))')"
   } | (umask 077 && "$ansible_bin/ansible-vault" encrypt --output "$vault")
   chmod 600 "$vault"
 fi

@@ -156,8 +156,8 @@
 
 - name: Decide whether splunkd must restart
   ansible.builtin.set_fact:
-    hl_server_restart_needed: "{{ hl_server_changed_files | map('basename') | select('in', hl_server_restart_confs)
-      | list | length > 0 }}"
+    hl_server_restart_needed: "{{ (hl_server_changed_files | map('basename') | select('in', hl_server_restart_confs)
+      | list | length > 0) or (hl_server_force_restart | bool) }}"
 
 - name: Show what changed
   ansible.builtin.debug:
