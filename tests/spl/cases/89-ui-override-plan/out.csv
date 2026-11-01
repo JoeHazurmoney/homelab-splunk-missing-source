@@ -9,4 +9,4 @@ m7,0,0,Enter the new limit in seconds: a number of at least 60,mute until 2033-0
 m8,1,1,OK: choose Apply under Confirm to write this change,mute none / threshold 600 s / reason old8,mute none / threshold none / reason r8,,,r8,
 m9,0,0,Choose an item,no override,mute until 2033-05-18 04:33 / threshold none / reason x,NOW+3600,,x,
 m10,0,0,Choose an action,no override,mute none / threshold none / reason x,,,x,
-tok,,,2 tokens for 3 plans,,,,,,
+tok,,,3 tokens for 4 plans,,,,,,

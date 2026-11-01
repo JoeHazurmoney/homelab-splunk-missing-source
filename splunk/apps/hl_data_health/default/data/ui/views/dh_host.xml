@@ -1,10 +1,10 @@
 <dashboard version="2" theme="dark">
     <label>Host detail</label>
-    <description>One host (spec §8.2): its expected children with age against threshold and the threshold's origin, 24 h of data by sourcetype, the forwarder, splunkd errors, tamper findings, transitions and Hyper-V events.</description>
+    <description>Everything about one host: what it should send and how late each item is, its data over 24 hours, its Splunk agent, recent agent errors, tamper findings, status changes and Hyper-V events.</description>
     <definition><![CDATA[
 {
     "title": "Host detail",
-    "description": "One host (spec §8.2). Opened from the Overview with the host set; pick another host above.",
+    "description": "Everything about one host: what it should send and how late each item is, its data over 24 hours, its Splunk agent, recent agent errors, tamper findings, status changes and Hyper-V events.",
     "inputs": {
         "input_host": {
             "type": "input.dropdown",
@@ -79,7 +79,7 @@
             "type": "ds.search",
             "name": "Latest splunkd errors",
             "options": {
-                "query": "search index=_internal sourcetype=splunkd (log_level=ERROR OR log_level=WARN) [| makeresults | eval host=$host|s$ | `dh_ui_host_terms`] earliest=-24h latest=now | head 25 | eval time=strftime(_time, \"%Y-%m-%d %H:%M:%S\"), message=coalesce(event_message, _raw) | table time log_level component message | `dh_ui_headers`"
+                "query": "search index=_internal sourcetype=splunkd (log_level=ERROR OR log_level=WARN) [| makeresults | eval host=$host|s$ | `dh_ui_host_terms`] earliest=-24h latest=now | head 25 | eval time=strftime(_time, \"%Y-%m-%d %H:%M:%S\"), message=coalesce(event_message, _raw) | eval level=log_level | table time level component message | `dh_ui_headers`"
             }
         },
         "ds_tamper": {

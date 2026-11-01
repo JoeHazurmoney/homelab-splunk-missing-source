@@ -16,6 +16,8 @@ the deployed app, so it needs only the standard library.
                                         stanza; every panel and input title of the four views has an
                                         entry in its section of dashboards.md, every entry there is
                                         a current title, and each panel's "Guide:" pointer resolves
+  negative <app_dir> <neg_dir>          each tests/spl/dash_neg/*.json breaks a view on purpose and
+                                        the check must reject it with the expected problem
 """
 import json
 import os
@@ -265,6 +267,8 @@ def check(app_dir):
                     p(f"{k} must run its plan {plan} unchanged before the write (the confirmation fits only that plan)")
                 if not ci["options"].get("isCascadingInput"):
                     p(f"confirmation {c} must reset when its form changes (options.isCascadingInput)")
+                if ci.get("context", {}).get("statics"):
+                    p(f"confirmation {c} must have no static items (its only choice is the plan's Apply line)")
                 for t in tokens_of(q):
                     if t in seen and seen[t] != k:
                         p(f"{k} and {seen[t]} share token {t}: one change could write two forms")
@@ -319,16 +323,21 @@ def queries(app_dir, view, pairs, chains=False):
 
 # dashboards.md: "## <view label>" sections; in each, an entry is a "### <title>" or "#### <title>"
 # heading or the first cell of a row in a table whose first header cell is "Tile" or "Input". These
-# headings group entries and are not panels themselves, and so do headings that end in " tab" (a
-# tab of the view) or start with "Recipe: " (a task, step by step).
-GROUP_HEADINGS = {"KPI tiles", "Filters", "Inputs", "Before you start", "Item IDs", "Recipes"}
+# headings group entries (Manage's tabs and recipes among them) and are not panels themselves.
+GROUP_HEADINGS = {
+    "KPI tiles", "Filters", "Inputs", "Before you start", "Item IDs",
+    "Mute & thresholds tab", "Expected list tab", "Test blocks (admin) tab", "Admin log tab",
+    "Recipe: Mute a host for maintenance", "Recipe: Silence one noisy sourcetype",
+    "Recipe: Change how long an item may stay silent", "Recipe: Add an expected row",
+    "Recipe: Adopt something unregistered", "Recipe: Run a test block", "Recipe: Find who muted something",
+}
 # Each panel's description ends with its guide pointer (task 12e: worded so that a reader in Splunk
 # sees that the guide is a file in the project repository).
 GUIDE = re.compile(r"Guide \(project repo\): docs/data-health/dashboards\.md > ([^>]+?) > (.+)$")
 
 
 def is_group(t):
-    return t in GROUP_HEADINGS or t.endswith(" tab") or t.startswith("Recipe: ")
+    return t in GROUP_HEADINGS
 
 
 def doc_sections(text):
@@ -401,10 +410,49 @@ def docs(app_dir, docs_dir):
     return 1 if problems else 0
 
 
+def negative(app_dir, neg_dir):
+    """The static rules reject what they should: each neg_dir/*.json breaks one view on purpose
+    ({"view": ..., "pattern": regex, "repl": replacement, "expect": text of the problem}); the check
+    of an app copy with that view must fail with the expected problem."""
+    import contextlib
+    import io
+    import shutil
+    import tempfile
+    bad = 0
+    for f in sorted(os.listdir(neg_dir)):
+        if not f.endswith(".json"):
+            continue
+        spec = json.load(open(os.path.join(neg_dir, f), encoding="utf-8"))
+        tmp = tempfile.mkdtemp(prefix="dhneg_")
+        try:
+            shutil.copytree(os.path.join(app_dir, "default"), os.path.join(tmp, "default"))
+            path = views(tmp)[spec["view"]]
+            text = open(path, encoding="utf-8").read()
+            broken, n = re.subn(spec["pattern"], spec["repl"], text, count=1)
+            if n != 1:
+                print(f"FAIL {f}: pattern not found in {spec['view']}")
+                bad = 1
+                continue
+            open(path, "w", encoding="utf-8").write(broken)
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out):
+                rc = check(tmp)
+            if rc == 1 and spec["expect"] in out.getvalue():
+                print(f"PASS {f}: rejected ({spec['expect']})")
+            else:
+                print(f"FAIL {f}: not rejected with '{spec['expect']}'; check said: {out.getvalue().strip()[:300]}")
+                bad = 1
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+    return bad
+
+
 if __name__ == "__main__":
     mode, app = sys.argv[1], sys.argv[2]
     if mode == "docs":
         sys.exit(docs(app, sys.argv[3]))
+    if mode == "negative":
+        sys.exit(negative(app, sys.argv[3]))
     if mode == "check":
         sys.exit(check(app))
     sys.exit(queries(app, sys.argv[3], sys.argv[4:], chains=(mode == "chains")))

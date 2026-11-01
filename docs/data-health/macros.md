@@ -466,7 +466,7 @@ Adds the filter attributes (site, owner, criticality, status, roll-up, descripti
 Outages that ended with a return to OK in the last 24 hours (a mute or an INFO profile is not a recovery). Used by: Overview, Recently recovered.
 
 ### `dh_ui_host_children(volume)`
-One host's expected rows: status, age against its limit, profile, where the limit comes from (in words, `dh_ui_origin_words`), any mute or test block, and last hour's volume. Used by: Host detail, Expected data from this host.
+One host's expected rows: status, age against its limit, profile, where the limit comes from (in words, `dh_ui_origin_words`), any mute or test block (with its time zone), and last hour's volume. Used by: Host detail, Expected data from this host.
 
 ### `dh_ui_fwd(now)`
 One host's forwarder facts as readable lines: version (flagged if not the expected one), OS, last heartbeat, last connection, last Ansible marker, last VM event, last probe. Used by: Host detail, Forwarder.
@@ -495,8 +495,8 @@ Turns a host name picked on a dashboard into a safe search filter for that host 
 ### `dh_ui_clean(fields)`
 Trims form values; empty or `-` means "none". Arguments: `fields`, the field names. Used by: the Manage plan macros.
 
-### `dh_ui_override_plan(overrides, now)`
-Checks a mute, unmute, set-limit or clear-limit request (reason required, mutes end within 30 days). It returns what is logged (`before`, `after`, `action`), what the preview shows in words (`ui_change`, `ui_item`, `ui_now`, `ui_after`, `check`), the Confirm choice's text (`dh_label`, for example "Apply: mute pi5 › syslog (enclave1) for 1 hour") and the confirmation code that the choice carries. Used by: Manage, Mute & thresholds tab.
+### `dh_ui_override_plan(overrides, admin_log, now)`
+Checks a mute, unmute, set-limit or clear-limit request (reason required, mutes end within 30 days). It returns what is logged (`before`, `after`, `action`), what the preview shows in words (`ui_change`, `ui_item`, `ui_now`, `ui_after`, `check`), the Confirm choice's text (`dh_label`, for example "Apply: mute pi5 › syslog (enclave1) for 1 hour") and the confirmation code that the choice carries. The code also covers the item's admin-log times (`admin_log`), so a confirmation fits only once: after DH Prune removes an expired mute, the old state is back but the log is not. Used by: Manage, Mute & thresholds tab.
 
 ### `dh_ui_override_write(overrides, admin_log, now)`
 Writes the override when the confirmation matches the current state, and logs it. A repeat or stale confirmation writes nothing. Used by: Manage, Mute & thresholds tab.
@@ -510,8 +510,8 @@ Writes the expected row when the confirmation matches, and logs it. Used by: Man
 ### `dh_ui_adopt_row(baseline, fwd)`
 Turns an unregistered entity into an expected-row request: agent hosts become `uf`, others `syslog`. An agent host's own row gets the `heartbeat` profile; any other row takes the baseline's suggestion, else continuous. Used by: Manage, Expected list tab (adopt).
 
-### `dh_ui_block_plan(blocks, now)`
-Checks a test-block request (dh_admin only; 1 minute to 24 hours; a source block needs an exact raw source) and shows the block before and after, in words for the preview and as logged, with the normalized source for reference, its Confirm text and its confirmation code. Used by: Manage, Test blocks tab.
+### `dh_ui_block_plan(blocks, admin_log, now)`
+Checks a test-block request (dh_admin only; 1 minute to 24 hours; a source block needs an exact raw source) and shows the block before and after, in words for the preview and as logged, with the normalized source for reference, its Confirm text and its confirmation code. The code covers the whole current table and the key's admin-log times (`admin_log`), so a confirmation fits only once, even after DH Prune has removed the expired block. Used by: Manage, Test blocks tab.
 
 ### `dh_ui_block_rows(blocks, now)`
 The whole new test-block table for a confirmed request; when that would leave the table empty, one placeholder row that matches nothing (DH Prune removes it within a minute). Used by: `dh_ui_block_write`.

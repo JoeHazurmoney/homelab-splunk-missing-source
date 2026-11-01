@@ -1,10 +1,10 @@
 <dashboard version="2" theme="dark">
     <label>Overview</label>
-    <description>SOC view of expected data (spec §8.1): the banner, KPIs per level, hosts that need attention, recent recoveries and tamper findings. Refreshes every 60 s. Click a row to open Host detail.</description>
+    <description>Whether all expected data is arriving, which hosts need attention and why, recent recoveries and tamper findings; it refreshes every minute, and clicking a row opens Host detail.</description>
     <definition><![CDATA[
 {
     "title": "Overview",
-    "description": "SOC view of expected data (spec §8.1). Refreshes every 60 s. The filters apply to every panel but the banner. Click a row to open Host detail.",
+    "description": "Whether all expected data is arriving, which hosts need attention and why, recent recoveries and tamper findings; it refreshes every minute, and clicking a row opens Host detail.",
     "inputs": {
         "input_site": {
             "type": "input.dropdown",

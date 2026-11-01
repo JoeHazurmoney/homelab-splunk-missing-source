@@ -60,14 +60,7 @@
                     }
                 },
                 "formattedStatics": ">statics | formatByType(formattedConfig)",
-                "statics": [
-                    [
-                        "Choose a host"
-                    ],
-                    [
-                        "-"
-                    ]
-                ],
+                "statics": [],
                 "label": ">primary | seriesByName(\"label\") | renameSeries(\"label\") | formatByType(formattedConfig)",
                 "value": ">primary | seriesByName(\"value\") | renameSeries(\"value\") | formatByType(formattedConfig)"
             }
@@ -91,14 +84,7 @@
                     }
                 },
                 "formattedStatics": ">statics | formatByType(formattedConfig)",
-                "statics": [
-                    [
-                        "Choose an item"
-                    ],
-                    [
-                        "-"
-                    ]
-                ],
+                "statics": [],
                 "label": ">primary | seriesByName(\"label\") | renameSeries(\"label\") | formatByType(formattedConfig)",
                 "value": ">primary | seriesByName(\"value\") | renameSeries(\"value\") | formatByType(formattedConfig)"
             }
@@ -261,14 +247,7 @@
                     }
                 },
                 "formattedStatics": ">statics | formatByType(formattedConfig)",
-                "statics": [
-                    [
-                        "None (host row)"
-                    ],
-                    [
-                        "-"
-                    ]
-                ],
+                "statics": [],
                 "label": ">primary | seriesByName(\"label\") | renameSeries(\"label\") | formatByType(formattedConfig)",
                 "value": ">primary | seriesByName(\"value\") | renameSeries(\"value\") | formatByType(formattedConfig)"
             }
@@ -487,14 +466,7 @@
                     }
                 },
                 "formattedStatics": ">statics | formatByType(formattedConfig)",
-                "statics": [
-                    [
-                        "Choose an unregistered item"
-                    ],
-                    [
-                        "-"
-                    ]
-                ],
+                "statics": [],
                 "label": ">primary | seriesByName(\"label\") | renameSeries(\"label\") | formatByType(formattedConfig)",
                 "value": ">primary | seriesByName(\"value\") | renameSeries(\"value\") | formatByType(formattedConfig)"
             }
@@ -607,14 +579,7 @@
                     }
                 },
                 "formattedStatics": ">statics | formatByType(formattedConfig)",
-                "statics": [
-                    [
-                        "Choose a host"
-                    ],
-                    [
-                        "-"
-                    ]
-                ],
+                "statics": [],
                 "label": ">primary | seriesByName(\"label\") | renameSeries(\"label\") | formatByType(formattedConfig)",
                 "value": ">primary | seriesByName(\"value\") | renameSeries(\"value\") | formatByType(formattedConfig)"
             }
@@ -660,14 +625,7 @@
                     }
                 },
                 "formattedStatics": ">statics | formatByType(formattedConfig)",
-                "statics": [
-                    [
-                        "Not needed for a whole-host block"
-                    ],
-                    [
-                        "-"
-                    ]
-                ],
+                "statics": [],
                 "label": ">primary | seriesByName(\"label\") | renameSeries(\"label\") | formatByType(formattedConfig)",
                 "value": ">primary | seriesByName(\"value\") | renameSeries(\"value\") | formatByType(formattedConfig)"
             }
@@ -774,21 +732,21 @@
             "type": "ds.search",
             "name": "Hosts",
             "options": {
-                "query": "| `dh_ui_status(dh_status)` | stats count by host | eval label=host, value=host | table label value"
+                "query": "| `dh_ui_status(dh_status)` | stats count by host | eval label=host, value=host | table label value | appendpipe [| stats count | eval label=\"Choose a host\", value=\"-\" | table label value] | eval dh_o=if(value==\"-\", 0, 1) | sort 0 dh_o | table label value"
             }
         },
         "ds_ov_entities": {
             "type": "ds.search",
             "name": "Items of the host",
             "options": {
-                "query": "| `dh_ui_status(dh_status)` | where host==$ov_host|s$ | eval dh_lv=case(level==\"host\", 0, level==\"sourcetype\", 1, true(), 2), label=`dh_ui_item_words(entity_id)`.\" (\".status.\")\", value=entity_id | sort 0 dh_lv entity_id | table label value"
+                "query": "| `dh_ui_status(dh_status)` | where host==$ov_host|s$ | eval dh_lv=case(level==\"host\", 0, level==\"sourcetype\", 1, true(), 2), label=`dh_ui_item_words(entity_id)`.\" (\".status.\")\", value=entity_id | sort 0 dh_lv entity_id | table label value | appendpipe [| stats count | eval label=if($ov_host|s$==\"-\", \"Choose a host first\", \"Choose an item\"), value=\"-\" | table label value] | eval dh_o=if(value==\"-\", 0, 1) | sort 0 dh_o | table label value"
             }
         },
         "ds_ov_plan": {
             "type": "ds.search",
             "name": "Mute or limit: plan",
             "options": {
-                "query": "| makeresults | eval entity_id=$ov_entity|s$, dh_action=$ov_action|s$, dh_secs=if($ov_action|s$==\"mute\", $ov_duration|s$, $ov_threshold|s$), reason=$ov_reason|s$, ticket=$ov_ticket|s$ | `dh_ui_actor` | `dh_ui_override_plan(dh_overrides, now())`"
+                "query": "| makeresults | eval entity_id=$ov_entity|s$, dh_action=$ov_action|s$, dh_secs=if($ov_action|s$==\"mute\", $ov_duration|s$, $ov_threshold|s$), reason=$ov_reason|s$, ticket=$ov_ticket|s$ | `dh_ui_actor` | `dh_ui_override_plan(dh_overrides, dh_admin_log, now())`"
             }
         },
         "ds_ov_preview": {
@@ -811,7 +769,7 @@
             "type": "ds.search",
             "name": "Mute or limit: apply",
             "options": {
-                "query": "| makeresults | eval entity_id=$ov_entity|s$, dh_action=$ov_action|s$, dh_secs=if($ov_action|s$==\"mute\", $ov_duration|s$, $ov_threshold|s$), reason=$ov_reason|s$, ticket=$ov_ticket|s$ | `dh_ui_actor` | `dh_ui_override_plan(dh_overrides, now())` | eval dh_confirm=$ov_confirm|s$ | `dh_ui_override_write(dh_overrides, dh_admin_log, now())` | `dh_ui_headers`"
+                "query": "| makeresults | eval entity_id=$ov_entity|s$, dh_action=$ov_action|s$, dh_secs=if($ov_action|s$==\"mute\", $ov_duration|s$, $ov_threshold|s$), reason=$ov_reason|s$, ticket=$ov_ticket|s$ | `dh_ui_actor` | `dh_ui_override_plan(dh_overrides, dh_admin_log, now())` | eval dh_confirm=$ov_confirm|s$ | `dh_ui_override_write(dh_overrides, dh_admin_log, now())` | `dh_ui_headers`"
             }
         },
         "ds_overrides": {
@@ -832,7 +790,7 @@
             "type": "ds.search",
             "name": "Indexes the app watches",
             "options": {
-                "query": "| `dh_ui_indexes`"
+                "query": "| `dh_ui_indexes` | appendpipe [| stats count | eval label=\"None (host row)\", value=\"-\" | table label value]"
             }
         },
         "ds_ex_plan": {
@@ -885,7 +843,7 @@
             "name": "Unregistered choices",
             "options": {
                 "extend": "ds_unreg",
-                "query": "| eval label=`dh_ui_item_words(entity_id)`.\", last seen \".last_seen, value=entity_id | table label value"
+                "query": "| eval label=`dh_ui_item_words(entity_id)`.\", last seen \".last_seen, value=entity_id | table label value | appendpipe [| stats count | eval label=\"Choose an unregistered item\", value=\"-\" | table label value] | eval dh_o=if(value==\"-\", 0, 1) | sort 0 dh_o | table label value"
             }
         },
         "ds_ad_plan": {
@@ -922,7 +880,7 @@
             "type": "ds.search",
             "name": "Raw sources of the host (24 h)",
             "options": {
-                "query": "| tstats count max(_indextime) as it where index IN (linux, windows, network) [| makeresults | eval host=$bk_host|s$ | `dh_ui_host_terms`] earliest=-24h latest=+1d by index sourcetype source | eval source_norm=`dh_source_norm(source)`, last_seen=strftime(it, `dh_ui_time_fmt_tz`) | sort 0 sourcetype source | table index sourcetype source source_norm count last_seen"
+                "query": "| tstats count as events max(_indextime) as it where index IN (linux, windows, network) [| makeresults | eval host=$bk_host|s$ | `dh_ui_host_terms`] earliest=-24h latest=+1d by index sourcetype source | eval source_norm=`dh_source_norm(source)`, last_seen=strftime(it, `dh_ui_time_fmt_tz`) | sort 0 sourcetype source | table index sourcetype source source_norm events last_seen"
             }
         },
         "ds_bk_sources_view": {
@@ -938,14 +896,14 @@
             "name": "Block target choices",
             "options": {
                 "extend": "ds_bk_sources",
-                "query": "| eval lvl=$bk_level|s$ | where lvl!=\"host\" | eval value=if(lvl==\"source\", sourcetype.\"|\".source, sourcetype.\"|*\"), label=if(lvl==\"source\", sourcetype.\" › \".source.\" (exact raw name; normalized: \".source_norm.\")\", sourcetype) | stats count by label value | table label value"
+                "query": "| eval lvl=$bk_level|s$ | where lvl!=\"host\" | eval value=if(lvl==\"source\", sourcetype.\"|\".source, sourcetype.\"|*\"), label=if(lvl==\"source\", sourcetype.\" › \".source.\" (exact raw name; normalized: \".source_norm.\")\", sourcetype) | stats count by label value | table label value | appendpipe [| stats count | eval label=case($bk_level|s$==\"host\", \"Not needed for a whole-host block\", $bk_level|s$==\"source\", \"Choose the raw source\", true(), \"Choose the sourcetype\"), value=\"-\" | table label value] | eval dh_o=if(value==\"-\", 0, 1) | sort 0 dh_o | table label value"
             }
         },
         "ds_bk_plan": {
             "type": "ds.search",
             "name": "Test block: plan",
             "options": {
-                "query": "| makeresults | eval dh_action=$bk_action|s$, level=$bk_level|s$, host=$bk_host|s$, target=$bk_target|s$, dh_secs=$bk_duration|s$, reason=$bk_reason|s$, ticket=$bk_ticket|s$ | `dh_ui_actor` | `dh_ui_block_plan(hl_ingest_block, now())`"
+                "query": "| makeresults | eval dh_action=$bk_action|s$, level=$bk_level|s$, host=$bk_host|s$, target=$bk_target|s$, dh_secs=$bk_duration|s$, reason=$bk_reason|s$, ticket=$bk_ticket|s$ | `dh_ui_actor` | `dh_ui_block_plan(hl_ingest_block, dh_admin_log, now())`"
             }
         },
         "ds_bk_preview": {
@@ -968,7 +926,7 @@
             "type": "ds.search",
             "name": "Test block: apply",
             "options": {
-                "query": "| makeresults | eval dh_action=$bk_action|s$, level=$bk_level|s$, host=$bk_host|s$, target=$bk_target|s$, dh_secs=$bk_duration|s$, reason=$bk_reason|s$, ticket=$bk_ticket|s$ | `dh_ui_actor` | `dh_ui_block_plan(hl_ingest_block, now())` | eval dh_confirm=$bk_confirm|s$ | `dh_ui_block_write(hl_ingest_block, dh_admin_log, now())` | `dh_ui_headers`"
+                "query": "| makeresults | eval dh_action=$bk_action|s$, level=$bk_level|s$, host=$bk_host|s$, target=$bk_target|s$, dh_secs=$bk_duration|s$, reason=$bk_reason|s$, ticket=$bk_ticket|s$ | `dh_ui_actor` | `dh_ui_block_plan(hl_ingest_block, dh_admin_log, now())` | eval dh_confirm=$bk_confirm|s$ | `dh_ui_block_write(hl_ingest_block, dh_admin_log, now())` | `dh_ui_headers`"
             }
         },
         "ds_blocks": {
@@ -1352,7 +1310,7 @@
                 "type": "grid",
                 "options": {
                     "width": 1440,
-                    "height": 1418
+                    "height": 1474
                 },
                 "structure": [
                     {
@@ -1372,7 +1330,7 @@
                             "x": 0,
                             "y": 70,
                             "w": 260,
-                            "h": 82
+                            "h": 96
                         }
                     },
                     {
@@ -1382,7 +1340,7 @@
                             "x": 260,
                             "y": 70,
                             "w": 460,
-                            "h": 82
+                            "h": 96
                         }
                     },
                     {
@@ -1392,7 +1350,7 @@
                             "x": 720,
                             "y": 70,
                             "w": 220,
-                            "h": 82
+                            "h": 96
                         }
                     },
                     {
@@ -1402,7 +1360,7 @@
                             "x": 940,
                             "y": 70,
                             "w": 220,
-                            "h": 82
+                            "h": 96
                         }
                     },
                     {
@@ -1412,7 +1370,7 @@
                             "x": 1160,
                             "y": 70,
                             "w": 280,
-                            "h": 82
+                            "h": 96
                         }
                     },
                     {
@@ -1420,9 +1378,9 @@
                         "type": "input",
                         "position": {
                             "x": 0,
-                            "y": 152,
+                            "y": 166,
                             "w": 960,
-                            "h": 82
+                            "h": 96
                         }
                     },
                     {
@@ -1430,9 +1388,9 @@
                         "type": "input",
                         "position": {
                             "x": 960,
-                            "y": 152,
+                            "y": 166,
                             "w": 480,
-                            "h": 82
+                            "h": 96
                         }
                     },
                     {
@@ -1440,7 +1398,7 @@
                         "type": "block",
                         "position": {
                             "x": 0,
-                            "y": 234,
+                            "y": 262,
                             "w": 480,
                             "h": 150
                         }
@@ -1450,7 +1408,7 @@
                         "type": "block",
                         "position": {
                             "x": 480,
-                            "y": 234,
+                            "y": 262,
                             "w": 960,
                             "h": 150
                         }
@@ -1460,9 +1418,9 @@
                         "type": "input",
                         "position": {
                             "x": 0,
-                            "y": 384,
+                            "y": 412,
                             "w": 600,
-                            "h": 82
+                            "h": 96
                         }
                     },
                     {
@@ -1470,9 +1428,9 @@
                         "type": "block",
                         "position": {
                             "x": 600,
-                            "y": 384,
+                            "y": 412,
                             "w": 840,
-                            "h": 82
+                            "h": 96
                         }
                     },
                     {
@@ -1480,7 +1438,7 @@
                         "type": "block",
                         "position": {
                             "x": 0,
-                            "y": 466,
+                            "y": 508,
                             "w": 1440,
                             "h": 150
                         }
@@ -1490,7 +1448,7 @@
                         "type": "block",
                         "position": {
                             "x": 0,
-                            "y": 616,
+                            "y": 658,
                             "w": 1440,
                             "h": 300
                         }
@@ -1500,9 +1458,9 @@
                         "type": "input",
                         "position": {
                             "x": 0,
-                            "y": 916,
-                            "w": 720,
-                            "h": 82
+                            "y": 958,
+                            "w": 1440,
+                            "h": 96
                         }
                     },
                     {
@@ -1510,7 +1468,7 @@
                         "type": "block",
                         "position": {
                             "x": 0,
-                            "y": 998,
+                            "y": 1054,
                             "w": 1440,
                             "h": 420
                         }
@@ -1521,7 +1479,7 @@
                 "type": "grid",
                 "options": {
                     "width": 1440,
-                    "height": 1716
+                    "height": 1828
                 },
                 "structure": [
                     {
@@ -1541,7 +1499,7 @@
                             "x": 0,
                             "y": 70,
                             "w": 260,
-                            "h": 82
+                            "h": 96
                         }
                     },
                     {
@@ -1551,7 +1509,7 @@
                             "x": 260,
                             "y": 70,
                             "w": 260,
-                            "h": 82
+                            "h": 96
                         }
                     },
                     {
@@ -1561,7 +1519,7 @@
                             "x": 520,
                             "y": 70,
                             "w": 300,
-                            "h": 82
+                            "h": 96
                         }
                     },
                     {
@@ -1571,7 +1529,7 @@
                             "x": 820,
                             "y": 70,
                             "w": 300,
-                            "h": 82
+                            "h": 96
                         }
                     },
                     {
@@ -1581,7 +1539,7 @@
                             "x": 1120,
                             "y": 70,
                             "w": 320,
-                            "h": 82
+                            "h": 96
                         }
                     },
                     {
@@ -1589,9 +1547,9 @@
                         "type": "input",
                         "position": {
                             "x": 0,
-                            "y": 152,
+                            "y": 166,
                             "w": 260,
-                            "h": 82
+                            "h": 96
                         }
                     },
                     {
@@ -1599,9 +1557,9 @@
                         "type": "input",
                         "position": {
                             "x": 260,
-                            "y": 152,
+                            "y": 166,
                             "w": 260,
-                            "h": 82
+                            "h": 96
                         }
                     },
                     {
@@ -1609,9 +1567,9 @@
                         "type": "input",
                         "position": {
                             "x": 520,
-                            "y": 152,
+                            "y": 166,
                             "w": 300,
-                            "h": 82
+                            "h": 96
                         }
                     },
                     {
@@ -1619,9 +1577,9 @@
                         "type": "input",
                         "position": {
                             "x": 820,
-                            "y": 152,
+                            "y": 166,
                             "w": 300,
-                            "h": 82
+                            "h": 96
                         }
                     },
                     {
@@ -1629,9 +1587,9 @@
                         "type": "input",
                         "position": {
                             "x": 1120,
-                            "y": 152,
+                            "y": 166,
                             "w": 320,
-                            "h": 82
+                            "h": 96
                         }
                     },
                     {
@@ -1639,9 +1597,9 @@
                         "type": "input",
                         "position": {
                             "x": 0,
-                            "y": 234,
+                            "y": 262,
                             "w": 260,
-                            "h": 82
+                            "h": 96
                         }
                     },
                     {
@@ -1649,9 +1607,9 @@
                         "type": "input",
                         "position": {
                             "x": 260,
-                            "y": 234,
+                            "y": 262,
                             "w": 260,
-                            "h": 82
+                            "h": 96
                         }
                     },
                     {
@@ -1659,9 +1617,9 @@
                         "type": "input",
                         "position": {
                             "x": 520,
-                            "y": 234,
+                            "y": 262,
                             "w": 400,
-                            "h": 82
+                            "h": 96
                         }
                     },
                     {
@@ -1669,9 +1627,9 @@
                         "type": "input",
                         "position": {
                             "x": 920,
-                            "y": 234,
+                            "y": 262,
                             "w": 520,
-                            "h": 82
+                            "h": 96
                         }
                     },
                     {
@@ -1679,9 +1637,9 @@
                         "type": "input",
                         "position": {
                             "x": 0,
-                            "y": 316,
+                            "y": 358,
                             "w": 960,
-                            "h": 82
+                            "h": 96
                         }
                     },
                     {
@@ -1689,9 +1647,9 @@
                         "type": "input",
                         "position": {
                             "x": 960,
-                            "y": 316,
+                            "y": 358,
                             "w": 480,
-                            "h": 82
+                            "h": 96
                         }
                     },
                     {
@@ -1699,7 +1657,7 @@
                         "type": "block",
                         "position": {
                             "x": 0,
-                            "y": 398,
+                            "y": 454,
                             "w": 480,
                             "h": 150
                         }
@@ -1709,7 +1667,7 @@
                         "type": "block",
                         "position": {
                             "x": 480,
-                            "y": 398,
+                            "y": 454,
                             "w": 960,
                             "h": 150
                         }
@@ -1719,9 +1677,9 @@
                         "type": "input",
                         "position": {
                             "x": 0,
-                            "y": 548,
+                            "y": 604,
                             "w": 600,
-                            "h": 82
+                            "h": 96
                         }
                     },
                     {
@@ -1729,9 +1687,9 @@
                         "type": "block",
                         "position": {
                             "x": 600,
-                            "y": 548,
+                            "y": 604,
                             "w": 840,
-                            "h": 82
+                            "h": 96
                         }
                     },
                     {
@@ -1739,7 +1697,7 @@
                         "type": "block",
                         "position": {
                             "x": 0,
-                            "y": 630,
+                            "y": 700,
                             "w": 1440,
                             "h": 150
                         }
@@ -1749,7 +1707,7 @@
                         "type": "block",
                         "position": {
                             "x": 0,
-                            "y": 780,
+                            "y": 850,
                             "w": 1440,
                             "h": 320
                         }
@@ -1759,7 +1717,7 @@
                         "type": "block",
                         "position": {
                             "x": 0,
-                            "y": 1100,
+                            "y": 1170,
                             "w": 1440,
                             "h": 70
                         }
@@ -1769,9 +1727,9 @@
                         "type": "input",
                         "position": {
                             "x": 0,
-                            "y": 1170,
+                            "y": 1240,
                             "w": 960,
-                            "h": 82
+                            "h": 96
                         }
                     },
                     {
@@ -1779,9 +1737,9 @@
                         "type": "input",
                         "position": {
                             "x": 960,
-                            "y": 1170,
+                            "y": 1240,
                             "w": 480,
-                            "h": 82
+                            "h": 96
                         }
                     },
                     {
@@ -1789,9 +1747,9 @@
                         "type": "input",
                         "position": {
                             "x": 0,
-                            "y": 1252,
+                            "y": 1336,
                             "w": 960,
-                            "h": 82
+                            "h": 96
                         }
                     },
                     {
@@ -1799,9 +1757,9 @@
                         "type": "input",
                         "position": {
                             "x": 960,
-                            "y": 1252,
+                            "y": 1336,
                             "w": 480,
-                            "h": 82
+                            "h": 96
                         }
                     },
                     {
@@ -1809,7 +1767,7 @@
                         "type": "block",
                         "position": {
                             "x": 0,
-                            "y": 1334,
+                            "y": 1432,
                             "w": 480,
                             "h": 150
                         }
@@ -1819,7 +1777,7 @@
                         "type": "block",
                         "position": {
                             "x": 480,
-                            "y": 1334,
+                            "y": 1432,
                             "w": 960,
                             "h": 150
                         }
@@ -1829,9 +1787,9 @@
                         "type": "input",
                         "position": {
                             "x": 0,
-                            "y": 1484,
+                            "y": 1582,
                             "w": 600,
-                            "h": 82
+                            "h": 96
                         }
                     },
                     {
@@ -1839,9 +1797,9 @@
                         "type": "block",
                         "position": {
                             "x": 600,
-                            "y": 1484,
+                            "y": 1582,
                             "w": 840,
-                            "h": 82
+                            "h": 96
                         }
                     },
                     {
@@ -1849,7 +1807,7 @@
                         "type": "block",
                         "position": {
                             "x": 0,
-                            "y": 1566,
+                            "y": 1678,
                             "w": 1440,
                             "h": 150
                         }
@@ -1860,7 +1818,7 @@
                 "type": "grid",
                 "options": {
                     "width": 1440,
-                    "height": 956
+                    "height": 998
                 },
                 "structure": [
                     {
@@ -1880,7 +1838,7 @@
                             "x": 0,
                             "y": 90,
                             "w": 240,
-                            "h": 82
+                            "h": 96
                         }
                     },
                     {
@@ -1890,7 +1848,7 @@
                             "x": 240,
                             "y": 90,
                             "w": 300,
-                            "h": 82
+                            "h": 96
                         }
                     },
                     {
@@ -1900,7 +1858,7 @@
                             "x": 540,
                             "y": 90,
                             "w": 300,
-                            "h": 82
+                            "h": 96
                         }
                     },
                     {
@@ -1910,7 +1868,7 @@
                             "x": 840,
                             "y": 90,
                             "w": 600,
-                            "h": 82
+                            "h": 96
                         }
                     },
                     {
@@ -1918,9 +1876,9 @@
                         "type": "input",
                         "position": {
                             "x": 0,
-                            "y": 172,
+                            "y": 186,
                             "w": 240,
-                            "h": 82
+                            "h": 96
                         }
                     },
                     {
@@ -1928,9 +1886,9 @@
                         "type": "input",
                         "position": {
                             "x": 240,
-                            "y": 172,
+                            "y": 186,
                             "w": 720,
-                            "h": 82
+                            "h": 96
                         }
                     },
                     {
@@ -1938,9 +1896,9 @@
                         "type": "input",
                         "position": {
                             "x": 960,
-                            "y": 172,
+                            "y": 186,
                             "w": 480,
-                            "h": 82
+                            "h": 96
                         }
                     },
                     {
@@ -1948,7 +1906,7 @@
                         "type": "block",
                         "position": {
                             "x": 0,
-                            "y": 254,
+                            "y": 282,
                             "w": 480,
                             "h": 150
                         }
@@ -1958,7 +1916,7 @@
                         "type": "block",
                         "position": {
                             "x": 480,
-                            "y": 254,
+                            "y": 282,
                             "w": 960,
                             "h": 150
                         }
@@ -1968,9 +1926,9 @@
                         "type": "input",
                         "position": {
                             "x": 0,
-                            "y": 404,
+                            "y": 432,
                             "w": 600,
-                            "h": 82
+                            "h": 96
                         }
                     },
                     {
@@ -1978,9 +1936,9 @@
                         "type": "block",
                         "position": {
                             "x": 600,
-                            "y": 404,
+                            "y": 432,
                             "w": 840,
-                            "h": 82
+                            "h": 96
                         }
                     },
                     {
@@ -1988,7 +1946,7 @@
                         "type": "block",
                         "position": {
                             "x": 0,
-                            "y": 486,
+                            "y": 528,
                             "w": 1440,
                             "h": 150
                         }
@@ -1998,7 +1956,7 @@
                         "type": "block",
                         "position": {
                             "x": 0,
-                            "y": 636,
+                            "y": 678,
                             "w": 720,
                             "h": 320
                         }
@@ -2008,7 +1966,7 @@
                         "type": "block",
                         "position": {
                             "x": 720,
-                            "y": 636,
+                            "y": 678,
                             "w": 720,
                             "h": 320
                         }
@@ -2019,7 +1977,7 @@
                 "type": "grid",
                 "options": {
                     "width": 1440,
-                    "height": 602
+                    "height": 616
                 },
                 "structure": [
                     {
@@ -2028,8 +1986,8 @@
                         "position": {
                             "x": 0,
                             "y": 0,
-                            "w": 720,
-                            "h": 82
+                            "w": 1440,
+                            "h": 96
                         }
                     },
                     {
@@ -2037,7 +1995,7 @@
                         "type": "block",
                         "position": {
                             "x": 0,
-                            "y": 82,
+                            "y": 96,
                             "w": 1440,
                             "h": 520
                         }

@@ -2,7 +2,7 @@
 
 This guide is for anyone watching the **HL Data Health** app in Splunk: the person who runs this lab, or a SOC analyst who has never read the searches behind it. It explains every panel in screen order: what it shows, where the number comes from, what good and bad look like, and what to do next. You don't need to know SPL to use it.
 
-It is a **living document**. Any change that adds, renames or removes a panel or a filter updates this file in the same pull request. `tests/spl/run.sh` fails (check `docs-coverage`) when a panel has no entry here, or when an entry names a panel that no longer exists. Every panel's description on screen ends with "Guide (project repo): docs/data-health/dashboards.md > *dashboard* > *panel*": this file, in the project's repository, and the entry below.
+It is a **living document**. The Manage view is generated: edit `tools/gen_dh_manage.js` and run `node tools/gen_dh_manage.js` instead of editing `dh_manage.xml` (`tests/spl/run.sh`, check `manage-generated`, fails when the two differ). Any change that adds, renames or removes a panel or a filter updates this file in the same pull request. `tests/spl/run.sh` fails (check `docs-coverage`) when a panel has no entry here, or when an entry names a panel that no longer exists. Every panel's description on screen ends with "Guide (project repo): docs/data-health/dashboards.md > *dashboard* > *panel*": this file, in the project's repository, and the entry below.
 
 The macros behind the panels are explained in [macros.md](macros.md).
 
@@ -182,7 +182,7 @@ Everything about one host. Pick the host at the top, or arrive here by clicking 
   - **Silent for / limit**: "400 s / 300 s" means silent for 400 s against a limit of 300 s; "never arrived" if nothing came yet.
   - **Profile**.
   - **Limit from**: where the limit comes from: *Override (set on Manage)*, *Fixed limit on its expected row* (a limit written on the item's expected-list row), *Learned from its history* (at least 3 days), *Profile default* ("(learning)" while it has fewer than 3 days of history), *Profile default (the row's profile is unknown)* (the profile is misspelt or unknown, so the continuous default is used), or *None (INFO: never alerts)*. **About the limit** says the same in a sentence.
-  - **Mute or test block**: "muted until … (reason)" or "test block until hh:mm".
+  - **Mute or test block**: "muted until … (reason)" or "test block until hh:mm", each with its time zone (for example "test block until 16:46 MDT").
   - **Since**, **Cause**, **Action**.
   - **Last hour volume**: last hour against the usual count ("x0.1 of median FLAGGED" means a tenth of usual, flagged as a drop), or why it isn't judged.
   - **Clock wrong**: 1 when the data's own timestamps are far from when it arrived.
@@ -238,7 +238,7 @@ Where you change what the app expects and how it alerts: mute data during planne
 - **Until a form is filled in**, its preview area shows what to fill in instead of a table. A required box (Reason, Host name) must not be empty. Optional boxes hold `-`, which means "none"; leave it there unless you have a value.
 - **The Confirm list** appears once the form is filled in. It offers the Apply line only when the preview's **Check** column says "OK: …"; otherwise it says "No results", and the Check column says what to fix.
 - **Changing the form clears the confirmation.** If you change any box of a form after choosing Apply, its Confirm choice is cleared and its result disappears; the change you already applied stays applied.
-- **A confirmation fits only once.** It fits only the state you previewed. After a reload, or when you come back to a tab, the result may say "Nothing written: this confirmation fits only the state you previewed, …". That is expected: the change was applied the first time. Check the tables or the Admin log tab.
+- **A confirmation fits only once.** It fits only the state you previewed, and never again after its change was applied, even if that change has since expired and been cleaned up. After a reload, or when you come back to a tab, the result may say "Nothing written: this confirmation fits only the state you previewed, …". That is expected: the change was applied the first time. Check the tables or the Admin log tab.
 - **The tables don't refresh by themselves.** Manage never refreshes on its own. After applying a change, reload the page to see it in the tables of the tab.
 - **Times** are shown in the time zone of your Splunk account (Settings > your name > Preferences) and always end with the zone, for example `2026-10-31 17:46 MDT`. That may differ from your PC clock.
 

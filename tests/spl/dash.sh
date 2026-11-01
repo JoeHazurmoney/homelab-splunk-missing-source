@@ -200,7 +200,7 @@ kv_get() { dh_search "| inputlookup $1 | $2" csv | tr -d '\r'; }
 
 writes() {
   WFAIL=0
-  local ov tok res ex ad bk file
+  local ov tok res ex ad bk file tok0
   kv_make dhtest_kv_overrides dh_overrides
   kv_make dhtest_kv_admin_log dh_admin_log
   kv_make dhtest_kv_expected dh_expected
@@ -216,6 +216,14 @@ writes() {
   expect "override repeat (reload) applies nothing" "$res" '^Nothing written'
   res=$(w_run ds_ov_apply "${ov[@]}" "ov_confirm=0123456789abcdef0123456789abcdef" | col Result)
   expect "override with a wrong confirmation applies nothing" "$res" '^Nothing written'
+  # DH Prune removes an expired mute row without a limit, which restores the state the mute was
+  # previewed in: the confirmation must still not fit (the admin-log time is in the token).
+  kv_get dhtest_kv_overrides 'where 1==0 | outputlookup dhtest_kv_overrides' >/dev/null
+  res=$(w_run ds_ov_apply "${ov[@]}" "ov_confirm=$tok" | col Result)
+  expect "override after a prune of its row applies nothing" "$res" '^Nothing written'
+  tok=$(w_run ds_ov_plan "${ov[@]}" | col dh_token)
+  res=$(w_run ds_ov_apply "${ov[@]}" "ov_confirm=$tok" | col Result)
+  expect "override applied again from a new preview" "$res" '^Done: Mute dhtest-w1: whole host$'
   ov[2]="ov_action=unmute"
   tok=$(w_run ds_ov_plan "${ov[@]}" | col dh_token)
   res=$(w_run ds_ov_apply "${ov[@]}" "ov_confirm=$tok" | col Result)
@@ -223,10 +231,11 @@ writes() {
   res=$(kv_get dhtest_kv_overrides 'eval m=coalesce(mute_until, "none") | table m')
   expect "unmute cleared mute_until" "$(printf '%s' "$res" | sed -n 2p)" '^none$'
   res=$(kv_get dhtest_kv_admin_log 'stats count, values(action) as a | eval a=mvjoin(a, " ") | table count a')
-  expect "admin log: one row per applied change" "$(printf '%s' "$res" | sed -n 2p)" '^2,"override_mute override_unmute"$'
+  expect "admin log: one row per applied change" "$(printf '%s' "$res" | sed -n 2p)" '^3,"override_mute override_unmute"$'
   # Expected row: add, and a repeat.
   ex=("ex_level=sourcetype" "ex_index=linux" "ex_host=DHTEST-W2.mshome.net" "ex_sourcetype=syslog" "ex_profile=continuous" "ex_reason=writes test")
   tok=$(w_run ds_ex_plan "${ex[@]}" | col dh_token)
+  tok0=$tok
   res=$(w_run ds_ex_apply "${ex[@]}" "ex_confirm=$tok" | col Result)
   expect "expected row applied" "$res" '^Done: Add expected row dhtest-w2 .{1,3} syslog \(linux\)$'
   res=$(kv_get dhtest_kv_expected 'eval es=if(abs(expected_since-now())<120, "now", expected_since) | table _key host managed_by enabled profile collection criticality es')
@@ -240,6 +249,10 @@ writes() {
   expect "identical update of a UI row applied" "$res" '^Done: Add expected row'
   res=$(w_run ds_ex_apply "${ex[@]}" "ex_confirm=$tok" | col Result)
   expect "identical update repeat applies nothing" "$res" '^Nothing written'
+  # The row removed again (the state the first add was previewed in): its confirmation still fits no more.
+  kv_get dhtest_kv_expected 'where host!="dhtest-w2" | outputlookup dhtest_kv_expected' >/dev/null
+  res=$(w_run ds_ex_apply "${ex[@]}" "ex_confirm=$tok0" | col Result)
+  expect "expected row after its removal applies nothing" "$res" '^Nothing written'
   # Adopt.
   ad=("ad_entity=sourcetype|linux|dhtest-w3|cpu|*" "ad_crit=3" "ad_reason=writes test")
   tok=$(w_run ds_ad_plan "${ad[@]}" | col dh_token)
@@ -259,6 +272,16 @@ writes() {
   expect "block row keys the raw source" "$(printf '%s\n' "$file" | sed -n 2p)" '^"?dhtest-w4\|linux_secure\|/var/log/secure\.1"?,[0-9]+,"?writes test"?,"?admin"?$'
   res=$(w_run ds_bk_apply "${bk[@]}" "bk_confirm=$tok" | col Result)
   expect "block repeat applies nothing" "$res" '^Nothing written'
+  # DH Prune drops the expired block, which restores the file the block was previewed on: the
+  # confirmation must still not fit, or a reload would silently drop real data again.
+  printf '%s\n' "$file" >"$work/blocks.keep"
+  dh_docker exec -u root "$DH_CONTAINER" rm -f "$DH_APP_DIR/lookups/dhtest_w_blocks.csv"
+  dh_curl -o "$work/reload.out" -X POST "$DH_MGMT/services/data/lookup-table-files/_reload"
+  res=$(w_run ds_bk_apply "${bk[@]}" "bk_confirm=$tok" | col Result)
+  expect "block after a prune of the file applies nothing" "$res" '^Nothing written'
+  dh_docker cp "$(dh_hostpath "$work/blocks.keep")" "$DH_CONTAINER:$DH_APP_DIR/lookups/dhtest_w_blocks.csv"
+  dh_docker exec -u root "$DH_CONTAINER" chown splunk:splunk "$DH_APP_DIR/lookups/dhtest_w_blocks.csv"
+  dh_curl -o "$work/reload.out" -X POST "$DH_MGMT/services/data/lookup-table-files/_reload"
   bk[0]="bk_action=remove"
   tok=$(w_run ds_bk_plan "${bk[@]}" | col dh_token)
   res=$(w_run ds_bk_apply "${bk[@]}" "bk_confirm=$tok" | col Result)
@@ -268,7 +291,7 @@ writes() {
   file=$(dh_docker exec -u root "$DH_CONTAINER" sh -c "cat $DH_APP_DIR/lookups/dhtest_w_blocks.csv" | tr -d '\r')
   expect "last block removed leaves the placeholder" "$(printf '%s\n' "$file" | sed -n 1,2p | tr '\n' ' ')" '^k,until,reason,"?set_by"? "?-"?,0,'
   res=$(kv_get dhtest_kv_admin_log 'stats count')
-  expect "admin log: every applied change, nothing for the refused ones" "$(printf '%s' "$res" | sed -n 2p)" '^7$'
+  expect "admin log: every applied change, nothing for the refused ones" "$(printf '%s' "$res" | sed -n 2p)" '^8$'
   [ "$WFAIL" -eq 0 ] && echo "writes: PASS"
   [ "$WFAIL" -eq 0 ]
 }

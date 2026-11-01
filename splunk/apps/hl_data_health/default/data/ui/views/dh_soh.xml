@@ -1,10 +1,10 @@
 <dashboard version="2" theme="dark">
     <label>Daily state of health</label>
-    <description>Engineering view of the latest daily report (spec §8.4): outages with durations and MTTR, flapping, never seen, unregistered, forwarders, lag p95, volume flags, licence, skipped searches and expiring mutes.</description>
+    <description>The daily state-of-health report (made at 07:00) for engineering: outages and recovery times, flapping, missing and unregistered data, forwarders, delays, volume drops, licence, skipped searches and expiring mutes.</description>
     <definition><![CDATA[
 {
     "title": "Daily state of health",
-    "description": "Engineering view of the latest DH Daily SoH report (07:00, index=data_health source=dh:soh) plus the live unregistered list (spec §8.4).",
+    "description": "The daily state-of-health report (made at 07:00) for engineering: outages and recovery times, flapping, missing and unregistered data, forwarders, delays, volume drops, licence, skipped searches and expiring mutes.",
     "inputs": {},
     "defaults": {
         "dataSources": {
