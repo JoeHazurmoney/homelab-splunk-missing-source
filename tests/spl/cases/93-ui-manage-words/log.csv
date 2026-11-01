@@ -1,0 +1,4 @@
+time,actor,action,entity_id,detail,reason,ticket
+NOW-120,taylor,override_mute,host|*|pi5|*|*,no override -> mute until 2033-05-18 04:33 / threshold none / reason patching,patching,CHG-1
+NOW-60,ana,block_add,pi5|syslog|*,not blocked -> test block until 2033-05-18 03:48 (r),r,-
+NOW-30,taylor,expected_add,sourcetype|linux|newh|syslog|*,not expected -> managed_by ui / enabled 1 / profile continuous / criticality 2 / collection uf,add syslog,-

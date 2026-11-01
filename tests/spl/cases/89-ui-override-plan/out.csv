@@ -1,12 +1,12 @@
 c,dh_ok,has_token,check,before,after,mute_until,threshold_override_secs,reason,ticket
-m1,1,1,ok: choose Apply under Confirm and Submit,no override,mute until 2033-05-18 04:33 / threshold none / reason patching,NOW+3600,,patching,CHG-1
-m2,0,0,a mute needs an expiry of at most 30 days,no override,mute until 2033-06-17 03:33 / threshold none / reason patching,NOW+2592001,,patching,
-m3,0,0,a reason is required,no override,mute until 2033-05-18 04:33 / threshold none / reason -,NOW+3600,,,
-m4,0,0,not muted: nothing to unmute,no override,mute none / threshold none / reason done,,,done,
-m5,1,1,ok: choose Apply under Confirm and Submit,mute until 2033-05-18 03:43 / threshold 1200 s / reason old,mute none / threshold 1200 s / reason done,,1200,done,
-m6,1,1,ok: choose Apply under Confirm and Submit,mute until 2033-05-18 03:43 / threshold none / reason maint,mute until 2033-05-18 03:43 / threshold 1800 s / reason maint,NOW+600,1800,maint,T6
-m7,0,0,a threshold override is a number of seconds of at least 60,mute until 2033-05-18 03:43 / threshold none / reason maint,mute until 2033-05-18 03:43 / threshold 30 s / reason maint,NOW+600,30,maint,T6
-m8,1,1,ok: choose Apply under Confirm and Submit,mute none / threshold 600 s / reason old8,mute none / threshold none / reason r8,,,r8,
-m9,0,0,pick an entity,no override,mute until 2033-05-18 04:33 / threshold none / reason x,NOW+3600,,x,
-m10,0,0,pick an action,no override,mute none / threshold none / reason x,,,x,
+m1,1,1,OK: choose Apply under Confirm to write this change,no override,mute until 2033-05-18 04:33 / threshold none / reason patching,NOW+3600,,patching,CHG-1
+m2,0,0,A mute lasts at most 30 days,no override,mute until 2033-06-17 03:33 / threshold none / reason patching,NOW+2592001,,patching,
+m3,0,0,Write a reason,no override,mute until 2033-05-18 04:33 / threshold none / reason -,NOW+3600,,,
+m4,0,0,This item is not muted: nothing to unmute,no override,mute none / threshold none / reason done,,,done,
+m5,1,1,OK: choose Apply under Confirm to write this change,mute until 2033-05-18 03:43 / threshold 1200 s / reason old,mute none / threshold 1200 s / reason done,,1200,done,
+m6,1,1,OK: choose Apply under Confirm to write this change,mute until 2033-05-18 03:43 / threshold none / reason maint,mute until 2033-05-18 03:43 / threshold 1800 s / reason maint,NOW+600,1800,maint,T6
+m7,0,0,Enter the new limit in seconds: a number of at least 60,mute until 2033-05-18 03:43 / threshold none / reason maint,mute until 2033-05-18 03:43 / threshold 30 s / reason maint,NOW+600,30,maint,T6
+m8,1,1,OK: choose Apply under Confirm to write this change,mute none / threshold 600 s / reason old8,mute none / threshold none / reason r8,,,r8,
+m9,0,0,Choose an item,no override,mute until 2033-05-18 04:33 / threshold none / reason x,NOW+3600,,x,
+m10,0,0,Choose an action,no override,mute none / threshold none / reason x,,,x,
 tok,,,2 tokens for 3 plans,,,,,,

@@ -1,0 +1,10 @@
+| inputlookup @words@ | eval item=`dh_ui_item_words(id)`, block=`dh_ui_block_words(k)`, change=`dh_ui_action_words(action)`, dur=`dh_ui_secs_words(secs)`, from=`dh_ui_origin_words(origin)` | table c item block change dur from
+| append [| inputlookup @ovreq@ | `dh_ui_override_plan(@ov@, @NOW@)` | table c ui_change ui_item ui_now ui_after dh_label]
+| append [| inputlookup @bkreq@ | `dh_ui_block_plan(@blk@, @NOW@)` | table c ui_change ui_item ui_now ui_after dh_label]
+| append [| inputlookup @exreq@ | `dh_ui_expected_plan(@exp@, @log@, @NOW@)` | table c ui_change ui_item ui_now ui_after dh_label]
+| append [| `dh_ui_admin_log(@log@)` | eval c="log", ui_now=time | table c ui_change ui_item ui_now detail reason entity_id]
+| append [| `dh_ui_admin_log(@log@)` | eval f_text="MUTE*pi5" | `dh_ui_hay_filter` | eval c="log:mute*pi5" | table c ui_item]
+| append [| `dh_ui_admin_log(@log@)` | eval f_text="newh*nothere" | `dh_ui_hay_filter` | eval c="log:none" | table c ui_item]
+| append [| `dh_ui_overrides(@ov@)` | eval c="ov", ui_now=mute_until | table c ui_item ui_now limit_override entity_id]
+| append [| `dh_ui_blocks(@blk@, @NOW@)` | eval c="blk", ui_now=until, ui_after=state | table c ui_item ui_now ui_after k]
+| foreach ui_now ui_after dh_label detail [eval <<FIELD>>=replace(<<FIELD>>, ",", ";")]
