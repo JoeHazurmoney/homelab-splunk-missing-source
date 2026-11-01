@@ -1,5 +1,0 @@
-# server_ports (splunk_server): back up both volumes, recreate the container with 9997/10514/20514 (one-time, after Taylor confirms)
-# Placeholder until task 3 (spec 11) fills it in.
-- name: Placeholder for server_ports
-  ansible.builtin.debug:
-    msg: "server_ports on {{ inventory_hostname }}: not implemented yet (task 3)"

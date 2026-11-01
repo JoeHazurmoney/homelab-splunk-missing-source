@@ -1,0 +1,80 @@
+# server_network (splunk_server, spec 5.3/6.1): create the Docker network hl-net and attach the
+# running Splunk container to it live (docker network connect: no recreate, no new published
+# port), so Cribl reaches splunktcp 9997 by name. Every run re-checks the attachment and re-attaches
+# when it is missing (after a Docker Desktop restart, for instance), then checks wd2l and records
+# what the role created in the state file for server_remove.
+- name: Look up the network
+  ansible.windows.win_command:
+    argv: [docker, network, inspect, "{{ hl_net_name }}"]
+  register: hl_net_inspect
+  changed_when: false
+  failed_when: hl_net_inspect.rc not in [0, 1]
+
+- name: Create the network
+  ansible.windows.win_command:
+    argv: [docker, network, create, --driver, bridge, --label, hl_splunk.managed=true, "{{ hl_net_name }}"]
+  register: hl_net_create
+  when: hl_net_inspect.rc != 0
+  changed_when: true
+
+- name: Read the Splunk container's networks
+  ansible.windows.win_command:
+    argv: [docker, inspect, "{{ hl_splunk_container }}"]
+  register: hl_net_splunk
+  changed_when: false
+
+- name: Note when the attachment starts
+  ansible.windows.win_shell: "[DateTimeOffset]::UtcNow.ToUnixTimeSeconds()"
+  register: hl_net_t0
+  changed_when: false
+  when: hl_net_name not in (hl_net_splunk.stdout | from_json)[0].NetworkSettings.Networks
+
+- name: Attach the Splunk container to the network (live)
+  ansible.windows.win_command:
+    argv: [docker, network, connect, "{{ hl_net_name }}", "{{ hl_splunk_container }}"]
+  register: hl_net_connect
+  when: hl_net_name not in (hl_net_splunk.stdout | from_json)[0].NetworkSettings.Networks
+  changed_when: true
+
+- name: Read the attachment back
+  ansible.windows.win_command:
+    argv: [docker, inspect, "{{ hl_splunk_container }}"]
+  register: hl_net_splunk_after
+  changed_when: false
+
+- name: Check the Splunk container is on the network with its ports unchanged
+  ansible.builtin.assert:
+    that:
+      - hl_net_name in hl_net_after.NetworkSettings.Networks
+      - hl_net_after.NetworkSettings.Networks[hl_net_name].IPAddress | length > 0
+      - hl_net_after.HostConfig.PortBindings == hl_net_before.HostConfig.PortBindings
+      - hl_net_after.State.Running
+    fail_msg: "{{ hl_splunk_container }} is not attached to {{ hl_net_name }} as expected"
+    success_msg: "{{ hl_splunk_container }} on {{ hl_net_name }} at
+      {{ hl_net_after.NetworkSettings.Networks[hl_net_name].IPAddress }}"
+  vars:
+    hl_net_before: "{{ (hl_net_splunk.stdout | from_json)[0] }}"
+    hl_net_after: "{{ (hl_net_splunk_after.stdout | from_json)[0] }}"
+
+- name: Check wd2l after the attachment
+  ansible.builtin.import_tasks: server_health.yml
+  vars:
+    hl_health_since: "{{ hl_net_t0.stdout | default('') | trim }}"
+
+- name: Read the state file
+  ansible.builtin.import_tasks: win_state_read.yml
+
+- name: Record the network and the attachment
+  ansible.builtin.set_fact:
+    hl_state: "{{ hl_state | combine({'server_network': hl_net_record}) }}"
+  vars:
+    # Sticky: once the role created the network or attached a container, that stays recorded
+    # until server_remove undoes it.
+    hl_net_record:
+      network: "{{ hl_net_name }}"
+      network_created: "{{ (hl_state.server_network.network_created | default(false)) or (hl_net_create is changed) }}"
+      attached: "{{ ((hl_state.server_network.attached | default([]))
+        + ([hl_splunk_container] if hl_net_connect is changed else [])) | unique | sort }}"
+
+- name: Write the state file
+  ansible.builtin.import_tasks: win_state_write.yml

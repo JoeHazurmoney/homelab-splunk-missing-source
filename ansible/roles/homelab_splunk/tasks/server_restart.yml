@@ -1,0 +1,18 @@
+# Restart splunkd inside the container (not the container: no recreate, no provisioning run), then
+# wait until wd2l's HEC is healthy and wd2l's data lands again (imported by server and
+# server_remove). Cribl's in-flight data during Splunk's shutdown is lost (spec 14.7 g, task 3b).
+- name: Note when the restart starts
+  ansible.windows.win_shell: "[DateTimeOffset]::UtcNow.ToUnixTimeSeconds()"
+  register: hl_server_restart_t0
+  changed_when: false
+
+- name: Restart splunkd in the container
+  ansible.windows.win_command:
+    argv: [docker, exec, -u, splunk, "{{ hl_splunk_container }}", "{{ hl_splunk_home }}/bin/splunk", restart]
+  register: hl_server_restart
+  changed_when: true
+
+- name: Check wd2l after the restart
+  ansible.builtin.import_tasks: server_health.yml
+  vars:
+    hl_health_since: "{{ hl_server_restart_t0.stdout | trim | int }}"
