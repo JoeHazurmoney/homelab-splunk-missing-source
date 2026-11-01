@@ -320,6 +320,23 @@ argument_specs:
         type: list
         elements: str
         description: Role-owned input apps on the Windows UF.
+      hl_stig_rules_src:
+        type: str
+        default: /usr/share/audit-rules/30-stig.rules
+        description: The STIG sample rules shipped by the audit-rules package.
+      hl_stig_privileged_src:
+        type: str
+        default: /usr/share/audit-rules/31-privileged.rules
+        description: The file whose comments hold the commands that generate the privileged-command rules.
+      hl_stig_rules_file:
+        type: str
+        default: /etc/audit/rules.d/50-hl-stig.rules
+        description: Where the role writes the STIG rules.
+      hl_audit_immutable:
+        type: bool
+        default: false
+        description: Must stay false; -e 2 (immutable) is never set by the role.
+        choices: [false]
       hl_server_host:
         type: str
         default: homepc

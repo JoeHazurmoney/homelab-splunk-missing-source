@@ -300,3 +300,10 @@ hl_tas:
 # stanzas say disabled = 1).
 hl_uf_input_apps_linux: [hl_uf_linux_inputs, hl_uf_wd2l_inputs]
 hl_uf_input_apps_windows: [hl_uf_windows_inputs]
+
+# --- STIG audit rules (spec 5.3 audit_rules; uf_linux) ---
+hl_stig_rules_src: /usr/share/audit-rules/30-stig.rules
+hl_stig_privileged_src: /usr/share/audit-rules/31-privileged.rules
+hl_stig_rules_file: /etc/audit/rules.d/50-hl-stig.rules
+# STIG's -e 2 makes every later rule change need a reboot; it is never set (spec 5.3)
+hl_audit_immutable: false
