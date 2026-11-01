@@ -180,7 +180,7 @@ The latest Ansible marker per host (`stop`, `start`, …, with who ran it and th
 The latest Hyper-V lifecycle event per VM (started, turned off, shut down, saved, reset), read from the Windows Worker-Admin log. Used by: *DH Tracker fast*.
 
 ### `dh_fwd_from_probe`
-The latest device-probe result per device (reachable or not), from the probe on the relay. Used by: *DH Tracker fast*.
+The latest device-probe result per device (reachable or not), from hl-devprobe on pi5. Used by: *DH Tracker fast*.
 
 ### `dh_fwd_fold(fwd, now)`
 Merges the five sources above with the existing `dh_fwd` rows, keeping the latest of each fact. Arguments: `fwd`, the forwarder table; `now`. Used by: *DH Tracker fast*.
