@@ -1,0 +1,46 @@
+# probe_remove (pi5, spec 5.3): stop and disable the timer, delete what probe added (as the state
+# file recorded it) and the log folder, daemon-reload.
+- name: Read the state file
+  ansible.builtin.import_tasks: linux_state_read.yml
+
+- name: Stop and disable the timer and the service
+  ansible.builtin.systemd_service:
+    name: "{{ item }}"
+    state: stopped
+    enabled: false
+  loop: [hl-devprobe.timer, hl-devprobe.service]
+  failed_when: false
+
+- name: Delete the probe's files
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop: "{{ (hl_state.probe | default({})).files | default(['/usr/local/libexec/hl-devprobe', '/etc/systemd/system/hl-devprobe.service',
+    '/etc/systemd/system/hl-devprobe.timer', '/etc/logrotate.d/hl-devprobe']) }}"
+
+- name: Delete the probe's log folder
+  ansible.builtin.file:
+    path: "{{ (hl_state.probe | default({})).dir | default(hl_probe_dir) }}"
+    state: absent
+
+- name: Reload systemd
+  ansible.builtin.systemd_service:
+    daemon_reload: true
+  changed_when: false
+
+- name: Check nothing is left
+  ansible.builtin.shell: |
+    set -o pipefail
+    ls -d /usr/local/libexec/hl-devprobe /etc/systemd/system/hl-devprobe.* /etc/logrotate.d/hl-devprobe {{ hl_probe_dir }} 2>/dev/null | wc -l
+  args:
+    executable: /bin/bash
+  register: hl_probe_left
+  changed_when: false
+  failed_when: hl_probe_left.stdout | trim != '0'
+
+- name: Drop the probe record
+  ansible.builtin.set_fact:
+    hl_state: "{{ hl_state | dict2items | rejectattr('key', 'eq', 'probe') | items2dict }}"
+
+- name: Write the state file
+  ansible.builtin.import_tasks: linux_state_write.yml

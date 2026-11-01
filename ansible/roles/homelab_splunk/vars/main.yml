@@ -144,3 +144,6 @@ hl_inputs_effective: >-
   {%- endfor -%}
   {{ out }}
 hl_inputs_enabled: "{{ hl_inputs_effective | selectattr('enabled') | list }}"
+
+# The syslog devices the probe pings, from the Splunk server's group_vars (pi5 isn't in that group)
+hl_probe_devices: "{{ hostvars[groups['splunk_server'][0]]['syslog_devices'] | default([]) }}"

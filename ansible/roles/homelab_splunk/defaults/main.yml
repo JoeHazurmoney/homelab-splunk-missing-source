@@ -307,3 +307,10 @@ hl_stig_privileged_src: /usr/share/audit-rules/31-privileged.rules
 hl_stig_rules_file: /etc/audit/rules.d/50-hl-stig.rules
 # STIG's -e 2 makes every later rule change need a reboot; it is never set (spec 5.3)
 hl_audit_immutable: false
+
+# --- The device probe (spec 5.3 probe/probe_remove, 4.4; task 8). Runs on pi5, pings every
+# syslog_devices entry (they live in group_vars/splunk_server.yml) and appends one line per ping
+# to probe.log, which pi5's UF forwards (network / hl:devprobe). Never through rsyslog or the journal.
+hl_probe_host: pi5
+hl_probe_interval: 60
+hl_probe_dir: /var/log/hl-devprobe

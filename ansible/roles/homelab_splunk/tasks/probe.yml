@@ -1,0 +1,66 @@
+# probe (pi5, spec 5.3/4.4): the probe script, hl-devprobe.service + .timer, the log folder and
+# logrotate. pi5's UF reads probe.log (hl_uf_linux_inputs, row `hosts: [pi5]`, task 6). Every file
+# is recorded in the state file; probe_remove undoes exactly that.
+- name: Read the state file
+  ansible.builtin.import_tasks: linux_state_read.yml
+
+- name: Create the probe's log folder
+  ansible.builtin.file:
+    path: "{{ hl_probe_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Install the probe script
+  ansible.builtin.template:
+    src: probe/hl-devprobe.sh.j2
+    dest: /usr/local/libexec/hl-devprobe
+    owner: root
+    group: root
+    mode: "0755"
+  register: hl_probe_script
+
+- name: Install the units and the logrotate rule
+  ansible.builtin.template:
+    src: "probe/{{ item.src }}"
+    dest: "{{ item.dest }}"
+    owner: root
+    group: root
+    mode: "0644"
+  loop:
+    - {src: hl-devprobe.service.j2, dest: /etc/systemd/system/hl-devprobe.service}
+    - {src: hl-devprobe.timer.j2, dest: /etc/systemd/system/hl-devprobe.timer}
+    - {src: hl-devprobe.logrotate.j2, dest: /etc/logrotate.d/hl-devprobe}
+  loop_control:
+    label: "{{ item.dest }}"
+  register: hl_probe_units
+
+- name: Start the timer
+  ansible.builtin.systemd_service:
+    name: hl-devprobe.timer
+    state: started
+    enabled: true
+    daemon_reload: "{{ hl_probe_units is changed }}"
+
+- name: Record what the probe added
+  ansible.builtin.set_fact:
+    hl_state: "{{ hl_state | combine({'probe': {'files': ['/usr/local/libexec/hl-devprobe', '/etc/systemd/system/hl-devprobe.service',
+      '/etc/systemd/system/hl-devprobe.timer', '/etc/logrotate.d/hl-devprobe'], 'dir': hl_probe_dir}}) }}"
+
+- name: Write the state file
+  ansible.builtin.import_tasks: linux_state_write.yml
+
+- name: Wait for a probe line for every device
+  ansible.builtin.shell: |
+    set -o pipefail
+    {% for d in hl_probe_devices %}
+    tail -n 50 {{ hl_probe_dir }}/probe.log 2>/dev/null | grep -c 'device={{ d.name }} ' || true
+    {% endfor %}
+  args:
+    executable: /bin/bash
+  register: hl_probe_lines
+  until: hl_probe_lines.stdout_lines | map('int') | select('equalto', 0) | list | length == 0
+  retries: "{{ ((hl_probe_interval * 3) / 10) | int }}"
+  delay: 10
+  changed_when: false

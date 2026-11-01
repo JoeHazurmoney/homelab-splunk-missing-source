@@ -1,5 +1,0 @@
-# syslog_relay (syslog_relay): 60-hl-splunk.conf (own logs to 10514, devices and probe to 20514 via ruleset hl_remote), firewalld, probe timer
-# Placeholder until task 8 (spec 11) fills it in.
-- name: Placeholder for syslog_relay
-  ansible.builtin.debug:
-    msg: "syslog_relay on {{ inventory_hostname }}: not implemented yet (task 8)"

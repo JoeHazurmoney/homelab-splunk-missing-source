@@ -1,8 +1,8 @@
 argument_specs:
   main:
-    short_description: Splunk UFs, TAs, auditing, the syslog relay and the data-health apps for the homelab
+    short_description: Splunk UFs, TAs, auditing, Cribl Stream, the device probe and the data-health apps for the homelab
     description:
-      - One role for every managed group (uf_linux, uf_windows, splunk_server, syslog_relay); tags select the
+      - One role for every managed group (uf_linux, uf_windows, splunk_server); tags select the
         component (spec 5.3). A bare run deploys; removing, stopping and restarting need their tag.
       - Defaults are in defaults/main.yml. Ansible validates the provided values against this spec before the role runs.
     options:
@@ -337,6 +337,18 @@ argument_specs:
         default: false
         description: Must stay false; -e 2 (immutable) is never set by the role.
         choices: [false]
+      hl_probe_host:
+        type: str
+        default: pi5
+        description: The host that runs hl-devprobe (it pings every syslog device).
+      hl_probe_interval:
+        type: int
+        default: 60
+        description: Seconds between probe rounds.
+      hl_probe_dir:
+        type: str
+        default: /var/log/hl-devprobe
+        description: The probe's log folder (probe.log, read by the host's UF).
       hl_server_host:
         type: str
         default: homepc
