@@ -86,7 +86,7 @@ panels() {
     args=()
     case $view in
       dh_host) args=("host=$host") ;;
-      dh_manage) args=("ov_host=$host" "ov_entity=host|*|$host|*|*" "bk_host=$host" "m_reason=panel check" "ex_host=dhtest-panel" "ad_entity=${unreg:-sourcetype|linux|dhtest-panel|syslog|*}") ;;
+      dh_manage) args=("ov_host=$host" "ov_entity=host|*|$host|*|*" "bk_host=$host" "ov_reason=panel check" "ex_reason=panel check" "ad_reason=panel check" "bk_reason=panel check" "ex_host=dhtest-panel" "ad_entity=${unreg:-sourcetype|linux|dhtest-panel|syslog|*}") ;;
     esac
     # Searches run as jobs; chains run as post-process searches on their base's job, as in Studio.
     while IFS=$'\t' read -r ds base spl; do
@@ -204,64 +204,71 @@ writes() {
   kv_make dhtest_kv_overrides dh_overrides
   kv_make dhtest_kv_admin_log dh_admin_log
   kv_make dhtest_kv_expected dh_expected
-  ov=("ov_host=dhtest-w1" "ov_entity=host|*|dhtest-w1|*|*" "ov_action=mute" "ov_duration=3600" "m_reason=writes test" "m_ticket=CHG-12")
+  ov=("ov_host=dhtest-w1" "ov_entity=host|*|dhtest-w1|*|*" "ov_action=mute" "ov_duration=3600" "ov_reason=writes test" "ov_ticket=CHG-12")
   # Override: preview, then apply with the previewed token.
   tok=$(w_run ds_ov_plan "${ov[@]}" | col dh_token)
   expect "override preview gives a token" "$tok" '^[0-9a-f]{32}$'
   res=$(w_run ds_ov_apply "${ov[@]}" "ov_confirm=$tok" | col Result)
-  expect "override applied" "$res" '^applied: override_mute host\|\*\|dhtest-w1\|\*\|\*$'
+  expect "override applied" "$res" '^Done: Mute dhtest-w1: whole host$'
   res=$(kv_get dhtest_kv_overrides 'eval ok=if(mute_until>now()+3500 AND mute_until<=now()+3600, 1, 0) | table _key ok reason ticket set_by')
   expect "override row (key, expiry, reason, ticket, set_by)" "$(printf '%s' "$res" | sed -n 2p)" '^"host\|\*\|dhtest-w1\|\*\|\*",1,"writes test","CHG-12",admin$'
   res=$(w_run ds_ov_apply "${ov[@]}" "ov_confirm=$tok" | col Result)
-  expect "override repeat (reload) applies nothing" "$res" '^nothing applied'
+  expect "override repeat (reload) applies nothing" "$res" '^Nothing written'
   res=$(w_run ds_ov_apply "${ov[@]}" "ov_confirm=0123456789abcdef0123456789abcdef" | col Result)
-  expect "override with a wrong confirmation applies nothing" "$res" '^nothing applied'
+  expect "override with a wrong confirmation applies nothing" "$res" '^Nothing written'
   ov[2]="ov_action=unmute"
   tok=$(w_run ds_ov_plan "${ov[@]}" | col dh_token)
   res=$(w_run ds_ov_apply "${ov[@]}" "ov_confirm=$tok" | col Result)
-  expect "unmute applied" "$res" '^applied: override_unmute'
+  expect "unmute applied" "$res" '^Done: Unmute dhtest-w1: whole host$'
   res=$(kv_get dhtest_kv_overrides 'eval m=coalesce(mute_until, "none") | table m')
   expect "unmute cleared mute_until" "$(printf '%s' "$res" | sed -n 2p)" '^none$'
   res=$(kv_get dhtest_kv_admin_log 'stats count, values(action) as a | eval a=mvjoin(a, " ") | table count a')
   expect "admin log: one row per applied change" "$(printf '%s' "$res" | sed -n 2p)" '^2,"override_mute override_unmute"$'
   # Expected row: add, and a repeat.
-  ex=("ex_level=sourcetype" "ex_index=linux" "ex_host=DHTEST-W2.mshome.net" "ex_sourcetype=syslog" "ex_profile=continuous" "m_reason=writes test")
+  ex=("ex_level=sourcetype" "ex_index=linux" "ex_host=DHTEST-W2.mshome.net" "ex_sourcetype=syslog" "ex_profile=continuous" "ex_reason=writes test")
   tok=$(w_run ds_ex_plan "${ex[@]}" | col dh_token)
   res=$(w_run ds_ex_apply "${ex[@]}" "ex_confirm=$tok" | col Result)
-  expect "expected row applied" "$res" '^applied: expected_add sourcetype\|linux\|dhtest-w2\|syslog\|\*$'
+  expect "expected row applied" "$res" '^Done: Add expected row dhtest-w2 .{1,3} syslog \(linux\)$'
   res=$(kv_get dhtest_kv_expected 'eval es=if(abs(expected_since-now())<120, "now", expected_since) | table _key host managed_by enabled profile collection criticality es')
   expect "expected row stored" "$(printf '%s' "$res" | sed -n 2p)" '^"sourcetype\|linux\|dhtest-w2\|syslog\|\*","?dhtest-w2"?,ui,1,continuous,uf,2,now$'
   res=$(w_run ds_ex_apply "${ex[@]}" "ex_confirm=$tok" | col Result)
-  expect "expected row repeat applies nothing" "$res" '^nothing applied'
+  expect "expected row repeat applies nothing" "$res" '^Nothing written'
+  # An identical update of a UI row leaves the row as it was; the admin-log time in the token still
+  # makes its confirmation fit only once.
+  tok=$(w_run ds_ex_plan "${ex[@]}" | col dh_token)
+  res=$(w_run ds_ex_apply "${ex[@]}" "ex_confirm=$tok" | col Result)
+  expect "identical update of a UI row applied" "$res" '^Done: Add expected row'
+  res=$(w_run ds_ex_apply "${ex[@]}" "ex_confirm=$tok" | col Result)
+  expect "identical update repeat applies nothing" "$res" '^Nothing written'
   # Adopt.
-  ad=("ad_entity=sourcetype|linux|dhtest-w3|cpu|*" "ad_crit=3" "m_reason=writes test")
+  ad=("ad_entity=sourcetype|linux|dhtest-w3|cpu|*" "ad_crit=3" "ad_reason=writes test")
   tok=$(w_run ds_ad_plan "${ad[@]}" | col dh_token)
   res=$(w_run ds_ad_apply "${ad[@]}" "ad_confirm=$tok" | col Result)
-  expect "adopt applied" "$res" '^applied: expected_adopt sourcetype\|linux\|dhtest-w3\|cpu\|\*$'
+  expect "adopt applied" "$res" '^Done: Adopt dhtest-w3 .{1,3} cpu \(linux\)$'
   res=$(kv_get dhtest_kv_expected 'search host=dhtest-w3 | table managed_by profile collection criticality')
   expect "adopted row stored" "$(printf '%s' "$res" | sed -n 2p)" '^ui,continuous,syslog,3$'
   # Test block on an exact raw source: the file is rewritten with k first and the raw source in k.
-  bk=("bk_action=add" "bk_host=dhtest-w4" "bk_level=source" "bk_target=linux_secure|/var/log/secure.1" "bk_duration=900" "m_reason=writes test" "m_ticket=CHG-B")
+  bk=("bk_action=add" "bk_host=dhtest-w4" "bk_level=source" "bk_target=linux_secure|/var/log/secure.1" "bk_duration=900" "bk_reason=writes test" "bk_ticket=CHG-B")
   res=$(w_run ds_bk_plan "${bk[@]}" | col source_norm)
   expect "block preview shows the normalized source" "$res" '^/var/log/secure\.\*$'
   tok=$(w_run ds_bk_plan "${bk[@]}" | col dh_token)
   res=$(w_run ds_bk_apply "${bk[@]}" "bk_confirm=$tok" | col Result)
-  expect "block applied" "$res" '^applied: block_add dhtest-w4\|linux_secure\|/var/log/secure\.1$'
+  expect "block applied" "$res" '^Done: Add test block dhtest-w4 .{1,3} linux_secure .{1,3} /var/log/secure\.1 \(exact source\)$'
   file=$(dh_docker exec -u root "$DH_CONTAINER" sh -c "cat $DH_APP_DIR/lookups/dhtest_w_blocks.csv" | tr -d '\r')
   expect "block file header is k first" "$(printf '%s\n' "$file" | sed -n 1p)" '^k,until,reason,"?set_by"?$'
   expect "block row keys the raw source" "$(printf '%s\n' "$file" | sed -n 2p)" '^"?dhtest-w4\|linux_secure\|/var/log/secure\.1"?,[0-9]+,"?writes test"?,"?admin"?$'
   res=$(w_run ds_bk_apply "${bk[@]}" "bk_confirm=$tok" | col Result)
-  expect "block repeat applies nothing" "$res" '^nothing applied'
+  expect "block repeat applies nothing" "$res" '^Nothing written'
   bk[0]="bk_action=remove"
   tok=$(w_run ds_bk_plan "${bk[@]}" | col dh_token)
   res=$(w_run ds_bk_apply "${bk[@]}" "bk_confirm=$tok" | col Result)
-  expect "block removed" "$res" '^applied: block_remove'
+  expect "block removed" "$res" '^Done: Remove test block'
   res=$(kv_get dhtest_kv_admin_log 'search action=block_* | stats values(ticket) as t, count | eval t=mvjoin(t, " ") | table count t')
   expect "block admin-log rows carry the ticket" "$(printf '%s' "$res" | sed -n 2p)" '^2,"?CHG-B"?$'
   file=$(dh_docker exec -u root "$DH_CONTAINER" sh -c "cat $DH_APP_DIR/lookups/dhtest_w_blocks.csv" | tr -d '\r')
   expect "last block removed leaves the placeholder" "$(printf '%s\n' "$file" | sed -n 1,2p | tr '\n' ' ')" '^k,until,reason,"?set_by"? "?-"?,0,'
   res=$(kv_get dhtest_kv_admin_log 'stats count')
-  expect "admin log: every applied change, nothing for the refused ones" "$(printf '%s' "$res" | sed -n 2p)" '^6$'
+  expect "admin log: every applied change, nothing for the refused ones" "$(printf '%s' "$res" | sed -n 2p)" '^7$'
   [ "$WFAIL" -eq 0 ] && echo "writes: PASS"
   [ "$WFAIL" -eq 0 ]
 }

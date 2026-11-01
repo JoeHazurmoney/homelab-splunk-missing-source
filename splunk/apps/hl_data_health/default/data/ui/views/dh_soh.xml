@@ -142,7 +142,7 @@
                 "sparklineDisplay": "off",
                 "trendDisplay": "off"
             },
-            "description": "When the daily report was made (07:00 each day). Guide: docs/data-health/dashboards.md, Daily state of health > Report time"
+            "description": "When the daily report was made (07:00 each day). Guide (project repo): docs/data-health/dashboards.md > Daily state of health > Report time"
         },
         "viz_mttr": {
             "type": "splunk.singlevalue",
@@ -155,7 +155,7 @@
                 "sparklineDisplay": "off",
                 "trendDisplay": "off"
             },
-            "description": "How long an outage lasted on average. Guide: docs/data-health/dashboards.md, Daily state of health > Mean time to recover (24 h)"
+            "description": "How long an outage lasted on average. Guide (project repo): docs/data-health/dashboards.md > Daily state of health > Mean time to recover (24 h)"
         },
         "viz_outages_n": {
             "type": "splunk.singlevalue",
@@ -168,7 +168,7 @@
                 "sparklineDisplay": "off",
                 "trendDisplay": "off"
             },
-            "description": "How many times data stopped in the last 24 h. Guide: docs/data-health/dashboards.md, Daily state of health > Outages (24 h)"
+            "description": "How many times data stopped in the last 24 h. Guide (project repo): docs/data-health/dashboards.md > Daily state of health > Outages (24 h)"
         },
         "viz_open_n": {
             "type": "splunk.singlevalue",
@@ -181,7 +181,7 @@
                 "sparklineDisplay": "off",
                 "trendDisplay": "off"
             },
-            "description": "How many of those have not come back yet. Guide: docs/data-health/dashboards.md, Daily state of health > Outages still open"
+            "description": "How many of those have not come back yet. Guide (project repo): docs/data-health/dashboards.md > Daily state of health > Outages still open"
         },
         "viz_lic_pct": {
             "type": "splunk.singlevalue",
@@ -194,7 +194,7 @@
                 "sparklineDisplay": "off",
                 "trendDisplay": "off"
             },
-            "description": "How close the instance came to its daily indexing limit. Guide: docs/data-health/dashboards.md, Daily state of health > Licence used yesterday (% of the daily quota)"
+            "description": "How close the instance came to its daily indexing limit. Guide (project repo): docs/data-health/dashboards.md > Daily state of health > Licence used yesterday (% of the daily quota)"
         },
         "viz_lic_days": {
             "type": "splunk.singlevalue",
@@ -207,7 +207,7 @@
                 "sparklineDisplay": "off",
                 "trendDisplay": "off"
             },
-            "description": "When the Splunk licence runs out. Guide: docs/data-health/dashboards.md, Daily state of health > Days until the licence expires"
+            "description": "When the Splunk licence runs out. Guide (project repo): docs/data-health/dashboards.md > Daily state of health > Days until the licence expires"
         },
         "viz_outages": {
             "type": "splunk.table",
@@ -218,7 +218,7 @@
             "options": {
                 "count": 25
             },
-            "description": "Each stretch of late or missing data, with how long it lasted. Guide: docs/data-health/dashboards.md, Daily state of health > Outages in the last 24 h"
+            "description": "Each stretch of late or missing data, with how long it lasted. Guide (project repo): docs/data-health/dashboards.md > Daily state of health > Outages in the last 24 h"
         },
         "viz_flapping": {
             "type": "splunk.table",
@@ -229,7 +229,7 @@
             "options": {
                 "count": 25
             },
-            "description": "Streams that keep stopping and starting. Guide: docs/data-health/dashboards.md, Daily state of health > Flapping (3 or more status changes in 24 h)"
+            "description": "Streams that keep stopping and starting. Guide (project repo): docs/data-health/dashboards.md > Daily state of health > Flapping (3 or more status changes in 24 h)"
         },
         "viz_never": {
             "type": "splunk.table",
@@ -240,7 +240,7 @@
             "options": {
                 "count": 25
             },
-            "description": "Expected data that never came, and expected rows with a profile the app does not know. Guide: docs/data-health/dashboards.md, Daily state of health > Never arrived, or a bad profile"
+            "description": "Expected data that never came, and expected rows with a profile the app does not know. Guide (project repo): docs/data-health/dashboards.md > Daily state of health > Never arrived, or a bad profile"
         },
         "viz_unreg": {
             "type": "splunk.table",
@@ -251,7 +251,7 @@
             "options": {
                 "count": 25
             },
-            "description": "Data that arrives but that nobody listed as expected. Guide: docs/data-health/dashboards.md, Daily state of health > Unregistered: seen in the last 7 d but not expected"
+            "description": "Data that arrives but that nobody listed as expected. Guide (project repo): docs/data-health/dashboards.md > Daily state of health > Unregistered: seen in the last 7 d but not expected"
         },
         "viz_fwd": {
             "type": "splunk.table",
@@ -262,7 +262,7 @@
             "options": {
                 "count": 25
             },
-            "description": "Splunk agents that need an upgrade or have stopped calling in. Guide: docs/data-health/dashboards.md, Daily state of health > Forwarders: wrong version or disconnected"
+            "description": "Splunk agents that need an upgrade or have stopped calling in. Guide (project repo): docs/data-health/dashboards.md > Daily state of health > Forwarders: wrong version or disconnected"
         },
         "viz_lag": {
             "type": "splunk.table",
@@ -273,7 +273,7 @@
             "options": {
                 "count": 25
             },
-            "description": "Data that arrives long after it was written. Guide: docs/data-health/dashboards.md, Daily state of health > Slow arrival (lag p95 of 60 s or more)"
+            "description": "Data that arrives long after it was written. Guide (project repo): docs/data-health/dashboards.md > Daily state of health > Slow arrival (lag p95 of 60 s or more)"
         },
         "viz_volume": {
             "type": "splunk.table",
@@ -284,7 +284,7 @@
             "options": {
                 "count": 25
             },
-            "description": "Hours with far fewer events than usual. Guide: docs/data-health/dashboards.md, Daily state of health > Volume drops (24 h)"
+            "description": "Hours with far fewer events than usual. Guide (project repo): docs/data-health/dashboards.md > Daily state of health > Volume drops (24 h)"
         },
         "viz_skipped": {
             "type": "splunk.table",
@@ -295,7 +295,7 @@
             "options": {
                 "count": 25
             },
-            "description": "Background searches of this app that did not run on time. Guide: docs/data-health/dashboards.md, Daily state of health > Skipped searches (24 h)"
+            "description": "Background searches of this app that did not run on time. Guide (project repo): docs/data-health/dashboards.md > Daily state of health > Skipped searches (24 h)"
         },
         "viz_mutes": {
             "type": "splunk.table",
@@ -306,7 +306,7 @@
             "options": {
                 "count": 25
             },
-            "description": "What is muted now, and what unmutes within a day. Guide: docs/data-health/dashboards.md, Daily state of health > Active and expiring mutes"
+            "description": "What is muted now, and what unmutes within a day. Guide (project repo): docs/data-health/dashboards.md > Daily state of health > Active and expiring mutes"
         }
     },
     "layout": {

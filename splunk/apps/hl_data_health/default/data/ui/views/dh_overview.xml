@@ -331,7 +331,7 @@
                 ]
             },
             "title": "Is the data current?",
-            "description": "Whether the page can be trusted right now. Guide: docs/data-health/dashboards.md, Overview > Is the data current?"
+            "description": "Whether the page can be trusted right now. Guide (project repo): docs/data-health/dashboards.md > Overview > Is the data current?"
         },
         "viz_k_tamper": {
             "type": "splunk.singlevalue",
@@ -345,7 +345,7 @@
                 "trendDisplay": "off",
                 "majorColor": "#DC4E41"
             },
-            "description": "Signs that someone may have switched off logging. Guide: docs/data-health/dashboards.md, Overview > Tamper findings (24 h)"
+            "description": "Signs that someone may have switched off logging. Guide (project repo): docs/data-health/dashboards.md > Overview > Tamper findings (24 h)"
         },
         "viz_headline": {
             "type": "splunk.singlevalue",
@@ -376,7 +376,7 @@
                 ]
             },
             "title": "How many hosts need attention",
-            "description": "A one-line summary of the table below. Guide: docs/data-health/dashboards.md, Overview > How many hosts need attention"
+            "description": "A one-line summary of the table below. Guide (project repo): docs/data-health/dashboards.md > Overview > How many hosts need attention"
         },
         "viz_attention": {
             "type": "splunk.table",
@@ -387,7 +387,7 @@
             "options": {
                 "count": 25
             },
-            "description": "One row per host with late or missing data; worst first. Click a row for Host detail. Guide: docs/data-health/dashboards.md, Overview > Needs attention",
+            "description": "One row per host with late or missing data; worst first. Click a row for Host detail. Guide (project repo): docs/data-health/dashboards.md > Overview > Needs attention",
             "eventHandlers": [
                 {
                     "type": "drilldown.linkToDashboard",
@@ -430,7 +430,7 @@
                     }
                 }
             ],
-            "description": "Data that stopped and has come back. Click a row for Host detail. Guide: docs/data-health/dashboards.md, Overview > Recently recovered (back to OK in the last 24 h)"
+            "description": "Data that stopped and has come back. Click a row for Host detail. Guide (project repo): docs/data-health/dashboards.md > Overview > Recently recovered (back to OK in the last 24 h)"
         },
         "viz_tamper": {
             "type": "splunk.table",
@@ -457,7 +457,7 @@
                     }
                 }
             ],
-            "description": "Signs that someone may have switched off logging. Click a row for Host detail. Guide: docs/data-health/dashboards.md, Overview > Tamper findings (first seen in the last 24 h)"
+            "description": "Signs that someone may have switched off logging. Click a row for Host detail. Guide (project repo): docs/data-health/dashboards.md > Overview > Tamper findings (first seen in the last 24 h)"
         },
         "viz_k_host_expected": {
             "type": "splunk.singlevalue",
@@ -470,7 +470,7 @@
                 "sparklineDisplay": "off",
                 "trendDisplay": "off"
             },
-            "description": "How many hosts are on the expected list. Guide: docs/data-health/dashboards.md, Overview > KPI tiles"
+            "description": "How many hosts are on the expected list. Guide (project repo): docs/data-health/dashboards.md > Overview > KPI tiles"
         },
         "viz_k_host_ok": {
             "type": "splunk.singlevalue",
@@ -484,7 +484,7 @@
                 "trendDisplay": "off",
                 "majorColor": "#53A051"
             },
-            "description": "How many expected hosts are arriving on time. Guide: docs/data-health/dashboards.md, Overview > KPI tiles"
+            "description": "How many expected hosts are arriving on time. Guide (project repo): docs/data-health/dashboards.md > Overview > KPI tiles"
         },
         "viz_k_host_late": {
             "type": "splunk.singlevalue",
@@ -498,7 +498,7 @@
                 "trendDisplay": "off",
                 "majorColor": "#F8BE34"
             },
-            "description": "How many expected hosts are later than their limit. Guide: docs/data-health/dashboards.md, Overview > KPI tiles"
+            "description": "How many expected hosts are later than their limit. Guide (project repo): docs/data-health/dashboards.md > Overview > KPI tiles"
         },
         "viz_k_host_missing": {
             "type": "splunk.singlevalue",
@@ -512,7 +512,7 @@
                 "trendDisplay": "off",
                 "majorColor": "#DC4E41"
             },
-            "description": "How many expected hosts are silent for more than twice their limit or never arrived. Guide: docs/data-health/dashboards.md, Overview > KPI tiles"
+            "description": "How many expected hosts are silent for more than twice their limit or never arrived. Guide (project repo): docs/data-health/dashboards.md > Overview > KPI tiles"
         },
         "viz_k_host_muted": {
             "type": "splunk.singlevalue",
@@ -526,7 +526,7 @@
                 "trendDisplay": "off",
                 "majorColor": "#9B9B9B"
             },
-            "description": "How many expected hosts are muted on purpose. Guide: docs/data-health/dashboards.md, Overview > KPI tiles"
+            "description": "How many expected hosts are muted on purpose. Guide (project repo): docs/data-health/dashboards.md > Overview > KPI tiles"
         },
         "viz_k_host_pending": {
             "type": "splunk.singlevalue",
@@ -539,7 +539,7 @@
                 "sparklineDisplay": "off",
                 "trendDisplay": "off"
             },
-            "description": "How many expected hosts have no trusted status yet. Guide: docs/data-health/dashboards.md, Overview > KPI tiles"
+            "description": "How many expected hosts have no trusted status yet. Guide (project repo): docs/data-health/dashboards.md > Overview > KPI tiles"
         },
         "viz_k_sourcetype_expected": {
             "type": "splunk.singlevalue",
@@ -552,7 +552,7 @@
                 "sparklineDisplay": "off",
                 "trendDisplay": "off"
             },
-            "description": "How many sourcetypes (kinds of data per host) are on the expected list. Guide: docs/data-health/dashboards.md, Overview > KPI tiles"
+            "description": "How many sourcetypes (kinds of data per host) are on the expected list. Guide (project repo): docs/data-health/dashboards.md > Overview > KPI tiles"
         },
         "viz_k_sourcetype_ok": {
             "type": "splunk.singlevalue",
@@ -566,7 +566,7 @@
                 "trendDisplay": "off",
                 "majorColor": "#53A051"
             },
-            "description": "How many expected sourcetypes (kinds of data per host) are arriving on time. Guide: docs/data-health/dashboards.md, Overview > KPI tiles"
+            "description": "How many expected sourcetypes (kinds of data per host) are arriving on time. Guide (project repo): docs/data-health/dashboards.md > Overview > KPI tiles"
         },
         "viz_k_sourcetype_late": {
             "type": "splunk.singlevalue",
@@ -580,7 +580,7 @@
                 "trendDisplay": "off",
                 "majorColor": "#F8BE34"
             },
-            "description": "How many expected sourcetypes (kinds of data per host) are later than their limit. Guide: docs/data-health/dashboards.md, Overview > KPI tiles"
+            "description": "How many expected sourcetypes (kinds of data per host) are later than their limit. Guide (project repo): docs/data-health/dashboards.md > Overview > KPI tiles"
         },
         "viz_k_sourcetype_missing": {
             "type": "splunk.singlevalue",
@@ -594,7 +594,7 @@
                 "trendDisplay": "off",
                 "majorColor": "#DC4E41"
             },
-            "description": "How many expected sourcetypes (kinds of data per host) are silent for more than twice their limit or never arrived. Guide: docs/data-health/dashboards.md, Overview > KPI tiles"
+            "description": "How many expected sourcetypes (kinds of data per host) are silent for more than twice their limit or never arrived. Guide (project repo): docs/data-health/dashboards.md > Overview > KPI tiles"
         },
         "viz_k_sourcetype_muted": {
             "type": "splunk.singlevalue",
@@ -608,7 +608,7 @@
                 "trendDisplay": "off",
                 "majorColor": "#9B9B9B"
             },
-            "description": "How many expected sourcetypes (kinds of data per host) are muted on purpose. Guide: docs/data-health/dashboards.md, Overview > KPI tiles"
+            "description": "How many expected sourcetypes (kinds of data per host) are muted on purpose. Guide (project repo): docs/data-health/dashboards.md > Overview > KPI tiles"
         },
         "viz_k_sourcetype_pending": {
             "type": "splunk.singlevalue",
@@ -621,7 +621,7 @@
                 "sparklineDisplay": "off",
                 "trendDisplay": "off"
             },
-            "description": "How many expected sourcetypes (kinds of data per host) have no trusted status yet. Guide: docs/data-health/dashboards.md, Overview > KPI tiles"
+            "description": "How many expected sourcetypes (kinds of data per host) have no trusted status yet. Guide (project repo): docs/data-health/dashboards.md > Overview > KPI tiles"
         },
         "viz_k_source_expected": {
             "type": "splunk.singlevalue",
@@ -634,7 +634,7 @@
                 "sparklineDisplay": "off",
                 "trendDisplay": "off"
             },
-            "description": "How many sources (single files or inputs) are on the expected list. Guide: docs/data-health/dashboards.md, Overview > KPI tiles"
+            "description": "How many sources (single files or inputs) are on the expected list. Guide (project repo): docs/data-health/dashboards.md > Overview > KPI tiles"
         },
         "viz_k_source_ok": {
             "type": "splunk.singlevalue",
@@ -648,7 +648,7 @@
                 "trendDisplay": "off",
                 "majorColor": "#53A051"
             },
-            "description": "How many expected sources (single files or inputs) are arriving on time. Guide: docs/data-health/dashboards.md, Overview > KPI tiles"
+            "description": "How many expected sources (single files or inputs) are arriving on time. Guide (project repo): docs/data-health/dashboards.md > Overview > KPI tiles"
         },
         "viz_k_source_late": {
             "type": "splunk.singlevalue",
@@ -662,7 +662,7 @@
                 "trendDisplay": "off",
                 "majorColor": "#F8BE34"
             },
-            "description": "How many expected sources (single files or inputs) are later than their limit. Guide: docs/data-health/dashboards.md, Overview > KPI tiles"
+            "description": "How many expected sources (single files or inputs) are later than their limit. Guide (project repo): docs/data-health/dashboards.md > Overview > KPI tiles"
         },
         "viz_k_source_missing": {
             "type": "splunk.singlevalue",
@@ -676,7 +676,7 @@
                 "trendDisplay": "off",
                 "majorColor": "#DC4E41"
             },
-            "description": "How many expected sources (single files or inputs) are silent for more than twice their limit or never arrived. Guide: docs/data-health/dashboards.md, Overview > KPI tiles"
+            "description": "How many expected sources (single files or inputs) are silent for more than twice their limit or never arrived. Guide (project repo): docs/data-health/dashboards.md > Overview > KPI tiles"
         },
         "viz_k_source_muted": {
             "type": "splunk.singlevalue",
@@ -690,7 +690,7 @@
                 "trendDisplay": "off",
                 "majorColor": "#9B9B9B"
             },
-            "description": "How many expected sources (single files or inputs) are muted on purpose. Guide: docs/data-health/dashboards.md, Overview > KPI tiles"
+            "description": "How many expected sources (single files or inputs) are muted on purpose. Guide (project repo): docs/data-health/dashboards.md > Overview > KPI tiles"
         },
         "viz_k_source_pending": {
             "type": "splunk.singlevalue",
@@ -703,7 +703,7 @@
                 "sparklineDisplay": "off",
                 "trendDisplay": "off"
             },
-            "description": "How many expected sources (single files or inputs) have no trusted status yet. Guide: docs/data-health/dashboards.md, Overview > KPI tiles"
+            "description": "How many expected sources (single files or inputs) have no trusted status yet. Guide (project repo): docs/data-health/dashboards.md > Overview > KPI tiles"
         }
     },
     "layout": {
