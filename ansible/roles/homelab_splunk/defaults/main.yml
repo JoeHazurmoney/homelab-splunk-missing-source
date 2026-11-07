@@ -33,6 +33,9 @@ hl_linux_state_dir: /var/lib/hl_splunk
 hl_uf_linux_packages: [sysstat]
 # How long install/start wait for the UF to connect to Cribl and for its _internal in Splunk
 hl_uf_connect_timeout: 180
+# uninstall: accept a contract without the install baselines (they are missing although the state file
+# records an install, e.g. deleted by hand); the play refuses otherwise
+hl_uninstall_without_baseline: false
 
 # --- Expectation metadata (spec 7.2 dh_expected). Set per group or host. ---
 hl_owner: taylorb

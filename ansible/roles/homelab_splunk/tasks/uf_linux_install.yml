@@ -75,6 +75,20 @@
   changed_when: false
   failed_when: false
 
+# Recorded and written before dnf runs: a run that fails after this point (dnf itself, a missing
+# rpm, …) leaves the record, and the next run's list is the union, so uninstall still removes and
+# checks them (task 4 fix round 1: a failed first run left sysstat out of the record).
+- name: Record the packages the role adds
+  ansible.builtin.set_fact:
+    hl_state: "{{ hl_state | combine({'packages_added': ((hl_state.packages_added | default([]))
+      + hl_uf_pkgs_missing) | unique | sort}) }}"
+  vars:
+    hl_uf_pkgs_missing: "{{ hl_uf_pkgs_before.results | selectattr('rc', 'ne', 0) | map(attribute='item') | list }}"
+
+- name: Write the package record
+  ansible.builtin.include_tasks: linux_state_write.yml
+  when: hl_uf_pkgs_before.results | selectattr('rc', 'ne', 0) | list | length > 0
+
 - name: Install the missing packages
   ansible.builtin.dnf:
     name: "{{ hl_uf_pkgs_missing }}"
@@ -82,11 +96,6 @@
   when: hl_uf_pkgs_missing | length > 0
   vars:
     hl_uf_pkgs_missing: "{{ hl_uf_pkgs_before.results | selectattr('rc', 'ne', 0) | map(attribute='item') | list }}"
-
-- name: Record the packages the role added
-  ansible.builtin.set_fact:
-    hl_state: "{{ hl_state | combine({'packages_added': ((hl_state.packages_added | default([]))
-      + (hl_uf_pkgs_before.results | selectattr('rc', 'ne', 0) | map(attribute='item') | list)) | unique | sort}) }}"
 
 # --- The package ---
 - name: Install the UF package
@@ -229,20 +238,27 @@
     hl_uf_log_from: "{{ (hl_uf_log_lines.stdout.split()[0] | int) if hl_uf_started is changed else 0 }}"
     hl_uf_since: "{{ (hl_uf_log_lines.stdout.split()[1] | int) if hl_uf_started is changed else 0 }}"
 
-# From splunkd.log, not `splunk show fips-mode`: that CLI command needs a login ("Authentication
-# needed, run splunk login", task 4 check 5), and -auth would put the admin password on argv.
-# splunkd logs the provider line just before "Splunkd starting", so the line counts only between
-# the previous start and the latest one: it then describes the running splunkd.
+# From the running splunkd (the service's MainPID), not `splunk show fips-mode`, which needs a
+# login (task 4 check 5; -auth would put the admin password on argv), and not splunkd.log, whose
+# start lines are gone once the log rotates (25 MB). The launcher passes splunk-launch.conf to
+# splunkd as its environment, and FIPS mode loads OpenSSL's FIPS 140-3 provider module (seen live:
+# fips140-3/fips.so on the VMs, only legacy.so on pi5).
 - name: Check the UF runs in FIPS mode (FIPS hosts only)
   ansible.builtin.shell: |
     set -o pipefail
-    awk '/FIPS provider enabled/ { f = $0 } /Splunkd starting \(build/ { last = f; f = "" } END { print last }' \
-      {{ hl_uf_home }}/var/log/splunk/splunkd.log
+    p=$(systemctl show -p MainPID --value SplunkForwarder)
+    [ "${p:-0}" -gt 0 ] || { echo "HL_PID=none"; exit 0; }
+    echo "HL_PID=$p"
+    tr '\0' '\n' < /proc/"$p"/environ | grep -E '^SPLUNK_FIPS(_VERSION)?=' || true
+    grep -q -F '/ossl-modules/fips140-3/fips.so' /proc/"$p"/maps && echo "HL_FIPS_MODULE=loaded" || echo "HL_FIPS_MODULE=absent"
   args:
     executable: /bin/bash
   register: hl_uf_fips_mode
   changed_when: false
-  failed_when: "hl_uf_fips_mode.stdout is not search('provider: 140-3, .* status: Success')"
+  failed_when: >-
+    'SPLUNK_FIPS=1' not in hl_uf_fips_mode.stdout_lines
+    or 'SPLUNK_FIPS_VERSION=140-3' not in hl_uf_fips_mode.stdout_lines
+    or 'HL_FIPS_MODULE=loaded' not in hl_uf_fips_mode.stdout_lines
   when: (hl_uf_fips.content | default('MA==') | b64decode | trim) == '1'
 
 - name: Marker for the install

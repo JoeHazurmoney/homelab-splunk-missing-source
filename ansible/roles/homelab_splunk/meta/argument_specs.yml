@@ -50,6 +50,10 @@ argument_specs:
         type: int
         default: 180
         description: Seconds to wait for the UF to connect to Cribl and for its _internal in Splunk.
+      hl_uninstall_without_baseline:
+        type: bool
+        default: false
+        description: Let uninstall check its contract without the install baselines (missing although an install is recorded).
       hl_s2s_port:
         type: int
         default: 9997

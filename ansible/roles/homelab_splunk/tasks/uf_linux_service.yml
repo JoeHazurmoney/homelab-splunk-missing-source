@@ -42,17 +42,21 @@
   when: hl_service_action in ['start', 'restart']
 
 - name: Read the UF's status
-  ansible.builtin.shell: |
-    set -o pipefail
-    echo "service=$(systemctl is-active SplunkForwarder 2>/dev/null || true)"
-    echo "rpm=$(rpm -q --qf '%{VERSION}' splunkforwarder 2>/dev/null || echo none)"
-    log={{ hl_uf_home }}/var/log/splunk/splunkd.log
-    echo "build=$(grep -h -o 'Splunkd starting (build [0-9a-f]*)' "$log" 2>/dev/null | tail -1 | grep -o '[0-9a-f]\{12\}' || true)"
-    echo "last_connect=$(grep -h 'Connected to idx=' "$log" 2>/dev/null | tail -1 | cut -c1-23)"
-    echo "last_refusal=$(grep -h -E 'Invalid S2S token|Connection closed by server' "$log" 2>/dev/null | tail -1 | cut -c1-23)"
-    echo "apps=$(ls {{ hl_uf_home }}/etc/apps 2>/dev/null | tr '\n' ' ')"
-    echo "fips=$(grep -c '^SPLUNK_FIPS=1' {{ hl_uf_home }}/etc/splunk-launch.conf 2>/dev/null || echo 0)"
-  args:
+  ansible.builtin.shell:
+    cmd: |
+      set -o pipefail
+      echo "service=$(systemctl is-active SplunkForwarder 2>/dev/null || true)"
+      echo "rpm=$(rpm -q --qf '%{VERSION}' splunkforwarder 2>/dev/null || echo none)"
+      log={{ hl_uf_home }}/var/log/splunk/splunkd.log
+      # The build from etc/splunk.version and FIPS from the running splunkd: splunkd.log's start
+      # lines are gone once the log rotates (task 4 fix round 1)
+      echo "build=$(sed -n 's/^BUILD=//p' {{ hl_uf_home }}/etc/splunk.version 2>/dev/null)"
+      echo "last_connect=$(grep -h 'Connected to idx=' "$log" 2>/dev/null | tail -1 | cut -c1-23)"
+      echo "last_close=$(grep -h -E '{{ hl_uf_close_re }}' "$log" 2>/dev/null | tail -1 | cut -c1-23)"
+      echo "apps=$(ls {{ hl_uf_home }}/etc/apps 2>/dev/null | tr '\n' ' ')"
+      p=$(systemctl show -p MainPID --value SplunkForwarder 2>/dev/null)
+      if [ "${p:-0}" -gt 0 ] && grep -q -F '/ossl-modules/fips140-3/fips.so' /proc/"$p"/maps 2>/dev/null; then f=on; else f=off; fi
+      echo "fips=$f (launch.conf SPLUNK_FIPS=1: $(grep -c '^SPLUNK_FIPS=1' {{ hl_uf_home }}/etc/splunk-launch.conf 2>/dev/null || true))"
     executable: /bin/bash
   register: hl_svc_status
   changed_when: false

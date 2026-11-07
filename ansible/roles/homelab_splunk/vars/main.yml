@@ -142,10 +142,14 @@ hl_uf_tamper_rules:
   - {kind: dir, path: /etc/audit, key: hl-audit-config}
 hl_uf_tamper_file: /etc/audit/rules.d/zz-hl-uf-tamper.rules
 # ERE for these rules and for wd2l's in `auditctl -l`, which prints a syscall rule's key as
-# `-F key=<key>` (never `-k <key>`; task 4, audit 4.0.3)
-hl_uf_tamper_key_re: "-F key=({{ hl_uf_tamper_rules | map(attribute='key') | unique | join('|') }})$"
-hl_wd2l_audit_key_re: "-F key=wd2l-"
+# `-F key=<key>` (task 4, audit 4.0.3) and a watch rule's (`-w`) as `-k <key>`
+hl_uf_tamper_key_re: "(-F key=|-k )({{ hl_uf_tamper_rules | map(attribute='key') | unique | join('|') }})$"
+hl_wd2l_audit_key_re: "(-F key=|-k )wd2l-"
+# ERE for the UF's splunkd.log lines that end a connection to Cribl. The UF logs a wrong token as a
+# plain "Connection closed by server" (task 4 check 7), the same as a benign close.
+hl_uf_close_re: "Invalid S2S token|Connection closed by server|unauthorized"
 # The files of hl_uf_outputs (templates/uf/hl_uf_outputs/default/<name>.j2)
 hl_uf_outputs_files: [app.conf, outputs.conf, limits.conf, web.conf]
-# The UF's CLI, run as its own user (running it as root warns about SPLUNK_HOME ownership, spike 14 d)
+# The UF's CLI. The role runs it only as root, for boot-start (enable/disable), which needs root;
+# status, FIPS and the connection are read from systemd, /proc, the rpm and splunkd.log instead.
 hl_uf_cli: "{{ hl_uf_home }}/bin/splunk"
