@@ -1,0 +1,23 @@
+c,item,block,change,dur,from,ui_change,ui_item,ui_now,ui_after,dh_label,detail,reason,entity_id,limit_override,k
+b1,,,,,,Add test block,h5 › linux_audit › /var/log/audit/audit.log.1 (exact source),Not blocked,Blocked until 2033-05-18 03:48 GMT (r); Splunk applies it within about a minute,Apply: block h5 › linux_audit › /var/log/audit/audit.log.1 (exact source) for 15 minutes,,,,,
+b2,,,,,,Remove test block,h1: whole host,Blocked until 2033-05-18 03:43 GMT (old block),Not blocked,Apply: remove the test block on h1: whole host,,,,,
+blk,,,,,,,h1: whole host,2033-05-18 03:43 GMT,test block until 03:43 GMT,,,,,,h1|*|*
+blk,,,,,,,h3 › cpu › cpu (exact source),2033-05-18 03:33 GMT,expired (removed within about 2 min),,,,,,h3|cpu|cpu
+log,,,,,,Add expected row,newh › syslog (linux),2033-05-18 03:32 GMT,,,not expected → managed by ui / enabled 1 / profile continuous / criticality 2 / collection uf,add syslog,sourcetype|linux|newh|syslog|*,,
+log,,,,,,Add test block,pi5 › syslog,2033-05-18 03:32 GMT,,,not blocked → test block until 2033-05-18 03:48 (r),r,pi5|syslog|*,,
+log,,,,,,Mute,pi5: whole host,2033-05-18 03:31 GMT,,,no override → mute until 2033-05-18 04:33 / limit none / reason patching,patching,host|*|pi5|*|*,,
+log:mute*pi5,,,,,,,pi5: whole host,,,,,,,,
+o1,,,,,,Mute,pi5 › syslog (enclave1),Not muted; no limit override,Muted until 2033-05-18 07:33 GMT (patching); no limit override,Apply: mute pi5 › syslog (enclave1) for 4 hours,,,,,
+o2,,,,,,Set limit,e5: whole host,Muted until 2033-05-18 03:43 GMT (old); limit override 20 minutes (1200 s),Muted until 2033-05-18 03:43 GMT (old); limit override 30 minutes (1800 s),Apply: set the limit of e5: whole host to 30 minutes (1800 s),,,,,
+o3,,,,,,Unmute,e5: whole host,Muted until 2033-05-18 03:43 GMT (old); limit override 20 minutes (1200 s),Not muted; limit override 20 minutes (1200 s),Apply: unmute e5: whole host,,,,,
+o4,,,,,,Clear limit,e6 › syslog (linux),Not muted; limit override 10 minutes (600 s),Not muted; no limit override,Apply: clear the limit override of e6 › syslog (linux),,,,,
+ov,,,,,,,e5: whole host,2033-05-18 03:43 GMT,,,,,host|*|e5|*|*,20 minutes (1200 s),
+ov,,,,,,,e6 › syslog (linux),-,,,,,sourcetype|linux|e6|syslog|*,10 minutes (600 s),
+w1,pi5: whole host,pi5: whole host,Mute,1 hour,Override (set on Manage),,,,,,,,,,
+w2,pi5 › syslog (enclave1),pi5 › syslog,Remove test block,20 minutes,Fixed limit on its expected row,,,,,,,,,,
+w3,h8 › app › /var/log/app-*.log (linux),h8 › linux_secure › /var/log/secure.1 (exact source),Adopt,90 s,Learned from its history,,,,,,,,,,
+w4,bogus,-,something_else,7 days,Profile default (the row's profile is unknown),,,,,,,,,,
+w5,,,Set limit,-,None (INFO: never alerts),,,,,,,,,,
+x1,,,,,,Add expected row,newh › cpu › cpu (linux),Not on the expected list,Expected; managed here (ui): profile periodic every 1 minute; criticality 2; arrives by uf,Apply: add newh › cpu › cpu (linux) to the expected list (profile periodic; criticality 2),,,,,
+x2,,,,,,Update expected row,h6 › syslog (linux),On the expected list; managed by ui: profile sporadic; criticality 3,Expected; managed here (ui): profile continuous; criticality 2; arrives by uf,Apply: update h6 › syslog (linux) on the expected list (profile continuous; criticality 2),,,,,
+x3,,,,,,Add expected row,-,Not on the expected list,Expected; managed here (ui): profile continuous; criticality 2; arrives by uf,,,,,,

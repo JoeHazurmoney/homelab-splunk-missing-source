@@ -93,8 +93,8 @@ argument_specs:
       hl_server_restart_confs:
         type: list
         elements: str
-        default: [indexes.conf, inputs.conf, props.conf]
-        description: Changing or removing one of these files restarts splunkd; other changes are reloaded.
+        default: [indexes.conf, inputs.conf, props.conf, web.conf]
+        description: Changing or removing one of these files restarts splunkd (web.conf has no REST reload); other changes are reloaded.
       hl_server_reload_endpoints:
         type: list
         elements: str

@@ -1,0 +1,2 @@
+entity_id,managed_by,enabled,expected_since,profile,criticality,interval_secs,collection,owner,site
+sourcetype|linux|h6|syslog|*,ui,1,NOW-5000,sporadic,3,,uf,ops,lab

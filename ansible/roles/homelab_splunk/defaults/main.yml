@@ -37,8 +37,9 @@ hl_server_apps:
     seed_lookups: [dh_expected_ansible.csv]
 # Limit server, server_remove (and, from task 6, apps/apps_remove) to these apps; [] = all
 hl_apps_only: []
-# A change to one of these files restarts splunkd; anything else is reloaded over REST
-hl_server_restart_confs: [indexes.conf, inputs.conf, props.conf]
+# A change to one of these files restarts splunkd; anything else is reloaded over REST.
+# web.conf has no REST reload (hl_server_base's dashboard risky-command setting, spec 7.8).
+hl_server_restart_confs: [indexes.conf, inputs.conf, props.conf, web.conf]
 hl_server_reload_endpoints:
   - apps/local
   - admin/conf-collections

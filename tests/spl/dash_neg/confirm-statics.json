@@ -1,0 +1,7 @@
+{
+    "about": "The mute Confirm list gets a static choice besides the plan's Apply line.",
+    "view": "dh_manage",
+    "pattern": "(\"input_ov_confirm\": \\{[\\s\\S]*?\"statics\": )\\[\\]",
+    "repl": "\\1[[\"Not yet\"], [\"-\"]]",
+    "expect": "confirmation ov_confirm must have no static items"
+}
