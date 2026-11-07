@@ -28,7 +28,7 @@ draft's plan, kept as the record.
 | `tasks/uf_linux_connected.yml` | the UF's splunkd.log: the latest `Connected to idx=<collector>:9997` is newer than the latest token refusal; then the host's `_internal` in Splunk < 120 s old (REST search delegated to homepc) |
 | `tasks/uf_linux_tamper.yml` | render, `augenrules --load` on change, then check `hl-uf-config` rules are loaded **and wd2l's rule count is unchanged** |
 | `tasks/uf_linux_uninstall.yml` | spec §5.6 order, then the full contract (rpm, home, units, polkit, user/group, mail, tamper, `auditctl` vs the baseline, new nouser paths vs the baseline, packages) |
-| `tasks/uf_linux_service.yml` | start/stop/restart (marker: before a stop, after a start), status (service, rpm, build, last connect, last refusal, apps, FIPS) |
+| `tasks/uf_linux_service.yml` | start/stop/restart (marker: before a stop, after a start), status (service, rpm, build, last connect, `last_close`, apps, FIPS) |
 | `tasks/verify.yml` | Linux UF running + connected + seen in Splunk; Cribl healthy |
 | `tasks/download.yml` | `get_url` with the pinned sha256 into `ansible/files/packages/` |
 | `tasks/main.yml` | `become: true` on every `uf_linux` import |
