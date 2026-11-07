@@ -1,10 +1,14 @@
 # Handoff: task 4 — Linux UF on wd2l-logsrv, wd2l-recv and pi5 → Cribl
 
-Issue #5 · branch `feat/4-uf-linux`, **stacked on `feat/3b-cribl`** (rebase onto `main` after 3b
-merges) · drafted in a cloud session on 2026-11-01 with no access to the hosts.
+Issue #5 · branch `feat/4-uf-linux`, drafted on `feat/3b-cribl` in a cloud session on 2026-11-01
+with no access to the hosts; merged with `main` after 3b merged (`4de84f9`).
 
-**State:** written; yamllint, ansible-lint (production) and shellcheck clean; `--syntax-check` OK. The tamper
-rules and `hl_uf_outputs` templates were rendered locally. **Nothing has run on a host.**
+**State:** verified live 2026-11-07 on wd2l-recv, wd2l-logsrv and pi5: checks 1–15 below pass, after
+seven fixes found on the hosts (the `-F key=` audit counts in install and uninstall, Cribl's
+`in_splunk_tcp` `maxS2Sversion: v4`, FIPS read from splunkd.log, the connection checked on every
+install run and on a start of a running UF, and the Splunk-side proof counting `_internal` sent after
+the (re)start). Check 15's winner, the Cribl hold released on splunktcp 9997, is now the default.
+Results, one row per check: spec §14.10. The text below is the draft's plan, kept as the record.
 
 ## What the branch adds
 
