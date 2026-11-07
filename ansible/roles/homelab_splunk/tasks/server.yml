@@ -2,8 +2,9 @@
 # HOMEPC, `docker cp` it into the container and swap in only default/ (and the app's other shipped
 # directories), metadata/default.meta and the shipped lookups, keeping local/ and UI-written
 # lookups. splunkd restarts only when a file in hl_server_restart_confs changed (indexes.conf,
-# inputs.conf, props.conf, web.conf); any other change is reloaded over REST. A splunkd restart loses what Cribl sends during Splunk's shutdown
-# (about 30 s in spike 2b, spec 14.7 g) until task 3b fixes or documents it.
+# inputs.conf, props.conf, web.conf); any other change is reloaded over REST.
+# A splunkd restart loses what Cribl sends during Splunk's shutdown (about 30 s in spike 2b,
+# spec 14.7 g) until task 3b fixes or documents it.
 #   -e '{"hl_apps_only":["hl_server_base"]}'   limits the run to the listed apps
 - name: Select the server apps to deploy
   ansible.builtin.set_fact:
