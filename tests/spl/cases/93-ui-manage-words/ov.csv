@@ -1,0 +1,3 @@
+entity_id,mute_until,reason,ticket,threshold_override_secs,set_by,set_at
+host|*|e5|*|*,NOW+600,old,T5,1200,taylor,NOW-100
+sourcetype|linux|e6|syslog|*,,,,600,ana,NOW-200

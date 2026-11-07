@@ -1,0 +1,7 @@
+{
+    "about": "The add-row write uses the mute form's Reason: one change could then write two forms.",
+    "view": "dh_manage",
+    "pattern": "reason=\\$ex_reason\\|s\\$(, ticket=\\$ex_ticket\\|s\\$ \\| `dh_ui_actor` \\| `dh_ui_expected_plan\\(dh_expected, dh_admin_log, now\\(\\)\\)` \\| eval dh_confirm=)",
+    "repl": "reason=$ov_reason|s$\\1",
+    "expect": "share token ov_reason: one change could write two forms"
+}

@@ -1,10 +1,10 @@
 <dashboard version="2" theme="dark">
     <label>Host detail</label>
-    <description>One host (spec §8.2): its expected children with age against threshold and the threshold's origin, 24 h of data by sourcetype, the forwarder, splunkd errors, tamper findings, transitions and Hyper-V events.</description>
+    <description>Everything about one host: what it should send and how late each item is, its data over 24 hours, its Splunk agent, recent agent errors, tamper findings, status changes and Hyper-V events.</description>
     <definition><![CDATA[
 {
     "title": "Host detail",
-    "description": "One host (spec §8.2). Opened from the Overview with the host set; pick another host above.",
+    "description": "Everything about one host: what it should send and how late each item is, its data over 24 hours, its Splunk agent, recent agent errors, tamper findings, status changes and Hyper-V events.",
     "inputs": {
         "input_host": {
             "type": "input.dropdown",
@@ -79,7 +79,7 @@
             "type": "ds.search",
             "name": "Latest splunkd errors",
             "options": {
-                "query": "search index=_internal sourcetype=splunkd (log_level=ERROR OR log_level=WARN) [| makeresults | eval host=$host|s$ | `dh_ui_host_terms`] earliest=-24h latest=now | head 25 | eval time=strftime(_time, \"%Y-%m-%d %H:%M:%S\"), message=coalesce(event_message, _raw) | table time log_level component message | `dh_ui_headers`"
+                "query": "search index=_internal sourcetype=splunkd (log_level=ERROR OR log_level=WARN) [| makeresults | eval host=$host|s$ | `dh_ui_host_terms`] earliest=-24h latest=now | head 25 | eval time=strftime(_time, \"%Y-%m-%d %H:%M:%S\"), message=coalesce(event_message, _raw) | eval level=log_level | table time level component message | `dh_ui_headers`"
             }
         },
         "ds_tamper": {
@@ -115,7 +115,7 @@
         "viz_children": {
             "type": "splunk.table",
             "title": "Expected data from this host",
-            "description": "Each stream this host should send: its status and how late it is against its limit. Guide: docs/data-health/dashboards.md, Host detail > Expected data from this host",
+            "description": "Each stream this host should send: its status and how late it is against its limit. Guide (project repo): docs/data-health/dashboards.md > Host detail > Expected data from this host",
             "dataSources": {
                 "primary": "ds_children"
             },
@@ -132,7 +132,7 @@
             "options": {
                 "stackMode": "stacked"
             },
-            "description": "How much data arrived from this host over the day. Guide: docs/data-health/dashboards.md, Host detail > Events in the last 24 h by sourcetype"
+            "description": "How much data arrived from this host over the day. Guide (project repo): docs/data-health/dashboards.md > Host detail > Events in the last 24 h by sourcetype"
         },
         "viz_fwd": {
             "type": "splunk.table",
@@ -143,7 +143,7 @@
             "options": {
                 "count": 25
             },
-            "description": "Version and last contact of the Splunk agent and the last Ansible and VM events. Guide: docs/data-health/dashboards.md, Host detail > Forwarder (the Splunk agent on the host)"
+            "description": "Version and last contact of the Splunk agent and the last Ansible and VM events. Guide (project repo): docs/data-health/dashboards.md > Host detail > Forwarder (the Splunk agent on the host)"
         },
         "viz_errors": {
             "type": "splunk.table",
@@ -154,7 +154,7 @@
             "options": {
                 "count": 25
             },
-            "description": "What the Splunk agent on this host complained about. Guide: docs/data-health/dashboards.md, Host detail > Latest Splunk agent errors and warnings (24 h)"
+            "description": "What the Splunk agent on this host complained about. Guide (project repo): docs/data-health/dashboards.md > Host detail > Latest Splunk agent errors and warnings (24 h)"
         },
         "viz_tamper": {
             "type": "splunk.table",
@@ -165,7 +165,7 @@
             "options": {
                 "count": 25
             },
-            "description": "Signs that someone may have switched off logging here. Guide: docs/data-health/dashboards.md, Host detail > Tamper findings on this host"
+            "description": "Signs that someone may have switched off logging here. Guide (project repo): docs/data-health/dashboards.md > Host detail > Tamper findings on this host"
         },
         "viz_transitions": {
             "type": "splunk.table",
@@ -176,7 +176,7 @@
             "options": {
                 "count": 25
             },
-            "description": "When each stream went late or missing and when it came back. Guide: docs/data-health/dashboards.md, Host detail > Status changes (7 d)"
+            "description": "When each stream went late or missing and when it came back. Guide (project repo): docs/data-health/dashboards.md > Host detail > Status changes (7 d)"
         },
         "viz_hyperv": {
             "type": "splunk.table",
@@ -187,7 +187,7 @@
             "options": {
                 "count": 25
             },
-            "description": "When this VM was started or stopped on the Hyper-V host. Guide: docs/data-health/dashboards.md, Host detail > Hyper-V VM events (7 d)"
+            "description": "When this VM was started or stopped on the Hyper-V host. Guide (project repo): docs/data-health/dashboards.md > Host detail > Hyper-V VM events (7 d)"
         },
         "viz_runbooks": {
             "type": "splunk.table",
@@ -207,7 +207,7 @@
                     }
                 }
             ],
-            "description": "The how-to pages linked to this host. Guide: docs/data-health/dashboards.md, Host detail > Runbooks (click to open)"
+            "description": "The how-to pages linked to this host. Guide (project repo): docs/data-health/dashboards.md > Host detail > Runbooks (click to open)"
         }
     },
     "layout": {

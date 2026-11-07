@@ -1,0 +1,2 @@
+time,actor,action,entity_id,detail,reason,ticket
+NOW-60,taylor,expected_add,sourcetype|linux|h6|syslog|*,x,y,-
