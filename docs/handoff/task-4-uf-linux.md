@@ -8,7 +8,11 @@ seven fixes found on the hosts (the `-F key=` audit counts in install and uninst
 `in_splunk_tcp` `maxS2Sversion: v4`, FIPS read from splunkd.log, the connection checked on every
 install run and on a start of a running UF, and the Splunk-side proof counting `_internal` sent after
 the (re)start). Check 15's winner, the Cribl hold released on splunktcp 9997, is now the default.
-Results, one row per check: spec §14.10. The text below is the draft's plan, kept as the record.
+Results, one row per check: spec §14.10. Review fix round 1 (same day): FIPS and the build read from the
+running splunkd and `etc/splunk.version` (splunkd.log rotates), no fast fail on a close and the Splunk
+proof anchored on the running splunkd's start (a wrong token had passed), the package record written
+before dnf, a stricter uninstall contract, and markers around the Cribl hold. The text below is the
+draft's plan, kept as the record.
 
 ## What the branch adds
 
