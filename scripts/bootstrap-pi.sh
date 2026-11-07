@@ -142,7 +142,15 @@ else
     printf 'vault_hl_uf_admin_password: "%s"\n' "$(python3 -c 'import secrets; print(secrets.token_urlsafe(24))')"
     printf 'vault_hl_s2s_token: "%s"\n' "$(python3 -c 'import uuid; print(uuid.uuid4())')"
     printf 'vault_hl_markers_token: "%s"\n' "$(python3 -c 'import uuid; print(uuid.uuid4())')"
-    printf 'vault_hl_cribl_admin_password: "%s"\n' "$(python3 -c 'import secrets; print(secrets.token_urlsafe(24))')"
+    # Cribl wants 3 of 4 classes (lower, upper but not first, digit but not last, other): retry until all 4
+    printf 'vault_hl_cribl_admin_password: "%s"\n' "$(python3 -c '
+import re, secrets
+while True:
+    p = secrets.token_urlsafe(24)
+    if re.search("[a-z]", p) and re.search("[A-Z]", p[1:]) and re.search("[0-9]", p[:-1]) and re.search("[^A-Za-z0-9]", p):
+        print(p)
+        break
+')"
   } | (umask 077 && "$ansible_bin/ansible-vault" encrypt --output "$vault")
   chmod 600 "$vault"
 fi

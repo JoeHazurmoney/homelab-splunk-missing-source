@@ -61,13 +61,16 @@
 
     - name: Work out the new table
       ansible.builtin.set_fact:
-        hl_block_rows: "{{ hl_block_keep + hl_block_new }}"
+        hl_block_rows: "{{ (hl_block_keep_json | from_json) + hl_block_new }}"
+        hl_block_cur_csv: "{{ (hl_block_cur.stdout | default('') | replace('\r', '') | trim) ~ '\n' }}"
       vars:
         hl_block_now: "{{ now(utc=true).timestamp() | int }}"
         hl_block_old: "{{ (hl_block_cur.stdout | default('k,until,reason,set_by')) | community.general.from_csv }}"
-        # Keep unexpired rows for other keys
-        hl_block_keep: "{{ hl_block_old | selectattr('k', 'defined') | rejectattr('k', 'equalto', hl_block_key)
-          | selectattr('until', 'match', '^[0-9]+$') | selectattr('until', 'gt', hl_block_now | string) | list }}"
+        # Keep the unexpired rows for other keys; until is compared as an integer
+        hl_block_keep_json: >-
+          {% set ns = namespace(rows=[]) %}{% for r in hl_block_old %}{% if r.k is defined and r.k != hl_block_key
+          and (r.until | default('') | string) is match('^[0-9]+$') and (r.until | int) > (hl_block_now | int)
+          %}{% set ns.rows = ns.rows + [r] %}{% endif %}{% endfor %}{{ ns.rows | to_json }}
         hl_block_new: "{{ [] if (hl_block_key | length == 0 or hl_block_clear | bool) else
           [{'k': hl_block_key, 'until': (hl_block_now | int + 60 * hl_block_minutes | int) | string,
             'reason': hl_block_reason, 'set_by': lookup('ansible.builtin.env', 'USER') or 'ansible'}] }}"
@@ -80,6 +83,7 @@
           {{ r.k }},{{ r.until }},{{ r.reason }},{{ r.set_by }}
           {% endfor %}
 
+    # Skipped when nothing changed (a prune-only run with nothing expired)
     - name: Push the table to Cribl through the lookups API
       ansible.windows.win_shell: |
         {{ hl_cribl_ps_prelude }}
@@ -99,7 +103,8 @@
       environment:
         HL_CRIBL_PW: "{{ vault_hl_cribl_admin_password }}"
       register: hl_block_push
-      changed_when: hl_block_csv != ((hl_block_cur.stdout | default('')) | trim ~ '\n')
+      when: hl_block_csv != hl_block_cur_csv
+      changed_when: true
 
     - name: Read Cribl's copy back
       ansible.windows.win_command:
@@ -113,31 +118,10 @@
         fail_msg: "Cribl's hl_ingest_block.csv differs from what the role pushed: {{ hl_block_back.stdout }}"
         quiet: true
 
-    # --- Mirror into Splunk (hl_server_base ships this file once as a seed and never overwrites it) ---
-    - name: Write the mirror on HOMEPC
-      ansible.windows.win_copy:
-        content: "{{ hl_block_csv }}"
-        dest: "{{ hl_block_stage.path }}\\hl_ingest_block.csv"
-      changed_when: false
-
-    - name: Copy the mirror into the Splunk container
-      ansible.windows.win_command:
-        argv: [docker, cp, "{{ hl_block_stage.path }}\\hl_ingest_block.csv",
-               "{{ hl_splunk_container }}:{{ hl_splunk_home }}/etc/apps/hl_server_base/lookups/hl_ingest_block.csv"]
-      changed_when: false
-
-    - name: Give the mirror back to splunk
-      ansible.windows.win_command:
-        argv: [docker, exec, -u, root, "{{ hl_splunk_container }}", chown, "splunk:splunk",
-               "{{ hl_splunk_home }}/etc/apps/hl_server_base/lookups/hl_ingest_block.csv"]
-      changed_when: false
-
-    # docker cp from Windows leaves it rwxr-xr-x; match the server tag's lookups (u=rw,go=r)
-    - name: Set the mirror's mode
-      ansible.windows.win_command:
-        argv: [docker, exec, -u, root, "{{ hl_splunk_container }}", chmod, "0644",
-               "{{ hl_splunk_home }}/etc/apps/hl_server_base/lookups/hl_ingest_block.csv"]
-      changed_when: false
+    - name: Mirror the table into Splunk
+      ansible.builtin.include_tasks: cribl_mirror.yml
+      vars:
+        hl_mirror_csv: "{{ hl_block_csv }}"
 
   always:
     - name: Remove the helper from the Cribl container
