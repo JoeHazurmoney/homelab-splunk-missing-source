@@ -42,6 +42,100 @@ argument_specs:
         type: str
         default: "wd2l:audit"
         description: Sourcetype of the host's /var/log/wd2l/audit-*.jsonl (wd2l:sender:audit on wd2l-logsrv).
+      hl_splunk_container:
+        type: str
+        default: wd2l-splunk
+        description: The Splunk container on splunk_server (Docker Desktop on HOMEPC).
+      hl_splunk_home:
+        type: str
+        default: /opt/splunk
+        description: SPLUNK_HOME inside the container.
+      hl_splunk_admin_password_file:
+        type: str
+        default: 'C:\Users\taylo\wd2l-splunk\secrets\splunk-admin-password'
+        description: File on HOMEPC holding the Splunk admin password; read there for each REST call, never copied.
+      hl_splunk_mgmt_url:
+        type: str
+        default: https://127.0.0.1:8089
+        description: Splunk REST, as HOMEPC reaches it.
+      hl_splunk_hec_url:
+        type: str
+        default: https://127.0.0.1:8088
+        description: wd2l's HEC, as HOMEPC reaches it (health checks).
+      hl_server_apps_src:
+        type: str
+        default: "{{ playbook_dir }}/../splunk/apps"
+        description: Where the server apps' sources are on the controller.
+      hl_server_apps:
+        type: list
+        elements: dict
+        description: The server apps the server tag deploys and server_remove removes, in deploy order.
+        options:
+          name:
+            type: str
+            required: true
+            description: App directory name under hl_server_apps_src.
+          seed_lookups:
+            type: list
+            elements: str
+            default: []
+            description: Lookup files shipped only when the app has none (others rewrite them).
+          templates:
+            type: list
+            elements: str
+            default: []
+            description: App-relative paths rendered from templates/server_apps/<app>/<path>.j2.
+      hl_apps_only:
+        type: list
+        elements: str
+        default: []
+        description: Limit the app tags to these apps; empty means all.
+      hl_server_restart_confs:
+        type: list
+        elements: str
+        default: [indexes.conf, inputs.conf, props.conf]
+        description: Changing or removing one of these files restarts splunkd; other changes are reloaded.
+      hl_server_reload_endpoints:
+        type: list
+        elements: str
+        description: REST endpoints (under /services/, without /_reload) reloaded after a change that needs no restart.
+      hl_purge_index_data:
+        type: bool
+        default: false
+        description: server_remove also deletes the removed indexes' data on disk.
+      hl_net_name:
+        type: str
+        default: hl-net
+        description: Docker network the Splunk container joins live so Cribl reaches splunktcp 9997.
+      hl_server_container_stage:
+        type: str
+        default: /tmp/hl_server_stage
+        description: Root-only staging directory inside the container, removed after each run.
+      hl_wd2l_app:
+        type: str
+        default: wd2l
+        description: wd2l's Splunk app (its dashboard is checked after every change).
+      hl_wd2l_dashboard:
+        type: str
+        default: wd2l_state_of_health
+        description: wd2l's dashboard view name.
+      hl_server_wd2l_indexes:
+        type: list
+        elements: str
+        default: [enclave1, wd2l]
+        description: wd2l indexes that must receive new events after a splunkd restart.
+      hl_server_wd2l_max_age:
+        type: int
+        default: 300
+        description: Seconds; wd2l's newest health record must be younger than this.
+      hl_server_health_timeout:
+        type: int
+        default: 300
+        description: Seconds to wait for HEC and wd2l data after a change.
+      hl_win_state_file:
+        type: str
+        default: 'C:\ProgramData\hl_splunk\state.json'
+        description: The role's state file on Windows hosts (spec 5.2).
       syslog_devices:
         type: list
         elements: dict
@@ -133,7 +227,7 @@ argument_specs:
       vault_hl_s2s_token:
         type: str
         no_log: true
-        description: S2S token (splunktcptoken) the forwarders present on 9997.
+        description: S2S token for 9997 (splunktcptoken hl_cribl on Splunk; the UFs and Cribl present it).
       vault_hl_markers_token:
         type: str
         no_log: true

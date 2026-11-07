@@ -1,5 +1,265 @@
-# server_remove (splunk_server): remove the server apps and their KV collections; index data stays unless hl_purge_index_data
-# Placeholder until task 3 (spec 11) fills it in.
-- name: Placeholder for server_remove
-  ansible.builtin.debug:
-    msg: "server_remove on {{ inventory_hostname }}: not implemented yet (task 3)"
+# server_remove (splunk_server, spec 5.3/5.6): remove the server apps the role owns ([hl] managed)
+# and their KV collections (REST), restart splunkd when the removed config needs it, keep the
+# index data unless -e hl_purge_index_data=true, then undo server_network as the state file
+# recorded it: disconnect the Splunk container from hl-net, and delete hl-net when the role
+# created it and no container is still attached (in a full removal, cribl_remove runs first).
+# The contract check at the end fails the play if anything is left.
+#   -e '{"hl_apps_only":["hl_server_base"]}'   removes only the listed apps and leaves hl-net alone
+- name: Select the server apps to remove (reverse deploy order)
+  ansible.builtin.set_fact:
+    hl_server_apps_run: "{{ (hl_server_apps | selectattr('name', 'in', hl_apps_only) | list
+      if hl_apps_only | length > 0 else hl_server_apps) | reverse | list }}"
+
+- name: Read the Splunk container before the removal
+  ansible.windows.win_command:
+    argv: [docker, inspect, "{{ hl_splunk_container }}"]
+  register: hl_rm_splunk_before
+  changed_when: false
+
+- name: Stage the in-container helper
+  ansible.windows.win_tempfile:
+    state: directory
+    prefix: hl_server_stage.
+  register: hl_server_winstage
+  changed_when: false
+
+- name: Remove the apps
+  block:
+    - name: Copy the in-container helper to HOMEPC
+      ansible.windows.win_copy:
+        src: hl_server_app.sh
+        dest: "{{ hl_server_winstage.path }}\\hl_server_app.sh"
+      changed_when: false
+
+    - name: Clear the container staging directory
+      ansible.windows.win_command:
+        argv: [docker, exec, -u, root, "{{ hl_splunk_container }}", rm, -rf, "{{ hl_server_container_stage }}"]
+      changed_when: false
+
+    - name: Copy the helper into the container
+      ansible.windows.win_command:
+        argv: [docker, cp, "{{ hl_server_winstage.path }}", "{{ hl_splunk_container }}:{{ hl_server_container_stage }}"]
+      changed_when: false
+
+    - name: Delete each app's KV collections (REST)
+      ansible.windows.win_shell: |
+        {{ hl_ps_prelude }}
+        $app = '{{ item.name }}'
+        $out = [ordered]@{ app = $app; deleted = @(); emptied = @(); errors = @() }
+        $r = Invoke-HlRest -Path "/servicesNS/nobody/$app/storage/collections/config?output_mode=json&count=0"
+        if ($r.Code -eq 200) {
+          foreach ($e in ($r.Content | ConvertFrom-Json).entry) {
+            if ($e.acl.app -ne $app) { continue }
+            $n = [uri]::EscapeDataString($e.name)
+            $d = Invoke-HlRest -Method DELETE -Path "/servicesNS/nobody/$app/storage/collections/config/$n"
+            if ($d.Code -eq 200) { $out.deleted += $e.name; continue }
+            # A collection defined in the default folder of the app cannot be deleted over REST: empty it;
+            # its definition goes with the files of the app.
+            $d2 = Invoke-HlRest -Method DELETE -Path "/servicesNS/nobody/$app/storage/collections/data/$n"
+            if ($d2.Code -eq 200) { $out.emptied += $e.name } else { $out.errors += "$($e.name): HTTP $($d.Code)/$($d2.Code)" }
+          }
+        } elseif ($r.Code -ne 404) { $out.errors += "list: HTTP $($r.Code)" }
+        $out | ConvertTo-Json -Compress
+      loop: "{{ hl_server_apps_run }}"
+      loop_control:
+        label: "{{ item.name }}"
+      register: hl_rm_kv
+      changed_when: (hl_rm_kv.stdout | from_json).deleted | length > 0 or (hl_rm_kv.stdout | from_json).emptied | length > 0
+      failed_when: hl_rm_kv.rc != 0 or (hl_rm_kv.stdout | from_json).errors | length > 0
+
+    - name: Delete each app's files
+      ansible.windows.win_command:
+        argv: [docker, exec, -u, root, "{{ hl_splunk_container }}", sh, "{{ hl_server_container_stage }}/hl_server_app.sh",
+               remove, "{{ item.name }}"]
+      loop: "{{ hl_server_apps_run }}"
+      loop_control:
+        label: "{{ item.name }}"
+      register: hl_rm_app
+      changed_when: "'HL_RESULT=removed' in hl_rm_app.stdout"
+      failed_when: hl_rm_app.rc != 0 or 'HL_RESULT=unmanaged' in hl_rm_app.stdout
+
+    - name: Work out what was removed
+      ansible.builtin.set_fact:
+        hl_rm_removed_apps: "{{ hl_rm_app.results | selectattr('changed') | map(attribute='item.name') | list }}"
+        hl_rm_confs: "{{ hl_rm_app.results | map(attribute='stdout_lines') | flatten | select('match', '^HL_CONFS=')
+          | map('regex_replace', '^HL_CONFS=', '') | join(' ') | split() | unique }}"
+        hl_rm_indexes: "{{ hl_rm_app.results | map(attribute='stdout_lines') | flatten | select('match', '^HL_INDEXES=')
+          | map('regex_replace', '^HL_INDEXES=', '') | join(' ') | split() | unique }}"
+
+    - name: Decide whether splunkd must restart
+      ansible.builtin.set_fact:
+        hl_server_restart_needed: "{{ hl_rm_confs | select('in', hl_server_restart_confs) | list | length > 0 }}"
+
+    - name: Restart splunkd (removed indexes, inputs or props)
+      ansible.builtin.import_tasks: server_restart.yml
+      when: hl_server_restart_needed | bool
+
+    - name: Reload what was removed without a restart
+      ansible.windows.win_shell: |
+        {{ hl_ps_prelude }}
+        $codes = [ordered]@{}
+        foreach ($ep in @({{ hl_server_reload_endpoints | map('to_json') | join(', ') }})) {
+          $codes[$ep] = (Invoke-HlRest -Method POST -Path "/services/$ep/_reload").Code
+        }
+        $codes | ConvertTo-Json -Compress
+      register: hl_rm_reload
+      when:
+        - hl_rm_removed_apps | length > 0
+        - not (hl_server_restart_needed | bool)
+      changed_when: false
+      failed_when: >-
+        hl_rm_reload.rc != 0 or
+        (hl_rm_reload.stdout | from_json | dict2items | rejectattr('value', 'in', [200, 201]) | list | length > 0)
+
+    - name: Purge the removed indexes' data (hl_purge_index_data)
+      ansible.windows.win_command:
+        argv: "{{ ['docker', 'exec', '-u', 'root', hl_splunk_container, 'sh', hl_server_container_stage ~ '/hl_server_app.sh',
+          'purge'] + hl_rm_indexes }}"
+      register: hl_rm_purge
+      when:
+        - hl_purge_index_data | bool
+        - hl_rm_indexes | length > 0
+      changed_when: hl_rm_purge.stdout_lines | select('match', '^HL_PURGED=.*\\S') | list | length > 0
+
+  always:
+    - name: Remove the container staging directory
+      ansible.windows.win_command:
+        argv: [docker, exec, -u, root, "{{ hl_splunk_container }}", rm, -rf, "{{ hl_server_container_stage }}"]
+      changed_when: false
+      failed_when: false
+
+    - name: Remove the staging directory on HOMEPC
+      ansible.windows.win_file:
+        path: "{{ hl_server_winstage.path }}"
+        state: absent
+      changed_when: false
+
+# --- Undo server_network, as the state file recorded it (full removal only: with hl_apps_only
+# set, only the listed apps go and hl-net stays) ---
+- name: Read the state file
+  ansible.builtin.import_tasks: win_state_read.yml
+
+- name: Keep the network record as it was before the removal
+  ansible.builtin.set_fact:
+    hl_rm_net_state: "{{ (hl_state.server_network | default({})) if hl_apps_only | length == 0 else {} }}"
+    hl_rm_net_others: []
+
+- name: Undo server_network
+  when: hl_apps_only | length == 0
+  block:
+    - name: Look up the network
+      ansible.windows.win_command:
+        argv: [docker, network, inspect, "{{ hl_net_name }}"]
+      register: hl_rm_net
+      changed_when: false
+      failed_when: hl_rm_net.rc not in [0, 1]
+
+    - name: Disconnect the Splunk container from the network (live)
+      ansible.windows.win_command:
+        argv: [docker, network, disconnect, "{{ hl_net_name }}", "{{ hl_splunk_container }}"]
+      when:
+        - hl_rm_net.rc == 0
+        - hl_splunk_container in (hl_rm_net_state.attached | default([]))
+        - hl_splunk_container in ((hl_rm_net.stdout | from_json)[0].Containers | default({}, true) | dict2items
+          | map(attribute='value.Name') | list)
+      changed_when: true
+
+    - name: Look up the network again
+      ansible.windows.win_command:
+        argv: [docker, network, inspect, "{{ hl_net_name }}"]
+      register: hl_rm_net2
+      changed_when: false
+      failed_when: hl_rm_net2.rc not in [0, 1]
+
+    - name: Note who is still on the network
+      ansible.builtin.set_fact:
+        hl_rm_net_others: "{{ ((hl_rm_net2.stdout | from_json)[0].Containers | default({}, true) | dict2items
+          | map(attribute='value.Name') | list) if hl_rm_net2.rc == 0 else [] }}"
+
+    - name: Delete the network (the role created it and nothing is attached)
+      ansible.windows.win_command:
+        argv: [docker, network, rm, "{{ hl_net_name }}"]
+      when:
+        - hl_rm_net2.rc == 0
+        - hl_rm_net_state.network_created | default(false)
+        - hl_rm_net_others | length == 0
+      changed_when: true
+
+    - name: Say why the network stays
+      ansible.builtin.debug:
+        msg: "{{ hl_net_name }} stays: still attached: {{ hl_rm_net_others }} (in a full removal cribl_remove runs first)"
+      when: hl_rm_net_others | length > 0
+
+    - name: Update the state file's network record
+      ansible.builtin.set_fact:
+        hl_state: "{{ (hl_state | combine({'server_network': hl_rm_net_state | combine({'attached': []})}))
+          if (hl_rm_net_others | length > 0 and hl_rm_net_state.network_created | default(false))
+          else (hl_state | dict2items | rejectattr('key', 'eq', 'server_network') | items2dict) }}"
+
+    - name: Write the state file
+      ansible.builtin.import_tasks: win_state_write.yml
+
+# --- The contract (spec 5.6, Splunk server): fail the play if anything is left ---
+- name: Read the Splunk container after the removal
+  ansible.windows.win_command:
+    argv: [docker, inspect, "{{ hl_splunk_container }}"]
+  register: hl_rm_splunk_after
+  changed_when: false
+
+- name: Look up the network for the contract
+  ansible.windows.win_command:
+    argv: [docker, network, inspect, "{{ hl_net_name }}"]
+  register: hl_rm_net3
+  changed_when: false
+  failed_when: hl_rm_net3.rc not in [0, 1]
+
+- name: Look for leftovers of the removed apps in the container
+  ansible.windows.win_command:
+    argv: "{{ ['docker', 'exec', '-u', 'root', hl_splunk_container, 'sh', '-c', hl_rm_leftover_sh, 'sh',
+      hl_splunk_home, hl_server_container_stage] + (hl_server_apps_run | map(attribute='name') | list) }}"
+  vars:
+    hl_rm_leftover_sh: >-
+      h=$1; st=$2; shift 2;
+      for a in "$@"; do ls -d "$h/etc/apps/$a" "$h"/etc/users/*/"$a" "$h"/var/run/splunk/confsnapshot/*/apps/"$a" 2>/dev/null; done;
+      ls -d "$st" 2>/dev/null; true
+  register: hl_rm_leftover
+  changed_when: false
+
+- name: Look for the removed apps' KV collections
+  ansible.windows.win_shell: |
+    {{ hl_ps_prelude }}
+    $apps = @({{ hl_server_apps_run | map(attribute='name') | map('to_json') | join(', ') }})
+    $r = Invoke-HlRest -Path "/servicesNS/nobody/-/storage/collections/config?output_mode=json&count=0"
+    if ($r.Code -ne 200) { throw "collections list: HTTP $($r.Code)" }
+    $left = @()
+    foreach ($e in ($r.Content | ConvertFrom-Json).entry) { if ($apps -contains $e.acl.app) { $left += "$($e.acl.app)/$($e.name)" } }
+    @{ left = $left } | ConvertTo-Json -Compress
+  register: hl_rm_kv_left
+  changed_when: false
+
+- name: Check the removal contract
+  ansible.builtin.assert:
+    that:
+      - hl_rm_leftover.stdout_lines | length == 0
+      - (hl_rm_kv_left.stdout | from_json).left | length == 0
+      - hl_splunk_container not in (hl_rm_net_state.attached | default([])) or hl_net_name not in hl_rm_after.NetworkSettings.Networks
+      - hl_rm_net3.rc != 0 or hl_rm_net_others | length > 0 or not (hl_rm_net_state.network_created | default(false))
+      - hl_rm_after.State.Running
+      - hl_rm_after.HostConfig.PortBindings == hl_rm_before.HostConfig.PortBindings
+      - hl_rm_after.Mounts | map(attribute='Name') | sort == hl_rm_before.Mounts | map(attribute='Name') | sort
+    fail_msg: >-
+      server_remove left something behind: files {{ hl_rm_leftover.stdout_lines }}, collections
+      {{ (hl_rm_kv_left.stdout | from_json).left }}, {{ hl_splunk_container }} networks
+      {{ hl_rm_after.NetworkSettings.Networks.keys() | list }}, {{ hl_net_name }} present={{ hl_rm_net3.rc == 0 }}
+    success_msg: >-
+      server_remove contract passed: apps {{ hl_server_apps_run | map(attribute='name') | list }} gone, no KV left,
+      {{ hl_splunk_container }} networks {{ hl_rm_after.NetworkSettings.Networks.keys() | list }},
+      {{ hl_net_name }} present={{ hl_rm_net3.rc == 0 }}, ports and volumes unchanged
+  vars:
+    hl_rm_before: "{{ (hl_rm_splunk_before.stdout | from_json)[0] }}"
+    hl_rm_after: "{{ (hl_rm_splunk_after.stdout | from_json)[0] }}"
+
+- name: Check wd2l after the removal
+  ansible.builtin.import_tasks: server_health.yml
+  vars:
+    hl_health_since: ""

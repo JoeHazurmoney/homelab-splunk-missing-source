@@ -1,5 +1,207 @@
-# server (splunk_server): package and swap in hl_server_base, the TAs and hl_data_health
-# Placeholder until task 3 (spec 11) fills it in.
-- name: Placeholder for server
+# server (splunk_server, spec 5.3/5.5): build each server app as a tar on the controller, copy it to
+# HOMEPC, `docker cp` it into the container and swap in only default/ (and the app's other shipped
+# directories), metadata/default.meta and the shipped lookups, keeping local/ and UI-written
+# lookups. splunkd restarts only when indexes.conf, inputs.conf or props.conf changed; any other
+# change is reloaded over REST. A splunkd restart loses what Cribl sends during Splunk's shutdown
+# (about 30 s in spike 2b, spec 14.7 g) until task 3b fixes or documents it.
+#   -e '{"hl_apps_only":["hl_server_base"]}'   limits the run to the listed apps
+- name: Select the server apps to deploy
+  ansible.builtin.set_fact:
+    hl_server_apps_run: "{{ hl_server_apps | selectattr('name', 'in', hl_apps_only) | list
+      if hl_apps_only | length > 0 else hl_server_apps }}"
+
+- name: Check the selected server apps exist in the repository
+  ansible.builtin.stat:
+    path: "{{ hl_server_apps_src }}/{{ item.name }}/default/app.conf"
+  loop: "{{ hl_server_apps_run }}"
+  loop_control:
+    label: "{{ item.name }}"
+  delegate_to: localhost
+  register: hl_server_app_src
+  failed_when: not hl_server_app_src.stat.exists
+
+# --- Build on the controller: copy without local/, render the templated files, tar ---
+- name: Create the controller build directory
+  ansible.builtin.tempfile:
+    state: directory
+    prefix: hl_server_build.
+  delegate_to: localhost
+  register: hl_server_build
+  changed_when: false
+
+- name: Build, copy and swap in the server apps
+  block:
+    - name: Copy each app without local/ into the build directory
+      ansible.builtin.shell: |
+        set -euo pipefail
+        tar -C {{ hl_server_apps_src | quote }} --exclude={{ (item.name ~ '/local') | quote }} \
+          --exclude={{ (item.name ~ '/metadata/local.meta') | quote }} -cf - {{ item.name | quote }} \
+          | tar -C {{ hl_server_build.path | quote }} -xf -
+      args:
+        executable: /bin/bash
+      loop: "{{ hl_server_apps_run }}"
+      loop_control:
+        label: "{{ item.name }}"
+      delegate_to: localhost
+      changed_when: false
+
+    - name: Render the templated app files (tokens from the vault)
+      ansible.builtin.template:
+        src: "server_apps/{{ item.0.name }}/{{ item.1 }}.j2"
+        dest: "{{ hl_server_build.path }}/{{ item.0.name }}/{{ item.1 }}"
+        mode: "0600"
+      loop: "{{ hl_server_apps_run | subelements('templates', skip_missing=True) }}"
+      loop_control:
+        label: "{{ item.0.name }}/{{ item.1 }}"
+      delegate_to: localhost
+      changed_when: false
+      diff: false
+
+    - name: Pack each app as a reproducible tar
+      ansible.builtin.command:
+        argv:
+          - tar
+          - --sort=name
+          - --mtime=@0
+          - --owner=0
+          - --group=0
+          - --numeric-owner
+          - --mode=u+rwX,go+rX
+          - -C
+          - "{{ hl_server_build.path }}"
+          - -cf
+          - "{{ hl_server_build.path }}/{{ item.name }}.tar"
+          - "{{ item.name }}"
+      loop: "{{ hl_server_apps_run }}"
+      loop_control:
+        label: "{{ item.name }}"
+      delegate_to: localhost
+      changed_when: false
+
+    # --- Copy to HOMEPC and into the container ---
+    - name: Create the staging directory on HOMEPC (user profile, not readable by others)
+      ansible.windows.win_tempfile:
+        state: directory
+        prefix: hl_server_stage.
+      register: hl_server_winstage
+      changed_when: false
+
+    - name: Copy the app tars to HOMEPC
+      ansible.windows.win_copy:
+        src: "{{ hl_server_build.path }}/{{ item.name }}.tar"
+        dest: "{{ hl_server_winstage.path }}\\{{ item.name }}.tar"
+      loop: "{{ hl_server_apps_run }}"
+      loop_control:
+        label: "{{ item.name }}"
+      changed_when: false
+
+    - name: Copy the in-container helper to HOMEPC
+      ansible.windows.win_copy:
+        src: hl_server_app.sh
+        dest: "{{ hl_server_winstage.path }}\\hl_server_app.sh"
+      changed_when: false
+
+    - name: Clear the container staging directory
+      ansible.windows.win_command:
+        argv: [docker, exec, -u, root, "{{ hl_splunk_container }}", rm, -rf, "{{ hl_server_container_stage }}"]
+      changed_when: false
+
+    - name: Copy the staging directory into the container
+      ansible.windows.win_command:
+        argv: [docker, cp, "{{ hl_server_winstage.path }}", "{{ hl_splunk_container }}:{{ hl_server_container_stage }}"]
+      changed_when: false
+
+    - name: Make the container staging directory root-only
+      ansible.windows.win_command:
+        argv: [docker, exec, -u, root, "{{ hl_splunk_container }}", chmod, -R, go=, "{{ hl_server_container_stage }}"]
+      changed_when: false
+
+    - name: Swap in each app (default/, metadata/default.meta, shipped lookups)
+      ansible.windows.win_command:
+        argv: "{{ ['docker', 'exec', '-u', 'root', hl_splunk_container, 'sh',
+          hl_server_container_stage ~ '/hl_server_app.sh', 'install', hl_server_container_stage, item.name]
+          + (item.seed_lookups | default([])) }}"
+      loop: "{{ hl_server_apps_run }}"
+      loop_control:
+        label: "{{ item.name }}"
+      register: hl_server_swap
+      changed_when: "'HL_RESULT=changed' in hl_server_swap.stdout"
+
+  always:
+    - name: Remove the container staging directory
+      ansible.windows.win_command:
+        argv: [docker, exec, -u, root, "{{ hl_splunk_container }}", rm, -rf, "{{ hl_server_container_stage }}"]
+      changed_when: false
+      failed_when: false
+
+    - name: Remove the staging directory on HOMEPC
+      ansible.windows.win_file:
+        path: "{{ hl_server_winstage.path }}"
+        state: absent
+      when: hl_server_winstage.path is defined
+      changed_when: false
+
+    - name: Remove the controller build directory
+      ansible.builtin.file:
+        path: "{{ hl_server_build.path }}"
+        state: absent
+      delegate_to: localhost
+      changed_when: false
+
+- name: Work out what changed
+  ansible.builtin.set_fact:
+    hl_server_changed_files: "{{ hl_server_swap.results | map(attribute='stdout_lines') | flatten
+      | select('match', '^HL_CHANGED=') | map('regex_replace', '^HL_CHANGED=', '') | join(' ') | split() }}"
+    hl_server_changed_apps: "{{ hl_server_swap.results | selectattr('changed') | map(attribute='item.name') | list }}"
+
+- name: Decide whether splunkd must restart
+  ansible.builtin.set_fact:
+    hl_server_restart_needed: "{{ hl_server_changed_files | map('basename') | select('in', hl_server_restart_confs)
+      | list | length > 0 }}"
+
+- name: Show what changed
   ansible.builtin.debug:
-    msg: "server on {{ inventory_hostname }}: not implemented yet (task 3)"
+    msg: "changed apps: {{ hl_server_changed_apps }}; files: {{ hl_server_changed_files }};
+      restart: {{ hl_server_restart_needed }}"
+  when: hl_server_changed_apps | length > 0
+
+- name: Restart splunkd (indexes, inputs or props changed)
+  ansible.builtin.import_tasks: server_restart.yml
+  when: hl_server_restart_needed | bool
+
+- name: Reload what changed without a restart
+  ansible.windows.win_shell: |
+    {{ hl_ps_prelude }}
+    $codes = [ordered]@{}
+    foreach ($ep in @({{ hl_server_reload_endpoints | map('to_json') | join(', ') }})) {
+      $codes[$ep] = (Invoke-HlRest -Method POST -Path "/services/$ep/_reload").Code
+    }
+    foreach ($app in @({{ hl_server_changed_apps | map('to_json') | join(', ') }})) {
+      $codes["$app storage/collections/config"] = (Invoke-HlRest -Method POST -Path "/servicesNS/nobody/$app/storage/collections/config/_reload").Code
+    }
+    $codes | ConvertTo-Json -Compress
+  register: hl_server_reload
+  when:
+    - hl_server_changed_apps | length > 0
+    - not (hl_server_restart_needed | bool)
+  changed_when: false
+  failed_when: >-
+    hl_server_reload.rc != 0 or
+    (hl_server_reload.stdout | from_json | dict2items | rejectattr('value', 'in', [200, 201]) | list | length > 0)
+
+- name: Check the server config with btool
+  ansible.windows.win_command:
+    argv: [docker, exec, -u, splunk, "{{ hl_splunk_container }}", "{{ hl_splunk_home }}/bin/splunk", btool, check]
+  register: hl_server_btool
+  changed_when: false
+  # rc 1 = findings somewhere (wd2l's own savedsearches.conf has 30 today); only ours fail the play
+  failed_when: hl_server_btool.rc not in [0, 1]
+
+- name: Fail on btool findings in the role's apps
+  ansible.builtin.assert:
+    that: hl_server_btool_ours | length == 0
+    fail_msg: "btool check flags the role's apps: {{ hl_server_btool_ours }}"
+    quiet: true
+  vars:
+    hl_server_btool_ours: "{{ (hl_server_btool.stdout_lines + hl_server_btool.stderr_lines)
+      | select('search', '/etc/apps/(' ~ (hl_server_apps | map(attribute='name') | join('|')) ~ ')/') | list }}"

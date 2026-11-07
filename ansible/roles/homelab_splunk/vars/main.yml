@@ -1,0 +1,68 @@
+# Internal values, not meant to be overridden (defaults/main.yml holds the settings).
+
+# PowerShell prepended to the splunk_server win_shell tasks. The Splunk admin password is read on
+# HOMEPC from hl_splunk_admin_password_file at the moment of the call and never leaves the PC
+# (spec 5.2): it is not a task argument and it is never printed.
+#   Invoke-HlRest -Method GET|POST|DELETE -Path /services/... [-Body @{...}]  -> {Code, Content}
+#   Invoke-HlSearch '<SPL>'      -> the result rows (oneshot export, JSON)
+#   Get-HlHecHealth              -> {Code, Content} of wd2l HEC /services/collector/health
+hl_ps_prelude: |
+  $ErrorActionPreference = 'Stop'
+  $ProgressPreference = 'SilentlyContinue'
+  [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+  # The container's management and HEC certificates are self-signed: accept them on loopback only.
+  # A compiled callback, because a PowerShell script block has no runspace on the TLS thread.
+  if (-not ('HlTrustLoopback' -as [type])) {
+  Add-Type -TypeDefinition @"
+  using System.Net;
+  using System.Net.Security;
+  using System.Security.Cryptography.X509Certificates;
+  public static class HlTrustLoopback {
+    static bool Check(object sender, X509Certificate cert, X509Chain chain, SslPolicyErrors errors) {
+      HttpWebRequest r = sender as HttpWebRequest;
+      return errors == SslPolicyErrors.None || (r != null && r.RequestUri.IsLoopback);
+    }
+    public static void Install() { ServicePointManager.ServerCertificateValidationCallback = Check; }
+  }
+  "@
+  }
+  [HlTrustLoopback]::Install()
+  $HlMgmt = '{{ hl_splunk_mgmt_url }}'
+  $HlHec = '{{ hl_splunk_hec_url }}'
+  $HlPassFile = '{{ hl_splunk_admin_password_file }}'
+  function Invoke-HlWeb {
+    param([string]$Method, [string]$Uri, [hashtable]$Headers = @{}, $Body = $null)
+    try {
+      $p = @{ UseBasicParsing = $true; Method = $Method; Uri = $Uri; Headers = $Headers; TimeoutSec = 120 }
+      if ($null -ne $Body) { $p.Body = $Body }
+      $r = Invoke-WebRequest @p
+      return [pscustomobject]@{ Code = [int]$r.StatusCode; Content = [string]$r.Content }
+    } catch [System.Net.WebException] {
+      $resp = $_.Exception.Response
+      if ($null -eq $resp) { return [pscustomobject]@{ Code = 0; Content = $_.Exception.Message } }
+      $sr = New-Object System.IO.StreamReader($resp.GetResponseStream())
+      return [pscustomobject]@{ Code = [int]$resp.StatusCode; Content = $sr.ReadToEnd() }
+    }
+  }
+  function Invoke-HlRest {
+    param([string]$Method = 'GET', [string]$Path, $Body = $null)
+    $pw = [System.IO.File]::ReadAllText($HlPassFile).Trim()
+    $auth = 'Basic ' + [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes('admin:' + $pw))
+    Remove-Variable pw
+    return Invoke-HlWeb -Method $Method -Uri ($HlMgmt + $Path) -Headers @{ Authorization = $auth } -Body $Body
+  }
+  function Invoke-HlSearch {
+    param([string]$Spl)
+    $r = Invoke-HlRest -Method POST -Path '/services/search/jobs/export' -Body @{ search = $Spl; output_mode = 'json'; exec_mode = 'oneshot' }
+    if ($r.Code -ne 200) { throw "search failed (HTTP $($r.Code)): $($r.Content)" }
+    $rows = @()
+    foreach ($line in ($r.Content -split "`n")) {
+      if ($line.Trim() -eq '') { continue }
+      $o = $line | ConvertFrom-Json
+      if ($o.PSObject.Properties.Name -contains 'result') { $rows += $o.result }
+    }
+    return ,$rows
+  }
+  function Get-HlHecHealth {
+    return Invoke-HlWeb -Method GET -Uri ($HlHec + '/services/collector/health')
+  }

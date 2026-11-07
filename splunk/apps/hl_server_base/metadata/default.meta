@@ -1,0 +1,18 @@
+# Everything is admin-written. The props and the hl_ingest_block table are exported, so the
+# Search app and hl_data_health see them.
+[]
+access = read : [ * ], write : [ admin ]
+export = none
+
+# Search-time props apply in every app.
+[props]
+export = system
+
+# hl_data_health reads the table; the Manage form (dh_admin) and DH Prune (nobody) rewrite it.
+[transforms/hl_ingest_block]
+access = read : [ admin, dh_admin, dh_analyst ], write : [ admin, dh_admin ]
+export = system
+
+[lookups/hl_ingest_block.csv]
+access = read : [ admin, dh_admin, dh_analyst ], write : [ admin, dh_admin ]
+export = system
