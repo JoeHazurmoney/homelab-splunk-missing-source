@@ -67,12 +67,14 @@ hl_ps_prelude: |
     return Invoke-HlWeb -Method GET -Uri ($HlHec + '/services/collector/health')
   }
 
-# PowerShell prepended to the Cribl win_shell tasks (cribl, cribl_block, cribl_remove). The Cribl
-# admin password arrives in the environment variable HL_CRIBL_PW (the task's `environment`, with
-# no_log), never in the script text.
+# PowerShell prepended to the Cribl win_shell tasks (cribl, cribl_block). The Cribl admin password
+# arrives in the environment variable HL_CRIBL_PW (the task's `environment`), never in the script
+# text, so it is not in the result's `cmd`; Ansible doesn't return the environment in a result (task
+# 3b checked its -v logs for the value: none). The password-change task also has no_log.
 #   Connect-HlCribl [-Password <pw>]  -> logs in, keeps the bearer token for Invoke-HlCribl ($true/$false)
 #   Invoke-HlCribl -Method GET|POST|PATCH|PUT|DELETE -Path /system/... [-Json <object>] [-Raw <string> -ContentType <type>]
 #                                     -> {Code, Content}
+#   Test-HlCriblLookup <id>           -> $true when Cribl has that lookup
 #   Get-HlCriblHealth                 -> {Code, Content} of /api/v1/health (no login)
 hl_cribl_ps_prelude: |
   $ErrorActionPreference = 'Stop'
@@ -106,9 +108,16 @@ hl_cribl_ps_prelude: |
     if (-not $script:HlCriblToken) { throw 'Invoke-HlCribl: not logged in (Connect-HlCribl)' }
     $h = @{ Authorization = 'Bearer ' + $script:HlCriblToken }
     $body = $null
+    # An omitted [string]$Raw is '' (never $null), and a GET with a body throws: test the binding
     if ($null -ne $Json) { $body = $Json | ConvertTo-Json -Depth 20 -Compress }
-    elseif ($null -ne $Raw) { $body = [Text.Encoding]::UTF8.GetBytes($Raw) }
+    elseif ($PSBoundParameters.ContainsKey('Raw')) { $body = [Text.Encoding]::UTF8.GetBytes($Raw) }
     return Invoke-HlCriblWeb -Method $Method -Uri ($HlCriblApi + $Path) -Headers $h -Body $body -ContentType $ContentType
+  }
+  # GET /system/lookups/<id> answers 200 with no items for a missing lookup (seen live, task 3b)
+  function Test-HlCriblLookup {
+    param([string]$Id)
+    $r = Invoke-HlCribl -Path "/system/lookups/$Id"
+    return ($r.Code -eq 200 -and @(($r.Content | ConvertFrom-Json).items).Count -gt 0)
   }
   function Get-HlCriblHealth {
     return Invoke-HlCriblWeb -Method GET -Uri ($HlCriblApi + '/health')
@@ -116,6 +125,9 @@ hl_cribl_ps_prelude: |
 
 # One Cribl syslog source per syslog_devices entry, merged into cribl/local/cribl/inputs.yml
 hl_cribl_device_inputs: "{{ lookup('ansible.builtin.template', 'cribl/device_inputs.yml.j2') | from_yaml }}"
+
+# Splunk's copy of the test-block table (cribl_block mirrors Cribl's table here, spec 7.2)
+hl_cribl_mirror_path: "{{ hl_splunk_home }}/etc/apps/hl_server_base/lookups/hl_ingest_block.csv"
 
 # The Linux UF's tamper audit rules (spec 5.4): b32 and b64 forms of each, keyed hl-*
 hl_uf_tamper_rules:

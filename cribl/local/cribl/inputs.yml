@@ -32,7 +32,7 @@ inputs:
         value: "'cribl'"
   # Cribl's own metrics. Only a metrics index keeps their values (spike §14.7 f).
   CriblMetrics:
-    type: cribl_metrics
+    type: criblmetrics
     disabled: false
     sendToRoutes: true
     prefix: cribl.logstream.

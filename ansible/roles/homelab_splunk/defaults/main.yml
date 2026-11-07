@@ -67,8 +67,9 @@ hl_server_apps:
     seed_lookups: [dh_expected_ansible.csv]
 # Limit server, server_remove (and, from task 6, apps/apps_remove) to these apps; [] = all
 hl_apps_only: []
-# A change to one of these files restarts splunkd; anything else is reloaded over REST
-hl_server_restart_confs: [indexes.conf, inputs.conf, props.conf]
+# A change to one of these files restarts splunkd; anything else is reloaded over REST.
+# web.conf has no REST reload (hl_server_base's dashboard risky-command setting, spec 7.8).
+hl_server_restart_confs: [indexes.conf, inputs.conf, props.conf, web.conf]
 # Restart splunkd even when nothing changed (the restart-loss test, docs/handoff/task-3b-cribl.md)
 hl_server_force_restart: false
 hl_server_reload_endpoints:
@@ -129,7 +130,7 @@ hl_cribl_health_timeout: 180          # seconds to wait for Cribl's /health and 
 hl_cribl_selftest: true
 # Hold Cribl around a splunkd restart (server tag): docker pause cribl, restart splunkd, wait for
 # HEC, unpause. The UFs keep their unACKed data (useACK); UDP sent meanwhile is lost. Off until
-# task 3b's restart test decides (docs/handoff/task-3b-cribl.md, check 6).
+# task 4's restart test decides (docs/handoff/task-3b-cribl.md check 6, spec 11 row 4).
 hl_cribl_hold_on_splunk_restart: false
 # cribl_block (never): set or clear one test block, e.g.
 #   --tags cribl_block -e hl_block_key='wd2l-recv|linux_secure|*' -e hl_block_minutes=30 -e hl_block_reason='E2E row 4'

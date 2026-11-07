@@ -1,7 +1,7 @@
 # Restart splunkd inside the container (not the container: no recreate, no provisioning run), then
 # wait until wd2l's HEC is healthy and wd2l's data lands again (imported by server and
 # server_remove). Cribl's in-flight data during Splunk's shutdown is lost (spec 14.7 g) unless
-# hl_cribl_hold_on_splunk_restart pauses Cribl around the restart (task 3b decides which).
+# hl_cribl_hold_on_splunk_restart pauses Cribl around the restart (task 4 decides which).
 - name: Note when the restart starts
   ansible.windows.win_shell: "[DateTimeOffset]::UtcNow.ToUnixTimeSeconds()"
   register: hl_server_restart_t0
