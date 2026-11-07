@@ -88,7 +88,10 @@
     $user | Add-Member -NotePropertyName password -NotePropertyValue $env:HL_CRIBL_PW -Force
     $r = Invoke-HlCribl -Method PATCH -Path '/system/users/admin' -Json $user
     if ($r.Code -ne 200) { throw "password change: HTTP $($r.Code) $($r.Content)" }
-    if (-not (Connect-HlCribl)) { throw 'the new admin password does not log in' }
+    # Cribl refuses the new password for about a second after the change (seen live, task 3b)
+    $ok = $false
+    foreach ($i in 1..30) { if (Connect-HlCribl) { $ok = $true; break }; Start-Sleep -Milliseconds 500 }
+    if (-not $ok) { throw 'the new admin password does not log in' }
     'HL_PW=set'
   environment:
     HL_CRIBL_PW: "{{ vault_hl_cribl_admin_password }}"
@@ -218,6 +221,8 @@
     if (-not (Connect-HlCribl)) { throw 'Cribl login failed' }
     $want = [ordered]@{
       '/system/inputs/in_splunk_tcp' = 'splunk'; '/system/inputs/in_cribl_audit' = 'file'
+      # An unknown type is ignored silently and Cribl keeps its disabled default (task 3b: cribl_metrics)
+      '/system/inputs/CriblLogs' = 'cribl'; '/system/inputs/CriblMetrics' = 'criblmetrics'
       '/system/outputs/out_splunk' = 'splunk'; '/pipelines/pl_test_block' = $null; '/pipelines/pl_syslog_pre' = $null
     }
     foreach ($d in @({{ hl_cribl_device_inputs.keys() | map('to_json') | join(', ') }})) { $want["/system/inputs/$d"] = 'syslog' }
@@ -225,7 +230,10 @@
     foreach ($p in @($want.Keys)) {
       $r = Invoke-HlCribl -Path $p
       $ok = $r.Code -eq 200
-      if ($ok -and $want[$p]) { $ok = (($r.Content | ConvertFrom-Json).items[0].type -eq $want[$p]) }
+      if ($ok -and $want[$p]) {
+        $it = ($r.Content | ConvertFrom-Json).items[0]
+        $ok = ($it.type -eq $want[$p]) -and -not $it.disabled
+      }
       $out[$p] = $ok
     }
     $routes = (Invoke-HlCribl -Path '/routes/default').Content | ConvertFrom-Json
@@ -246,8 +254,9 @@
     {{ hl_cribl_ps_prelude }}
     if (-not (Connect-HlCribl)) { throw 'Cribl login failed' }
     $id = 'hl_ingest_block.csv'
-    if ((Invoke-HlCribl -Path "/system/lookups/$id").Code -eq 200) { 'HL_LOOKUP=present'; exit 0 }
-    $csv = {{ lookup('ansible.builtin.file', hl_cribl_src ~ '/data/lookups/hl_ingest_block.csv') | to_json }}
+    if (Test-HlCriblLookup $id) { 'HL_LOOKUP=present'; exit 0 }
+    # base64: a JSON string in PowerShell keeps \n literally and expands $ (task 3b)
+    $csv = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('{{ hl_cribl_seed_b64 }}'))
     $up = Invoke-HlCribl -Method PUT -Path "/system/lookups?filename=$id" -Raw $csv -ContentType 'text/csv'
     if ($up.Code -ne 200) { throw "lookup upload: HTTP $($up.Code) $($up.Content)" }
     $tmp = ($up.Content | ConvertFrom-Json).filename
@@ -256,8 +265,24 @@
     'HL_LOOKUP=created'
   environment:
     HL_CRIBL_PW: "{{ vault_hl_cribl_admin_password }}"
+  vars:
+    # rstrip=false keeps the file's final newline
+    hl_cribl_seed_b64: "{{ lookup('ansible.builtin.file', hl_cribl_src ~ '/data/lookups/hl_ingest_block.csv', rstrip=false) | b64encode }}"
   register: hl_cribl_lookup
   changed_when: "'HL_LOOKUP=created' in hl_cribl_lookup.stdout"
+
+- name: Read the test-block table's header in Cribl
+  ansible.windows.win_command:
+    argv: [docker, exec, "{{ hl_cribl_container }}", sh, -c, 'head -n 1 "$CRIBL_VOLUME_DIR/data/lookups/hl_ingest_block.csv"']
+  register: hl_cribl_lookup_head
+  changed_when: false
+
+# A broken header (e.g. a literal \n) makes every block row unreadable to pl_test_block
+- name: Check the test-block table's header
+  ansible.builtin.assert:
+    that: (hl_cribl_lookup_head.stdout | replace('\r', '') | trim) == 'k,until,reason,set_by'
+    fail_msg: "Cribl's hl_ingest_block.csv starts with {{ hl_cribl_lookup_head.stdout | to_json }}, not k,until,reason,set_by"
+    quiet: true
 
 # --- Cribl's data reaches Splunk (the cribl heartbeat, spec 7.4) ---
 - name: Wait for Cribl's own logs and metrics in Splunk

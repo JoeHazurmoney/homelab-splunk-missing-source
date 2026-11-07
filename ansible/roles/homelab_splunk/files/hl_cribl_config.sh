@@ -17,6 +17,9 @@
 #
 #   hl_cribl_config.sh lookup-path <file>
 #     -> HL_LOOKUP=<absolute path of data/lookups/<file>, or empty>
+#
+#   hl_cribl_config.sh lookup-cat <file>
+#     -> the content of data/lookups/<file> (nothing when Cribl has none)
 set -eu
 base=${CRIBL_VOLUME_DIR:-}
 if [ -z "$base" ] || [ ! -d "$base" ]; then base=${CRIBL_HOME:-/opt/cribl}; fi
@@ -75,14 +78,20 @@ lookup_path() {
   echo "HL_LOOKUP="
 }
 
+lookup_cat() {
+  p=$(lookup_path "$1" | sed 's/^HL_LOOKUP=//')
+  [ -z "$p" ] || cat "$p"
+}
+
 cmd=${1:-}
 [ $# -gt 0 ] && shift
 case $cmd in
   install) install_config "$@" ;;
   remove) remove_config ;;
   lookup-path) lookup_path "$@" ;;
+  lookup-cat) lookup_cat "$@" ;;
   *)
-    echo "usage: $0 install <stage> | remove | lookup-path <file>" >&2
+    echo "usage: $0 install <stage> | remove | lookup-path <file> | lookup-cat <file>" >&2
     exit 64
     ;;
 esac

@@ -85,11 +85,12 @@
         {{ hl_cribl_ps_prelude }}
         if (-not (Connect-HlCribl)) { throw 'Cribl login failed' }
         $id = 'hl_ingest_block.csv'
-        $csv = {{ hl_block_csv | to_json }}
+        # base64: a JSON string in PowerShell keeps \n literally and expands $ (task 3b)
+        $csv = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('{{ hl_block_csv | b64encode }}'))
         $up = Invoke-HlCribl -Method PUT -Path "/system/lookups?filename=$id" -Raw $csv -ContentType 'text/csv'
         if ($up.Code -ne 200) { throw "lookup upload: HTTP $($up.Code) $($up.Content)" }
         $tmp = ($up.Content | ConvertFrom-Json).filename
-        $exists = (Invoke-HlCribl -Path "/system/lookups/$id").Code -eq 200
+        $exists = Test-HlCriblLookup $id
         $m = if ($exists) { 'PATCH' } else { 'POST' }
         $p = if ($exists) { "/system/lookups/$id" } else { '/system/lookups' }
         $r = Invoke-HlCribl -Method $m -Path $p -Json @{ id = $id; fileInfo = @{ filename = $tmp } }
@@ -99,6 +100,18 @@
         HL_CRIBL_PW: "{{ vault_hl_cribl_admin_password }}"
       register: hl_block_push
       changed_when: hl_block_csv != ((hl_block_cur.stdout | default('')) | trim ~ '\n')
+
+    - name: Read Cribl's copy back
+      ansible.windows.win_command:
+        argv: [docker, exec, -u, "0", "{{ hl_cribl_container }}", sh, /tmp/hl_cribl_config.sh, lookup-cat, hl_ingest_block.csv]
+      register: hl_block_back
+      changed_when: false
+
+    - name: Check Cribl holds exactly the table the role sent
+      ansible.builtin.assert:
+        that: (hl_block_back.stdout | replace('\r', '') | trim) == (hl_block_csv | trim)
+        fail_msg: "Cribl's hl_ingest_block.csv differs from what the role pushed: {{ hl_block_back.stdout }}"
+        quiet: true
 
     # --- Mirror into Splunk (hl_server_base ships this file once as a seed and never overwrites it) ---
     - name: Write the mirror on HOMEPC
@@ -116,6 +129,13 @@
     - name: Give the mirror back to splunk
       ansible.windows.win_command:
         argv: [docker, exec, -u, root, "{{ hl_splunk_container }}", chown, "splunk:splunk",
+               "{{ hl_splunk_home }}/etc/apps/hl_server_base/lookups/hl_ingest_block.csv"]
+      changed_when: false
+
+    # docker cp from Windows leaves it rwxr-xr-x; match the server tag's lookups (u=rw,go=r)
+    - name: Set the mirror's mode
+      ansible.windows.win_command:
+        argv: [docker, exec, -u, root, "{{ hl_splunk_container }}", chmod, "0644",
                "{{ hl_splunk_home }}/etc/apps/hl_server_base/lookups/hl_ingest_block.csv"]
       changed_when: false
 

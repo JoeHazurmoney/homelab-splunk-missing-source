@@ -73,6 +73,7 @@ hl_ps_prelude: |
 #   Connect-HlCribl [-Password <pw>]  -> logs in, keeps the bearer token for Invoke-HlCribl ($true/$false)
 #   Invoke-HlCribl -Method GET|POST|PATCH|PUT|DELETE -Path /system/... [-Json <object>] [-Raw <string> -ContentType <type>]
 #                                     -> {Code, Content}
+#   Test-HlCriblLookup <id>           -> $true when Cribl has that lookup
 #   Get-HlCriblHealth                 -> {Code, Content} of /api/v1/health (no login)
 hl_cribl_ps_prelude: |
   $ErrorActionPreference = 'Stop'
@@ -106,9 +107,16 @@ hl_cribl_ps_prelude: |
     if (-not $script:HlCriblToken) { throw 'Invoke-HlCribl: not logged in (Connect-HlCribl)' }
     $h = @{ Authorization = 'Bearer ' + $script:HlCriblToken }
     $body = $null
+    # An omitted [string]$Raw is '' (never $null), and a GET with a body throws: test the binding
     if ($null -ne $Json) { $body = $Json | ConvertTo-Json -Depth 20 -Compress }
-    elseif ($null -ne $Raw) { $body = [Text.Encoding]::UTF8.GetBytes($Raw) }
+    elseif ($PSBoundParameters.ContainsKey('Raw')) { $body = [Text.Encoding]::UTF8.GetBytes($Raw) }
     return Invoke-HlCriblWeb -Method $Method -Uri ($HlCriblApi + $Path) -Headers $h -Body $body -ContentType $ContentType
+  }
+  # GET /system/lookups/<id> answers 200 with no items for a missing lookup (seen live, task 3b)
+  function Test-HlCriblLookup {
+    param([string]$Id)
+    $r = Invoke-HlCribl -Path "/system/lookups/$Id"
+    return ($r.Code -eq 200 -and @(($r.Content | ConvertFrom-Json).items).Count -gt 0)
   }
   function Get-HlCriblHealth {
     return Invoke-HlCriblWeb -Method GET -Uri ($HlCriblApi + '/health')
