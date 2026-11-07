@@ -126,6 +126,10 @@ hl_cribl_ps_prelude: |
 # One Cribl syslog source per syslog_devices entry, merged into cribl/local/cribl/inputs.yml
 hl_cribl_device_inputs: "{{ lookup('ansible.builtin.template', 'cribl/device_inputs.yml.j2') | from_yaml }}"
 
+# Splunk's splunktcp listener inside the container (the image's etc/system/local, spec 5.5), which
+# Cribl's out_splunk sends to over hl-net
+hl_splunk_tcp_port: 9997
+
 # Splunk's copy of the test-block table (cribl_block mirrors Cribl's table here, spec 7.2)
 hl_cribl_mirror_path: "{{ hl_splunk_home }}/etc/apps/hl_server_base/lookups/hl_ingest_block.csv"
 
@@ -137,6 +141,10 @@ hl_uf_tamper_rules:
   - {kind: dir, path: /etc/rsyslog.d, key: hl-syslog-config}
   - {kind: dir, path: /etc/audit, key: hl-audit-config}
 hl_uf_tamper_file: /etc/audit/rules.d/zz-hl-uf-tamper.rules
+# ERE for these rules and for wd2l's in `auditctl -l`, which prints a syscall rule's key as
+# `-F key=<key>` (never `-k <key>`; task 4, audit 4.0.3)
+hl_uf_tamper_key_re: "-F key=({{ hl_uf_tamper_rules | map(attribute='key') | unique | join('|') }})$"
+hl_wd2l_audit_key_re: "-F key=wd2l-"
 # The files of hl_uf_outputs (templates/uf/hl_uf_outputs/default/<name>.j2)
 hl_uf_outputs_files: [app.conf, outputs.conf, limits.conf, web.conf]
 # The UF's CLI, run as its own user (running it as root warns about SPLUNK_HOME ownership, spike 14 d)

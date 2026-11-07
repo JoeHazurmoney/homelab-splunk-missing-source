@@ -129,9 +129,10 @@ hl_cribl_health_timeout: 180          # seconds to wait for Cribl's /health and 
 # alive to data health, so it runs only when something changed.
 hl_cribl_selftest: true
 # Hold Cribl around a splunkd restart (server tag): docker pause cribl, restart splunkd, wait for
-# HEC, unpause. The UFs keep their unACKed data (useACK); UDP sent meanwhile is lost. Off until
-# task 4's restart test decides (docs/handoff/task-3b-cribl.md check 6, spec 11 row 4).
-hl_cribl_hold_on_splunk_restart: false
+# splunktcp to accept connections, unpause. The UFs keep their unACKed data (useACK); UDP sent
+# meanwhile is lost. On, because it is the only option that lost nothing: task 4 check 15 (spec
+# 13, 14.10) lost 3 s of a 1/s sequence with maxS2Sversion v4 alone and none with the hold.
+hl_cribl_hold_on_splunk_restart: true
 # cribl_block (never): set or clear one test block, e.g.
 #   --tags cribl_block -e hl_block_key='wd2l-recv|linux_secure|*' -e hl_block_minutes=30 -e hl_block_reason='E2E row 4'
 #   --tags cribl_block -e hl_block_key='wd2l-recv|linux_secure|*' -e hl_block_clear=true

@@ -203,11 +203,12 @@
   ansible.builtin.import_tasks: uf_linux_tamper.yml
 
 # --- Start, then prove the path through Cribl ---
+# "<lines> <epoch>": where splunkd.log ends and the host's clock, just before the (re)start
 - name: Note where splunkd.log ends before the start
   ansible.builtin.shell: |
     set -o pipefail
     f={{ hl_uf_home }}/var/log/splunk/splunkd.log
-    if [ -f "$f" ]; then wc -l < "$f"; else echo 0; fi
+    if [ -f "$f" ]; then echo "$(wc -l < "$f") $(date +%s)"; else echo "0 $(date +%s)"; fi
   args:
     executable: /bin/bash
   register: hl_uf_log_lines
@@ -220,20 +221,28 @@
     enabled: true
   register: hl_uf_started
 
+# Every run, so a rerun after a failed connect can't pass without one: after a (re)start from the
+# start's log line, otherwise the whole log, where the latest state counts (as verify does)
 - name: Check the UF is connected through Cribl
   ansible.builtin.include_tasks: uf_linux_connected.yml
   vars:
-    hl_uf_log_from: "{{ hl_uf_log_lines.stdout | trim | int }}"
-  when: hl_uf_started is changed or hl_uf_fresh | bool
+    hl_uf_log_from: "{{ (hl_uf_log_lines.stdout.split()[0] | int) if hl_uf_started is changed else 0 }}"
+    hl_uf_since: "{{ (hl_uf_log_lines.stdout.split()[1] | int) if hl_uf_started is changed else 0 }}"
 
+# From splunkd.log, not `splunk show fips-mode`: that CLI command needs a login ("Authentication
+# needed, run splunk login", task 4 check 5), and -auth would put the admin password on argv.
+# splunkd logs the provider line just before "Splunkd starting", so the line counts only between
+# the previous start and the latest one: it then describes the running splunkd.
 - name: Check the UF runs in FIPS mode (FIPS hosts only)
-  ansible.builtin.command:
-    argv: ["{{ hl_uf_cli }}", show, fips-mode]
-  become: true
-  become_user: "{{ hl_uf_user }}"
+  ansible.builtin.shell: |
+    set -o pipefail
+    awk '/FIPS provider enabled/ { f = $0 } /Splunkd starting \(build/ { last = f; f = "" } END { print last }' \
+      {{ hl_uf_home }}/var/log/splunk/splunkd.log
+  args:
+    executable: /bin/bash
   register: hl_uf_fips_mode
   changed_when: false
-  failed_when: "'FIPS mode enabled' not in hl_uf_fips_mode.stdout"
+  failed_when: "hl_uf_fips_mode.stdout is not search('provider: 140-3, .* status: Success')"
   when: (hl_uf_fips.content | default('MA==') | b64decode | trim) == '1'
 
 - name: Marker for the install

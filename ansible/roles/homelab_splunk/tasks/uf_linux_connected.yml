@@ -1,12 +1,17 @@
 # Is this Linux UF sending through Cribl? (install, start, restart, verify; spec 5.3, 13)
 #   vars: hl_uf_log_from (line number of splunkd.log to read from; 0 = the whole file)
+#         hl_uf_since (epoch on the UF's clock, e.g. just before a (re)start; 0 = 120 s ago)
 # 1. The UF's own splunkd.log after hl_uf_log_from: the latest "Connected to idx=<collector>:<port>"
 #    is newer than the latest token refusal. Splunk never sees a wrong token (Cribl refuses it), and
 #    the data written meanwhile is lost once the UF restarts (spike 14.7 a): this check catches it.
-# 2. Splunk sees this host's _internal (through Cribl) within the timeout.
+#    It is a fast first answer only: a refused attempt also logs "Connected to idx=…" about 1 ms
+#    before "Connection closed by server" (task 4 checks 1 and 7), so a sample can fall between them.
+# 2. The proof: Splunk has this host's _internal stamped at or after hl_uf_since, which only data
+#    sent through Cribl after the (re)start can be.
 - name: Wait for the UF to connect to Cribl
   ansible.builtin.shell: |
     set -o pipefail
+    echo "HL_NOW=$(date +%s)"
     log={{ hl_uf_home }}/var/log/splunk/splunkd.log
     [ -f "$log" ] || { echo "HL_CONNECTED=0"; exit 0; }
     # The latest of "connected" and "refused" in the window decides
@@ -28,17 +33,21 @@
     hl_uf_conn.rc != 0 or hl_uf_conn.stdout is search('HL_REFUSED=[1-9]')
     or hl_uf_conn.stdout is not search('HL_CONNECTED=[1-9]')
 
-- name: Wait for this host's _internal in Splunk (through Cribl)
+- name: Wait for this host's _internal in Splunk (through Cribl, sent since the (re)start)
   ansible.windows.win_shell: |
     {{ hl_ps_prelude }}
     $h = '{{ inventory_hostname | lower | regex_replace('[.].*$', '') }}'
-    $rows = Invoke-HlSearch ("| tstats max(_indextime) as t where index=_internal (host=$h OR host=$h.*) earliest=-15m | eval age=now()-t")
-    $a = ($rows | Select-Object -First 1).age
-    @{ age = $(if ("$a" -match '^\d+(\.\d+)?$') { [int][double]$a } else { -1 }) } | ConvertTo-Json -Compress
+    $rows = Invoke-HlSearch ("| tstats count max(_time) as t where index=_internal (host=$h OR host=$h.*) earliest={{ hl_uf_seen_since }}")
+    $r = $rows | Select-Object -First 1
+    @{ count = [int]("0" + $r.count); since = {{ hl_uf_seen_since }}; latest = "$($r.t)" } | ConvertTo-Json -Compress
+  vars:
+    hl_uf_seen_since: >-
+      {{ (hl_uf_since | int) if (hl_uf_since | default(0) | int) > 0
+         else ((hl_uf_conn.stdout | regex_search('HL_NOW=([0-9]+)', '\1') | first | int) - 120) }}
   delegate_to: "{{ hl_server_host }}"
   become: false
   register: hl_uf_seen
-  until: hl_uf_seen.rc == 0 and (hl_uf_seen.stdout | from_json).age >= 0 and (hl_uf_seen.stdout | from_json).age < 120
+  until: hl_uf_seen.rc == 0 and (hl_uf_seen.stdout | from_json).count > 0
   retries: "{{ (hl_uf_connect_timeout / 10) | int }}"
   delay: 10
   changed_when: false

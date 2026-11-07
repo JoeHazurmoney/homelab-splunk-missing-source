@@ -28,10 +28,20 @@
     state: absent
   register: hl_un_tamper
 
+- name: Count the tamper rules still loaded
+  ansible.builtin.shell: |
+    set -o pipefail
+    auditctl -l | grep -c -E -- '{{ hl_uf_tamper_key_re }}' || true
+  args:
+    executable: /bin/bash
+  register: hl_un_tamper_loaded
+  changed_when: false
+
+# Also when the file was already gone but its rules are still loaded (a rerun after a failure)
 - name: Reload the audit rules without them
   ansible.builtin.command:
     argv: [augenrules, --load]
-  when: hl_un_tamper.changed or hl_un_force_reload | default(false)
+  when: hl_un_tamper.changed or (hl_un_tamper_loaded.stdout | trim | int) > 0
   changed_when: true
 
 - name: Disable boot-start
@@ -90,7 +100,7 @@
     echo "user=$(getent passwd {{ hl_uf_user }} | wc -l)"
     echo "group=$(getent group {{ hl_uf_user }} | wc -l)"
     echo "mail=$([ -e /var/spool/mail/{{ hl_uf_user }} ] && echo present || echo absent)"
-    echo "tamper=$(auditctl -l | grep -c -- '-k hl-uf-' || true)"
+    echo "tamper=$(auditctl -l | grep -c -E -- '{{ hl_uf_tamper_key_re }}' || true)"
     if [ -f "$d/auditctl.before" ]; then
       auditctl -l | LC_ALL=C sort > "$d/auditctl.after"
       echo "auditctl_diff=$(diff "$d/auditctl.before" "$d/auditctl.after" | grep -c '^[<>]' || true)"

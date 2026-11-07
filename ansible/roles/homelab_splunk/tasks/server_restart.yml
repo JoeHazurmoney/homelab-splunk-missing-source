@@ -1,7 +1,8 @@
 # Restart splunkd inside the container (not the container: no recreate, no provisioning run), then
 # wait until wd2l's HEC is healthy and wd2l's data lands again (imported by server and
 # server_remove). Cribl's in-flight data during Splunk's shutdown is lost (spec 14.7 g) unless
-# hl_cribl_hold_on_splunk_restart pauses Cribl around the restart (task 4 decides which).
+# hl_cribl_hold_on_splunk_restart pauses Cribl around the restart, released once splunktcp
+# accepts connections again (task 4 check 15 decides which, spec 13).
 - name: Note when the restart starts
   ansible.windows.win_shell: "[DateTimeOffset]::UtcNow.ToUnixTimeSeconds()"
   register: hl_server_restart_t0
@@ -36,15 +37,21 @@
       register: hl_server_restart
       changed_when: true
 
-    - name: Wait for HEC before letting Cribl send again
-      ansible.windows.win_shell: |
-        {{ hl_ps_prelude }}
-        Get-HlHecHealth | ConvertTo-Json -Compress
-      register: hl_server_hec_hold
-      until: >-
-        hl_server_hec_hold.rc == 0 and (hl_server_hec_hold.stdout | from_json).Code == 200
-      retries: "{{ (hl_server_health_timeout / 10) | int }}"
-      delay: 10
+    # Cribl sends to splunktcp, not HEC, and HEC answering doesn't mean 9997 is open (task 3b
+    # review). A TCP connect from inside the Splunk container (bash's /dev/tcp; the image has no nc)
+    # reaches the same 0.0.0.0 listener Cribl uses over hl-net; Cribl's own network namespace can't
+    # run anything while it is paused. Every 2 s, so Cribl is held no longer than needed.
+    - name: Wait for splunktcp before letting Cribl send again
+      ansible.windows.win_command:
+        argv: [
+          docker, exec, "{{ hl_splunk_container }}", timeout, "3", bash, -c,
+          "exec 3<>/dev/tcp/127.0.0.1/{{ hl_splunk_tcp_port }}"
+        ]
+      register: hl_server_tcp_hold
+      until: hl_server_tcp_hold.rc == 0
+      retries: "{{ (hl_server_health_timeout / 2) | int }}"
+      delay: 2
+      failed_when: hl_server_tcp_hold.rc != 0
       when: hl_server_cribl_held | bool
       changed_when: false
 

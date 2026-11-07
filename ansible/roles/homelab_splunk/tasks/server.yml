@@ -4,7 +4,8 @@
 # lookups. splunkd restarts only when a file in hl_server_restart_confs changed (indexes.conf,
 # inputs.conf, props.conf, web.conf); any other change is reloaded over REST.
 # A splunkd restart loses what Cribl sends during Splunk's shutdown (about 30 s in spike 2b,
-# spec 14.7 g) until task 4's restart test fixes or documents it (spec 5.3 server).
+# spec 14.7 g; 3 s with maxS2Sversion v4, task 4), so server_restart.yml holds Cribl paused until
+# splunktcp is back (hl_cribl_hold_on_splunk_restart, on; nothing lost in task 4 check 15).
 #   -e '{"hl_apps_only":["hl_server_base"]}'   limits the run to the listed apps
 - name: Select the server apps to deploy
   ansible.builtin.set_fact:

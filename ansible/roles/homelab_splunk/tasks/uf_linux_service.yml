@@ -8,11 +8,12 @@
     hl_marker_action: stop
   when: hl_service_action == 'stop'
 
+# "<lines> <epoch>": where splunkd.log ends and the host's clock, just before the (re)start
 - name: Note where splunkd.log ends
   ansible.builtin.shell: |
     set -o pipefail
     f={{ hl_uf_home }}/var/log/splunk/splunkd.log
-    if [ -f "$f" ]; then wc -l < "$f"; else echo 0; fi
+    if [ -f "$f" ]; then echo "$(wc -l < "$f") $(date +%s)"; else echo "0 $(date +%s)"; fi
   args:
     executable: /bin/bash
   register: hl_svc_log_lines
@@ -26,10 +27,12 @@
   register: hl_svc_result
   when: hl_service_action in ['start', 'stop', 'restart']
 
+# A start of a running UF changes nothing: then the whole log, where the latest state counts
 - name: Check the UF is connected through Cribl
   ansible.builtin.include_tasks: uf_linux_connected.yml
   vars:
-    hl_uf_log_from: "{{ hl_svc_log_lines.stdout | trim | int }}"
+    hl_uf_log_from: "{{ (hl_svc_log_lines.stdout.split()[0] | int) if hl_svc_result is changed else 0 }}"
+    hl_uf_since: "{{ (hl_svc_log_lines.stdout.split()[1] | int) if hl_svc_result is changed else 0 }}"
   when: hl_service_action in ['start', 'restart']
 
 - name: Marker after the start

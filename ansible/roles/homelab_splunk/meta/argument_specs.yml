@@ -232,8 +232,8 @@ argument_specs:
         description: After a Cribl change, send one syslog line per device port and wait for it in Splunk.
       hl_cribl_hold_on_splunk_restart:
         type: bool
-        default: false
-        description: Pause the Cribl container while the server tag restarts splunkd.
+        default: true
+        description: Pause the Cribl container while the server tag restarts splunkd, until splunktcp accepts connections.
       hl_block_key:
         type: str
         default: ""
