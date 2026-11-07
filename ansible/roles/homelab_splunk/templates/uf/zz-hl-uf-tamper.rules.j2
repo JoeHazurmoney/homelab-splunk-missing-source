@@ -1,0 +1,9 @@
+## Managed by the homelab_splunk role (install / uninstall); removed before the UF on uninstall.
+## Tamper rules for the forwarding path (spec 5.4). The file sorts after wd2l.rules. A path that
+## does not exist on this host is left out (auditctl rejects it, and augenrules would then stop
+## at this file).
+{% for r in hl_uf_tamper_rules if r.path in hl_uf_tamper_present %}
+{% for arch in hl_audit_arches %}
+-a always,exit -F arch={{ arch }} -F {{ r.kind }}={{ r.path }} -F perm=wa -F auid!=unset -k {{ r.key }}
+{% endfor %}
+{% endfor %}

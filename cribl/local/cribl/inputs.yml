@@ -22,6 +22,9 @@ inputs:
     dropControlFields: true
     extractMetrics: false
     compress: disabled
+    # A source here replaces Cribl's default object, not merges with it, and without this key Cribl
+    # takes v3 and closes every UF 10.6 connection ("S2S version mismatch", task 4 check 1).
+    maxS2Sversion: v4
   # Cribl's own logs, worker processes only (spike §14.7 f): the `cribl` heartbeat, 120 s.
   CriblLogs:
     type: cribl

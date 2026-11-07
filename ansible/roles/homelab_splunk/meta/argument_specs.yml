@@ -6,14 +6,62 @@ argument_specs:
         component (spec 5.3). A bare run deploys; removing, stopping and restarting need their tag.
       - Defaults are in defaults/main.yml. Ansible validates the provided values against this spec before the role runs.
     options:
-      splunk_indexer:
+      hl_collector:
         type: str
         default: 192.168.1.27
-        description: Address the forwarders send S2S to (127.0.0.1 on HOMEPC itself).
+        description: Address the forwarders send S2S to, Cribl's (127.0.0.1 on HOMEPC itself).
+      hl_uf_version:
+        type: str
+        default: 10.6.1.1
+        description: The pinned UF version.
+      hl_uf_build:
+        type: str
+        default: b2ae2962645c
+        description: Its build id (the UF logs only the build, spike 14.7 e).
+      hl_uf_home:
+        type: str
+        default: /opt/splunkforwarder
+        description: SPLUNK_HOME of the Linux UF.
+      hl_uf_user:
+        type: str
+        default: splunkfwd
+        description: The account the Linux UF runs as (the RPM creates it).
+      hl_uf_packages_dir:
+        type: str
+        default: "{{ playbook_dir }}/files/packages"
+        description: Where the UF packages are on the controller.
+      hl_uf_packages:
+        type: dict
+        description: Package file, URL and sha256 per platform (x86_64, aarch64, windows), spec 14.3.
+      hl_uf_mgmt:
+        type: str
+        default: 127.0.0.1:8090
+        description: UF management host:port (web.conf mgmtHostPort).
+      hl_linux_state_dir:
+        type: str
+        default: /var/lib/hl_splunk
+        description: The role's state file and install baselines on Linux hosts.
+      hl_uf_linux_packages:
+        type: list
+        elements: str
+        default: [sysstat]
+        description: Packages installed with the UF; removed on uninstall only if the role added them.
+      hl_uf_connect_timeout:
+        type: int
+        default: 180
+        description: Seconds to wait for the UF to connect to Cribl and for its _internal in Splunk.
+      hl_uninstall_without_baseline:
+        type: bool
+        default: false
+        description: Let uninstall check its contract without the install baselines (missing although an install is recorded).
+      hl_uninstall_accept_new_units:
+        type: bool
+        default: false
+        description: Let the uninstall contract pass when unit files appeared while the UF was installed (still listed), e.g. from an unrelated package.
       hl_s2s_port:
         type: int
         default: 9997
-        description: S2S receiving port on the Splunk container.
+        description: S2S port the forwarders send to (Cribl's Splunk TCP source).
       hl_owner:
         type: str
         default: taylorb
@@ -192,8 +240,8 @@ argument_specs:
         description: After a Cribl change, send one syslog line per device port and wait for it in Splunk.
       hl_cribl_hold_on_splunk_restart:
         type: bool
-        default: false
-        description: Pause the Cribl container while the server tag restarts splunkd.
+        default: true
+        description: Pause the Cribl container while the server tag restarts splunkd, until splunktcp accepts connections.
       hl_block_key:
         type: str
         default: ""
@@ -214,6 +262,15 @@ argument_specs:
         type: int
         default: 1440
         description: cribl_block - the longest block allowed.
+      hl_audit_arches:
+        type: list
+        elements: str
+        default: [b32, b64]
+        description: Syscall ABIs each role audit rule is written for.
+      hl_server_host:
+        type: str
+        default: homepc
+        description: Inventory name of the Splunk server host (REST searches are delegated to it).
       hl_marker_hec_url:
         type: str
         default: https://192.168.1.27:8088/services/collector/event

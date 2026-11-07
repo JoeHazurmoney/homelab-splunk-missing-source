@@ -1,19 +1,41 @@
 # Restart splunkd inside the container (not the container: no recreate, no provisioning run), then
 # wait until wd2l's HEC is healthy and wd2l's data lands again (imported by server and
 # server_remove). Cribl's in-flight data during Splunk's shutdown is lost (spec 14.7 g) unless
-# hl_cribl_hold_on_splunk_restart pauses Cribl around the restart (task 4 decides which).
+# hl_cribl_hold_on_splunk_restart pauses Cribl around the restart, released once splunktcp
+# accepts connections again (task 4 check 15 decides which, spec 13).
 - name: Note when the restart starts
   ansible.windows.win_shell: "[DateTimeOffset]::UtcNow.ToUnixTimeSeconds()"
   register: hl_server_restart_t0
   changed_when: false
 
+# "<running> <paused>": a paused container also reports Running=true, and `docker pause` on it fails.
+# One that is already paused is left as it is (this run didn't pause it, so it doesn't unpause it).
 - name: Look for a running Cribl container to hold
   ansible.windows.win_command:
-    argv: [docker, inspect, --format, "{{ '{{.State.Running}}' }}", "{{ hl_cribl_container }}"]
+    argv: [docker, inspect, --format, "{{ '{{.State.Running}} {{.State.Paused}}' }}", "{{ hl_cribl_container }}"]
   register: hl_server_cribl_running
   changed_when: false
   failed_when: false
   when: hl_cribl_hold_on_splunk_restart | bool
+
+# The hold drops UDP syslog sent to Cribl while it is paused (spec 13), so markers bracket it:
+# data health then names the gap and suppresses tamper findings in that window. Both are best
+# effort: a failed marker warns and never blocks the restart or the unpause (e.g. `server` after
+# `server_remove`, when the hl_markers HEC token is gone until this very run restarts splunkd).
+- name: Marker before holding Cribl (best effort)
+  when:
+    - hl_cribl_hold_on_splunk_restart | bool
+    - hl_server_cribl_running.stdout | default('') | trim == 'true false'
+  block:
+    - name: Post the cribl_hold marker
+      ansible.builtin.include_tasks: marker.yml
+      vars:
+        hl_marker_action: cribl_hold
+        hl_marker_target: "{{ hl_cribl_container }}"
+  rescue:
+    - name: Warn that the cribl_hold marker failed
+      ansible.builtin.debug:
+        msg: "WARNING: the cribl_hold marker could not be posted to {{ hl_marker_hec_url }}; the restart goes on without it."
 
 - name: Restart splunkd, holding Cribl when asked
   block:
@@ -23,7 +45,7 @@
       register: hl_server_cribl_paused
       when:
         - hl_cribl_hold_on_splunk_restart | bool
-        - hl_server_cribl_running.stdout | default('') | trim == 'true'
+        - hl_server_cribl_running.stdout | default('') | trim == 'true false'
       changed_when: true
 
     - name: Note whether Cribl is held
@@ -36,15 +58,23 @@
       register: hl_server_restart
       changed_when: true
 
-    - name: Wait for HEC before letting Cribl send again
-      ansible.windows.win_shell: |
-        {{ hl_ps_prelude }}
-        Get-HlHecHealth | ConvertTo-Json -Compress
-      register: hl_server_hec_hold
-      until: >-
-        hl_server_hec_hold.rc == 0 and (hl_server_hec_hold.stdout | from_json).Code == 200
-      retries: "{{ (hl_server_health_timeout / 10) | int }}"
-      delay: 10
+    # Cribl sends to splunktcp, not HEC, and HEC answering doesn't mean 9997 is open (task 3b
+    # review). A TCP connect from inside the Splunk container (bash's /dev/tcp; the image has no nc)
+    # reaches the same 0.0.0.0 listener Cribl uses over hl-net; Cribl's own network namespace can't
+    # run anything while it is paused. Every 2 s, so Cribl is held no longer than needed; a try
+    # takes at most 3 s (timeout) + 2 s (delay), so the retries keep the whole wait within
+    # hl_server_health_timeout.
+    - name: Wait for splunktcp before letting Cribl send again
+      ansible.windows.win_command:
+        argv: [
+          docker, exec, "{{ hl_splunk_container }}", timeout, "3", bash, -c,
+          "exec 3<>/dev/tcp/127.0.0.1/{{ hl_splunk_tcp_port }}"
+        ]
+      register: hl_server_tcp_hold
+      until: hl_server_tcp_hold.rc == 0
+      retries: "{{ (hl_server_health_timeout / 5) | int }}"
+      delay: 2
+      failed_when: hl_server_tcp_hold.rc != 0
       when: hl_server_cribl_held | bool
       changed_when: false
 
@@ -55,6 +85,31 @@
       # Also after a failed restart: never leave Cribl paused
       when: hl_server_cribl_held | default(false) | bool
       changed_when: true
+
+    # Here, so a hold always gets its release, also after a failed restart. The marker goes to
+    # HEC, so wait up to 60 s for it first; both steps are best effort.
+    - name: Marker after releasing Cribl (best effort)
+      when: hl_server_cribl_held | default(false) | bool
+      block:
+        - name: Wait for HEC before the cribl_release marker
+          ansible.windows.win_shell: |
+            {{ hl_ps_prelude }}
+            Get-HlHecHealth | ConvertTo-Json -Compress
+          register: hl_server_hec_release
+          until: hl_server_hec_release.rc == 0 and (hl_server_hec_release.stdout | from_json).Code == 200
+          retries: 6
+          delay: 10
+          changed_when: false
+
+        - name: Post the cribl_release marker
+          ansible.builtin.include_tasks: marker.yml
+          vars:
+            hl_marker_action: cribl_release
+            hl_marker_target: "{{ hl_cribl_container }}"
+      rescue:
+        - name: Warn that the cribl_release marker failed
+          ansible.builtin.debug:
+            msg: "WARNING: the cribl_release marker could not be posted to {{ hl_marker_hec_url }}; Cribl is unpaused."
 
 - name: Check wd2l after the restart
   ansible.builtin.import_tasks: server_health.yml

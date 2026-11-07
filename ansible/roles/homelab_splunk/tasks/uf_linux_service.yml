@@ -1,6 +1,68 @@
-# start / stop / restart / status (uf_linux): service control + marker; status = state, version,
-# apps, outputs connection. main.yml imports this file once per action, with hl_service_action set.
-# Placeholder until task 4 (spec 11) fills it in.
-- name: Placeholder for the service action
+# start / stop / restart / status (uf_linux, spec 5.3): service control + marker. main.yml imports
+# this file once per action, with hl_service_action set. A stop posts its marker first (so a
+# finding during the stop is the role's own work); start/restart post theirs once connected.
+# status = service state, version and build, apps, and the outputs connection (from splunkd.log).
+- name: Marker before the stop
+  ansible.builtin.include_tasks: marker.yml
+  vars:
+    hl_marker_action: stop
+  when: hl_service_action == 'stop'
+
+# "<lines> <epoch>": where splunkd.log ends and the host's clock, just before the (re)start
+- name: Note where splunkd.log ends
+  ansible.builtin.shell: |
+    set -o pipefail
+    f={{ hl_uf_home }}/var/log/splunk/splunkd.log
+    if [ -f "$f" ]; then echo "$(wc -l < "$f") $(date +%s)"; else echo "0 $(date +%s)"; fi
+  args:
+    executable: /bin/bash
+  register: hl_svc_log_lines
+  changed_when: false
+  when: hl_service_action in ['start', 'restart']
+
+- name: "Run the service action: {{ hl_service_action }}"
+  ansible.builtin.systemd_service:
+    name: SplunkForwarder
+    state: "{{ {'start': 'started', 'stop': 'stopped', 'restart': 'restarted'}[hl_service_action] }}"
+  register: hl_svc_result
+  when: hl_service_action in ['start', 'stop', 'restart']
+
+# A start of a running UF changes nothing: then the whole log, where the latest state counts
+- name: Check the UF is connected through Cribl
+  ansible.builtin.include_tasks: uf_linux_connected.yml
+  vars:
+    hl_uf_log_from: "{{ (hl_svc_log_lines.stdout.split()[0] | int) if hl_svc_result is changed else 0 }}"
+    hl_uf_since: "{{ (hl_svc_log_lines.stdout.split()[1] | int) if hl_svc_result is changed else 0 }}"
+  when: hl_service_action in ['start', 'restart']
+
+- name: Marker after the start
+  ansible.builtin.include_tasks: marker.yml
+  vars:
+    hl_marker_action: "{{ hl_service_action }}"
+  when: hl_service_action in ['start', 'restart']
+
+- name: Read the UF's status
+  ansible.builtin.shell:
+    cmd: |
+      set -o pipefail
+      echo "service=$(systemctl is-active SplunkForwarder 2>/dev/null || true)"
+      echo "rpm=$(rpm -q --qf '%{VERSION}' splunkforwarder 2>/dev/null || echo none)"
+      log={{ hl_uf_home }}/var/log/splunk/splunkd.log
+      # The build from etc/splunk.version and FIPS from the running splunkd: splunkd.log's start
+      # lines are gone once the log rotates (task 4 fix round 1)
+      echo "build=$(sed -n 's/^BUILD=//p' {{ hl_uf_home }}/etc/splunk.version 2>/dev/null)"
+      echo "last_connect=$(grep -h 'Connected to idx=' "$log" 2>/dev/null | tail -1 | cut -c1-23)"
+      echo "last_close=$(grep -h -E '{{ hl_uf_close_re }}' "$log" 2>/dev/null | tail -1 | cut -c1-23)"
+      echo "apps=$(ls {{ hl_uf_home }}/etc/apps 2>/dev/null | tr '\n' ' ')"
+      p=$(systemctl show -p MainPID --value SplunkForwarder 2>/dev/null)
+      if [ "${p:-0}" -gt 0 ] && grep -q -F '/ossl-modules/fips140-3/fips.so' /proc/"$p"/maps 2>/dev/null; then f=on; else f=off; fi
+      echo "fips=$f (launch.conf SPLUNK_FIPS=1: $(grep -c '^SPLUNK_FIPS=1' {{ hl_uf_home }}/etc/splunk-launch.conf 2>/dev/null || true))"
+    executable: /bin/bash
+  register: hl_svc_status
+  changed_when: false
+  when: hl_service_action == 'status'
+
+- name: Show the UF's status
   ansible.builtin.debug:
-    msg: "{{ hl_service_action }} on {{ inventory_hostname }}: not implemented yet (task 4)"
+    msg: "{{ hl_svc_status.stdout_lines }}"
+  when: hl_service_action == 'status'

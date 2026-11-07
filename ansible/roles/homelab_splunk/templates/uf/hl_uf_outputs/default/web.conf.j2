@@ -1,0 +1,5 @@
+# Managed by the homelab_splunk role. Management on loopback only, off 8089 (the Splunk container's
+# port on HOMEPC). The Linux UF 10.6.1.1 in the spike listened on its Unix socket only; the role
+# uses the CLI (spec 5.3 install, task 4/5 checks).
+[settings]
+mgmtHostPort = {{ hl_uf_mgmt }}

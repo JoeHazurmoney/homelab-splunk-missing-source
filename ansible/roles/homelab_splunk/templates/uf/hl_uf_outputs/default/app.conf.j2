@@ -1,0 +1,21 @@
+# Managed by the homelab_splunk role (install / apps tags); local edits are overwritten.
+# hl_uf_outputs: where this UF sends (Cribl), its management port and its thruput (spec 5.5).
+[install]
+state = enabled
+
+[ui]
+is_visible = false
+label = HL UF Outputs
+
+[launcher]
+author = homelab
+description = Sends to Cribl Stream with the S2S token and useACK.
+version = 0.1.0
+
+[package]
+id = hl_uf_outputs
+check_for_updates = false
+
+# Role-owned marker: apps_remove and uninstall delete only apps with this flag (spec 5.5).
+[hl]
+managed = true

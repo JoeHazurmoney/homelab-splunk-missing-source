@@ -33,5 +33,6 @@
   vars:
     hl_marker_host: "{{ (hl_marker_target | default(inventory_hostname)) | lower | regex_replace('[.].*$', '') }}"
   delegate_to: localhost
+  become: false
   changed_when: false
   no_log: true    # the HEC token is in the headers

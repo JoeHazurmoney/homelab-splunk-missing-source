@@ -1,6 +1,26 @@
-# verify (all): UF running; connected (tcpin by hostname/guid); every expected sourcetype seen in
-# the last N minutes (REST search through the container).
-# Placeholder until a later task (spec 11) fills it in.
-- name: Placeholder for verify
-  ansible.builtin.debug:
-    msg: "verify on {{ inventory_hostname }}: not implemented yet"
+# verify (all, read-only; spec 5.3): UF hosts — running, connected to Cribl (the UF's own log: Splunk
+# sees only Cribl's connection), no token refusal, and this host's _internal seen in Splunk;
+# splunk_server — Cribl healthy. Task 10 adds "every expected sourcetype seen in the last N min".
+- name: Verify the Linux UF
+  when: "'uf_linux' in group_names"
+  block:
+    - name: Check the service is running
+      ansible.builtin.command:
+        argv: [systemctl, is-active, SplunkForwarder]
+      changed_when: false
+
+    - name: Check the UF is connected through Cribl (the whole log; the latest state counts)
+      ansible.builtin.include_tasks: uf_linux_connected.yml
+      vars:
+        hl_uf_log_from: 0
+
+- name: Verify Cribl
+  when: "'splunk_server' in group_names"
+  block:
+    - name: Check Cribl reports healthy
+      ansible.windows.win_shell: |
+        {{ hl_cribl_ps_prelude }}
+        Get-HlCriblHealth | ConvertTo-Json -Compress
+      register: hl_verify_cribl
+      changed_when: false
+      failed_when: hl_verify_cribl.rc != 0 or (hl_verify_cribl.stdout | from_json).Code != 200

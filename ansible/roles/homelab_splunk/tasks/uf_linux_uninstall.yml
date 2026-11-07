@@ -1,5 +1,209 @@
-# uninstall (uf_linux): marker, stop, remove tamper rules, remove the UF, verify the clean-uninstall contract
-# Placeholder until task 4 (spec 11) fills it in.
-- name: Placeholder for uninstall
-  ansible.builtin.debug:
-    msg: "uninstall on {{ inventory_hostname }}: not implemented yet (task 4)"
+# uninstall (uf_linux, spec 5.3/5.6; the order was proven on wd2l-recv in the spike, 14 d):
+# marker → stop → remove the tamper rules FIRST and reload auditd (otherwise augenrules stops at
+# the failing file and drops wd2l.rules) → disable boot-start → rpm -e → rm -rf the UF home →
+# userdel → daemon-reload → the packages the role added → the contract (fails on any leftover)
+# → baselines and state removed. The next `expected` run retires the host's rows.
+- name: Read the state file
+  ansible.builtin.import_tasks: linux_state_read.yml
+
+# The baselines exist exactly when the role recorded an install; without one (a rerun after a
+# finished uninstall) there is nothing to compare against, and that is not an error.
+- name: Note what this uninstall must prove
+  ansible.builtin.set_fact:
+    hl_un_had_install: "{{ (hl_state.uf | default({})).installed | default(false) | bool }}"
+    hl_un_homes: ["/root", "{{ ansible_facts['user_dir'] | default('/home/' ~ ansible_user) }}"]
+
+- name: Marker for the uninstall
+  ansible.builtin.include_tasks: marker.yml
+  vars:
+    hl_marker_action: uninstall
+
+- name: Look for the UF service
+  ansible.builtin.stat:
+    path: /etc/systemd/system/SplunkForwarder.service
+  register: hl_un_unit
+
+- name: Stop the UF
+  ansible.builtin.systemd_service:
+    name: SplunkForwarder
+    state: stopped
+  when: hl_un_unit.stat.exists
+
+- name: Remove the tamper rules
+  ansible.builtin.file:
+    path: "{{ hl_uf_tamper_file }}"
+    state: absent
+  register: hl_un_tamper
+
+- name: Count the tamper rules still loaded
+  ansible.builtin.shell: |
+    set -o pipefail
+    auditctl -l | grep -c -E -- '{{ hl_uf_tamper_key_re }}' || true
+  args:
+    executable: /bin/bash
+  register: hl_un_tamper_loaded
+  changed_when: false
+
+# Also when the file was already gone but its rules are still loaded (a rerun after a failure)
+- name: Reload the audit rules without them
+  ansible.builtin.command:
+    argv: [augenrules, --load]
+  when: hl_un_tamper.changed or (hl_un_tamper_loaded.stdout | trim | int) > 0
+  changed_when: true
+
+- name: Look for the UF's CLI
+  ansible.builtin.stat:
+    path: "{{ hl_uf_cli }}"
+  register: hl_un_cli
+
+- name: Disable boot-start
+  ansible.builtin.command:
+    argv: ["{{ hl_uf_cli }}", disable, boot-start]
+    removes: /etc/systemd/system/SplunkForwarder.service
+  when: hl_un_cli.stat.exists
+
+# A rerun after a partial uninstall (rpm and home gone, unit left): what `disable boot-start` removes
+- name: Remove a unit left without its CLI
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - /etc/systemd/system/SplunkForwarder.service
+    - /etc/systemd/system/multi-user.target.wants/SplunkForwarder.service
+  when: not hl_un_cli.stat.exists
+
+- name: Remove the rpm
+  ansible.builtin.dnf:
+    name: splunkforwarder
+    state: absent
+
+# rpm -e leaves etc/ and splunkfwd's ~/.splunk behind (about 9 MB, spec 5.6)
+- name: Remove the UF home
+  ansible.builtin.file:
+    path: "{{ hl_uf_home }}"
+    state: absent
+
+- name: Remove the splunkfwd account (and its group)
+  ansible.builtin.user:
+    name: "{{ hl_uf_user }}"
+    state: absent
+    remove: true
+
+- name: Remove splunkfwd's mail spool
+  ansible.builtin.file:
+    path: "/var/spool/mail/{{ hl_uf_user }}"
+    state: absent
+
+- name: Remove ~/.splunk for root and the Ansible user
+  ansible.builtin.file:
+    path: "{{ item }}/.splunk"
+    state: absent
+  loop: "{{ hl_un_homes }}"
+
+- name: Reload systemd
+  ansible.builtin.systemd_service:
+    daemon_reload: true
+  changed_when: false
+
+- name: Remove the packages the role added
+  ansible.builtin.dnf:
+    name: "{{ hl_state.packages_added }}"
+    state: absent
+  when: hl_state.packages_added | default([]) | length > 0
+
+# --- The contract (spec 5.6, Linux) ---
+- name: Gather what is left
+  ansible.builtin.shell:
+    cmd: |
+      set -o pipefail
+      d={{ hl_linux_state_dir }}
+      echo "rpm=$(rpm -q splunkforwarder >/dev/null 2>&1 && echo present || echo absent)"
+      echo "home=$([ -e {{ hl_uf_home }} ] && echo present || echo absent)"
+      echo "units=$(ls /etc/systemd/system/SplunkForwarder* /usr/lib/systemd/system/SplunkForwarder* /run/systemd/system/SplunkForwarder* 2>/dev/null | wc -l)"
+      echo "polkit=$(ls /etc/polkit-1/rules.d/*plunk* 2>/dev/null | wc -l)"
+      echo "user=$(getent passwd {{ hl_uf_user }} | wc -l)"
+      echo "group=$(getent group {{ hl_uf_user }} | wc -l)"
+      echo "mail=$([ -e /var/spool/mail/{{ hl_uf_user }} ] && echo present || echo absent)"
+      echo "dot_splunk=$(for h in {{ hl_un_homes | map('quote') | join(' ') }}; do [ -e "$h/.splunk" ] && echo "$h"; done | wc -l)"
+      echo "tamper=$(auditctl -l | grep -c -E -- '{{ hl_uf_tamper_key_re }}' || true)"
+      if [ -f "$d/auditctl.before" ]; then
+        auditctl -l | LC_ALL=C sort > "$d/auditctl.after"
+        echo "auditctl_diff=$(diff "$d/auditctl.before" "$d/auditctl.after" | grep -c '^[<>]' || true)"
+      else echo "auditctl_diff=nobaseline"; fi
+      if [ -f "$d/nouser.before" ]; then
+        find / -xdev \( -nouser -o -nogroup \) -print 2>/dev/null | LC_ALL=C sort > "$d/nouser.after"
+        echo "nouser_new=$(comm -13 "$d/nouser.before" "$d/nouser.after" | wc -l)"
+        comm -13 "$d/nouser.before" "$d/nouser.after" | head -20 | sed 's/^/nouser_path=/'
+      else echo "nouser_new=nobaseline"; fi
+      # Units the install brought (SplunkForwarder.service, sysstat's units) must be gone. A unit
+      # that something else added meanwhile also shows here: the play lists it and fails, unless
+      # -e hl_uninstall_accept_new_units=true says those are known to be unrelated.
+      # Transient units (an SSH login's session-N.scope) come and go and are left out (task 4 fix round 2).
+      if [ -f "$d/units.before" ]; then
+        systemctl list-unit-files --no-legend | awk '$2 != "transient" {print $1}' | LC_ALL=C sort > "$d/units.after"
+        echo "units_new=$(comm -13 "$d/units.before" "$d/units.after" | wc -l)"
+        comm -13 "$d/units.before" "$d/units.after" | head -20 | sed 's/^/units_path=/'
+      else echo "units_new=nobaseline"; fi
+      {% for p in hl_state.packages_added | default([]) %}
+      echo "pkg_{{ p }}=$(rpm -q {{ p }} >/dev/null 2>&1 && echo present || echo absent)"
+      {% endfor %}
+    executable: /bin/bash
+  register: hl_un_left
+  changed_when: false
+
+# A missing baseline is acceptable only when the role recorded no install (a rerun after a
+# finished uninstall). Otherwise someone deleted the baselines, and the contract can't be proven.
+- name: Refuse an uninstall the baselines can't prove
+  ansible.builtin.assert:
+    that: >-
+      not hl_un_had_install or hl_uninstall_without_baseline | bool
+      or hl_un_left.stdout_lines | select('match', '^[a-z_]+=nobaseline$') | list | length == 0
+    fail_msg: >-
+      The state file records an install, but these baselines from before it are missing from
+      {{ hl_linux_state_dir }}: {{ hl_un_left.stdout_lines | select('match', '^[a-z_]+=nobaseline$') | list }}.
+      So new audit rules, unowned paths or units can't be detected. The UF is removed, but the
+      contract wasn't checked: rerun with -e hl_uninstall_without_baseline=true to check the rest.
+    quiet: true
+
+- name: Check the uninstall contract
+  ansible.builtin.assert:
+    that:
+      - "'rpm=absent' in hl_un_left.stdout_lines"
+      - "'home=absent' in hl_un_left.stdout_lines"
+      - "'units=0' in hl_un_left.stdout_lines"
+      - "'polkit=0' in hl_un_left.stdout_lines"
+      - "'user=0' in hl_un_left.stdout_lines"
+      - "'group=0' in hl_un_left.stdout_lines"
+      - "'mail=absent' in hl_un_left.stdout_lines"
+      - "'dot_splunk=0' in hl_un_left.stdout_lines"
+      - "'tamper=0' in hl_un_left.stdout_lines"
+      - "'auditctl_diff=0' in hl_un_left.stdout_lines or 'auditctl_diff=nobaseline' in hl_un_left.stdout_lines"
+      - "'nouser_new=0' in hl_un_left.stdout_lines or 'nouser_new=nobaseline' in hl_un_left.stdout_lines"
+      - "'units_new=0' in hl_un_left.stdout_lines or 'units_new=nobaseline' in hl_un_left.stdout_lines
+         or hl_uninstall_accept_new_units | bool"
+      - hl_un_left.stdout_lines | select('match', '^pkg_.*=present$') | list | length == 0
+    fail_msg: >-
+      uninstall left something behind: {{ hl_un_left.stdout_lines }}.
+      {{ ('New unit files since the install: ' ~ (hl_un_left.stdout_lines | select('match', '^units_path=')
+      | map('regex_replace', '^units_path=', '') | list | join(', ')) ~ '. If they belong to something
+      else installed meanwhile, rerun with -e hl_uninstall_accept_new_units=true (the UF is already
+      removed; the rerun repeats the checks and lists them again).')
+      if hl_un_left.stdout_lines | select('match', '^units_path=') | list | length > 0 else '' }}
+    success_msg: >-
+      uninstall contract passed: {{ hl_un_left.stdout_lines | join(', ') }}{{ ''
+      if hl_un_left.stdout_lines | select('match', '^[a-z_]+=nobaseline$') | list | length == 0
+      else ' (NOT compared with a baseline: ' ~ ('no install was recorded' if not hl_un_had_install
+      else 'baselines missing, accepted with hl_uninstall_without_baseline') ~ ')' }}
+
+- name: Remove the baselines
+  ansible.builtin.file:
+    path: "{{ hl_linux_state_dir }}/{{ item }}"
+    state: absent
+  loop: [nouser.before, nouser.after, auditctl.before, auditctl.after, units.before, units.after]
+
+- name: Drop the UF and package records from the state file
+  ansible.builtin.set_fact:
+    hl_state: "{{ hl_state | dict2items | rejectattr('key', 'in', ['uf', 'packages_added']) | items2dict }}"
+
+- name: Write the state file
+  ansible.builtin.import_tasks: linux_state_write.yml
