@@ -19,15 +19,23 @@
   when: hl_cribl_hold_on_splunk_restart | bool
 
 # The hold drops UDP syslog sent to Cribl while it is paused (spec 13), so markers bracket it:
-# data health then names the gap and suppresses tamper findings in that window.
-- name: Marker before holding Cribl
-  ansible.builtin.include_tasks: marker.yml
-  vars:
-    hl_marker_action: cribl_hold
-    hl_marker_target: "{{ hl_cribl_container }}"
+# data health then names the gap and suppresses tamper findings in that window. Both are best
+# effort: a failed marker warns and never blocks the restart or the unpause (e.g. `server` after
+# `server_remove`, when the hl_markers HEC token is gone until this very run restarts splunkd).
+- name: Marker before holding Cribl (best effort)
   when:
     - hl_cribl_hold_on_splunk_restart | bool
     - hl_server_cribl_running.stdout | default('') | trim == 'true false'
+  block:
+    - name: Post the cribl_hold marker
+      ansible.builtin.include_tasks: marker.yml
+      vars:
+        hl_marker_action: cribl_hold
+        hl_marker_target: "{{ hl_cribl_container }}"
+  rescue:
+    - name: Warn that the cribl_hold marker failed
+      ansible.builtin.debug:
+        msg: "WARNING: the cribl_hold marker could not be posted to {{ hl_marker_hec_url }}; the restart goes on without it."
 
 - name: Restart splunkd, holding Cribl when asked
   block:
@@ -78,15 +86,32 @@
       when: hl_server_cribl_held | default(false) | bool
       changed_when: true
 
+    # Here, so a hold always gets its release, also after a failed restart. The marker goes to
+    # HEC, so wait up to 60 s for it first; both steps are best effort.
+    - name: Marker after releasing Cribl (best effort)
+      when: hl_server_cribl_held | default(false) | bool
+      block:
+        - name: Wait for HEC before the cribl_release marker
+          ansible.windows.win_shell: |
+            {{ hl_ps_prelude }}
+            Get-HlHecHealth | ConvertTo-Json -Compress
+          register: hl_server_hec_release
+          until: hl_server_hec_release.rc == 0 and (hl_server_hec_release.stdout | from_json).Code == 200
+          retries: 6
+          delay: 10
+          changed_when: false
+
+        - name: Post the cribl_release marker
+          ansible.builtin.include_tasks: marker.yml
+          vars:
+            hl_marker_action: cribl_release
+            hl_marker_target: "{{ hl_cribl_container }}"
+      rescue:
+        - name: Warn that the cribl_release marker failed
+          ansible.builtin.debug:
+            msg: "WARNING: the cribl_release marker could not be posted to {{ hl_marker_hec_url }}; Cribl is unpaused."
+
 - name: Check wd2l after the restart
   ansible.builtin.import_tasks: server_health.yml
   vars:
     hl_health_since: "{{ hl_server_restart_t0.stdout | trim | int }}"
-
-# After the health check, because the marker goes to HEC, which has to be back
-- name: Marker after releasing Cribl
-  ansible.builtin.include_tasks: marker.yml
-  vars:
-    hl_marker_action: cribl_release
-    hl_marker_target: "{{ hl_cribl_container }}"
-  when: hl_server_cribl_held | default(false) | bool

@@ -36,6 +36,9 @@ hl_uf_connect_timeout: 180
 # uninstall: accept a contract without the install baselines (they are missing although the state file
 # records an install, e.g. deleted by hand); the play refuses otherwise
 hl_uninstall_without_baseline: false
+# uninstall: accept unit files that appeared while the UF was installed (listed, not removed),
+# when they belong to something else
+hl_uninstall_accept_new_units: false
 
 # --- Expectation metadata (spec 7.2 dh_expected). Set per group or host. ---
 hl_owner: taylorb

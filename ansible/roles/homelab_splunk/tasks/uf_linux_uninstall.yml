@@ -136,9 +136,11 @@
         comm -13 "$d/nouser.before" "$d/nouser.after" | head -20 | sed 's/^/nouser_path=/'
       else echo "nouser_new=nobaseline"; fi
       # Units the install brought (SplunkForwarder.service, sysstat's units) must be gone. A unit
-      # that something else added meanwhile also shows here; the play lists it and fails.
+      # that something else added meanwhile also shows here: the play lists it and fails, unless
+      # -e hl_uninstall_accept_new_units=true says those are known to be unrelated.
+      # Transient units (an SSH login's session-N.scope) come and go and are left out (task 4 fix round 2).
       if [ -f "$d/units.before" ]; then
-        systemctl list-unit-files --no-legend | awk '{print $1}' | LC_ALL=C sort > "$d/units.after"
+        systemctl list-unit-files --no-legend | awk '$2 != "transient" {print $1}' | LC_ALL=C sort > "$d/units.after"
         echo "units_new=$(comm -13 "$d/units.before" "$d/units.after" | wc -l)"
         comm -13 "$d/units.before" "$d/units.after" | head -20 | sed 's/^/units_path=/'
       else echo "units_new=nobaseline"; fi
@@ -177,9 +179,16 @@
       - "'tamper=0' in hl_un_left.stdout_lines"
       - "'auditctl_diff=0' in hl_un_left.stdout_lines or 'auditctl_diff=nobaseline' in hl_un_left.stdout_lines"
       - "'nouser_new=0' in hl_un_left.stdout_lines or 'nouser_new=nobaseline' in hl_un_left.stdout_lines"
-      - "'units_new=0' in hl_un_left.stdout_lines or 'units_new=nobaseline' in hl_un_left.stdout_lines"
+      - "'units_new=0' in hl_un_left.stdout_lines or 'units_new=nobaseline' in hl_un_left.stdout_lines
+         or hl_uninstall_accept_new_units | bool"
       - hl_un_left.stdout_lines | select('match', '^pkg_.*=present$') | list | length == 0
-    fail_msg: "uninstall left something behind: {{ hl_un_left.stdout_lines }}"
+    fail_msg: >-
+      uninstall left something behind: {{ hl_un_left.stdout_lines }}.
+      {{ ('New unit files since the install: ' ~ (hl_un_left.stdout_lines | select('match', '^units_path=')
+      | map('regex_replace', '^units_path=', '') | list | join(', ')) ~ '. If they belong to something
+      else installed meanwhile, rerun with -e hl_uninstall_accept_new_units=true (the UF is already
+      removed; the rerun repeats the checks and lists them again).')
+      if hl_un_left.stdout_lines | select('match', '^units_path=') | list | length > 0 else '' }}
     success_msg: >-
       uninstall contract passed: {{ hl_un_left.stdout_lines | join(', ') }}{{ ''
       if hl_un_left.stdout_lines | select('match', '^[a-z_]+=nobaseline$') | list | length == 0

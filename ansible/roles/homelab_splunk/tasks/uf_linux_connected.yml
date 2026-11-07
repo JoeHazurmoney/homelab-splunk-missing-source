@@ -14,30 +14,33 @@
 #    Not "since the restart was asked for": the old splunkd, still holding the old token, sends its
 #    own shutdown lines while it stops, and those passed a wrong token (task 4 fix round 1).
 - name: Wait for the UF to connect to Cribl
-  ansible.builtin.shell: |
-    set -o pipefail
-    echo "HL_NOW=$(date +%s)"
-    st=$(systemctl show -p ActiveEnterTimestamp --value SplunkForwarder 2>/dev/null)
-    if [ -n "$st" ]; then echo "HL_STARTED=$(date -d "$st" +%s 2>/dev/null || echo 0)"; else echo "HL_STARTED=0"; fi
-    log={{ hl_uf_home }}/var/log/splunk/splunkd.log
-    from={{ (hl_uf_log_from | default(0) | int) + 1 }}
-    # The wait loops here, not with until/retries: Ansible fails a task whose retries run out, and
-    # the next task should say why (the last close). The latest of "connected" and "closed" decides.
-    end=$(( $(date +%s) + {{ hl_uf_connect_timeout | int }} ))
-    while :; do
-      lc=0; lr=""
-      if [ -f "$log" ]; then
-        lc=$(tail -n +"$from" "$log" | grep -n 'Connected to idx={{ hl_collector }}:{{ hl_s2s_port }}' | tail -1 | cut -d: -f1 || true)
-        lr=$(tail -n +"$from" "$log" | grep -n -E '{{ hl_uf_close_re }}' | tail -1 || true)
-      fi
-      lc=${lc:-0}; ln=${lr%%:*}; ln=${ln:-0}
-      [ "$lc" -gt "$ln" ] && break
-      [ "$(date +%s)" -ge "$end" ] && break
-      sleep 10
-    done
-    if [ "$lc" -gt "$ln" ]; then echo "HL_CONNECTED=1"; else echo "HL_CONNECTED=0"; fi
-    if [ -n "$lr" ]; then echo "HL_LAST_CLOSE=${lr#*:}" | cut -c1-300; fi
-  args:
+  ansible.builtin.shell:
+    cmd: |
+      set -o pipefail
+      echo "HL_NOW=$(date +%s)"
+      # The running splunkd's start as epoch seconds ("@1794087825", systemd 257); anything else is
+      # reported as unknown and fails below, never as 0 (that would count every event)
+      st=$(systemctl show --timestamp=unix -p ActiveEnterTimestamp --value SplunkForwarder 2>/dev/null)
+      st=${st#@}
+      case "$st" in ''|*[!0-9]*) echo "HL_STARTED=unknown";; *) echo "HL_STARTED=$st";; esac
+      log={{ hl_uf_home }}/var/log/splunk/splunkd.log
+      from={{ (hl_uf_log_from | default(0) | int) + 1 }}
+      # The wait loops here, not with until/retries: Ansible fails a task whose retries run out, and
+      # the next task should say why (the last close). The latest of "connected" and "closed" decides.
+      end=$(( $(date +%s) + {{ hl_uf_connect_timeout | int }} ))
+      while :; do
+        lc=0; lr=""
+        if [ -f "$log" ]; then
+          lc=$(tail -n +"$from" "$log" | grep -n 'Connected to idx={{ hl_collector }}:{{ hl_s2s_port }}' | tail -1 | cut -d: -f1 || true)
+          lr=$(tail -n +"$from" "$log" | grep -n -E '{{ hl_uf_close_re }}' | tail -1 || true)
+        fi
+        lc=${lc:-0}; ln=${lr%%:*}; ln=${ln:-0}
+        [ "$lc" -gt "$ln" ] && break
+        [ "$(date +%s)" -ge "$end" ] && break
+        sleep 10
+      done
+      if [ "$lc" -gt "$ln" ]; then echo "HL_CONNECTED=1"; else echo "HL_CONNECTED=0"; fi
+      if [ -n "$lr" ]; then echo "HL_LAST_CLOSE=${lr#*:}" | cut -c1-300; fi
     executable: /bin/bash
   register: hl_uf_conn
   changed_when: false
@@ -51,6 +54,14 @@
       | map('regex_replace', '^HL_LAST_CLOSE=', '') | first | default('none') }}.
       A wrong token shows on Cribl's side as "Invalid S2S token … sent by host={{ inventory_hostname }}".
   when: hl_uf_conn.rc != 0 or hl_uf_conn.stdout is not search('HL_CONNECTED=1')
+
+- name: Fail when the running splunkd's start time is unknown
+  ansible.builtin.fail:
+    msg: >-
+      `systemctl show --timestamp=unix -p ActiveEnterTimestamp SplunkForwarder` gave no epoch
+      ({{ hl_uf_conn.stdout_lines | select('match', '^HL_STARTED=') | first | default('no HL_STARTED line') }}),
+      so the Splunk-side check can't tell this splunkd's data from an earlier one's.
+  when: hl_uf_conn.stdout is not search('HL_STARTED=[0-9]+')
 
 - name: Wait for this host's _internal in Splunk (through Cribl, from the running splunkd)
   ansible.windows.win_shell: |

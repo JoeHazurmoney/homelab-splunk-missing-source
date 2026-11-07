@@ -58,10 +58,11 @@
         executable: /bin/bash
       changed_when: true
 
+    # Unit files without the transient ones (session-N.scope of each SSH login), as uninstall compares
     - name: Save the systemd unit list
       ansible.builtin.shell: |
         set -o pipefail
-        systemctl list-unit-files --no-legend | awk '{print $1}' | LC_ALL=C sort > {{ hl_linux_state_dir }}/units.before
+        systemctl list-unit-files --no-legend | awk '$2 != "transient" {print $1}' | LC_ALL=C sort > {{ hl_linux_state_dir }}/units.before
       args:
         executable: /bin/bash
       changed_when: true

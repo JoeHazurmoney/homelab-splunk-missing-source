@@ -54,6 +54,10 @@ argument_specs:
         type: bool
         default: false
         description: Let uninstall check its contract without the install baselines (missing although an install is recorded).
+      hl_uninstall_accept_new_units:
+        type: bool
+        default: false
+        description: Let the uninstall contract pass when unit files appeared while the UF was installed (still listed), e.g. from an unrelated package.
       hl_s2s_port:
         type: int
         default: 9997
