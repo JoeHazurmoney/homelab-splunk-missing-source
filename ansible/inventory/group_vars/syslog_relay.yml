@@ -1,9 +1,0 @@
-# Agentless syslog devices relayed by the Pi (spec 5.2). Ansible never logs in to them; the relay
-# maps fromhost-ip to the device name, and `expected` turns each row into an expected entity.
-syslog_devices:
-  - name: udm
-    ip: 192.168.1.1
-    index: network
-    sourcetype: "unifi:syslog"
-    profile: sporadic
-    criticality: 2

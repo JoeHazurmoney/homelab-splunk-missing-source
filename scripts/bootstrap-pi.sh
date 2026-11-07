@@ -131,6 +131,10 @@ if [ -f "$vault" ]; then
   head -n1 "$vault" | grep -q '^\$ANSIBLE_VAULT;' || die "$vault is not encrypted; encrypt it: ansible-vault encrypt $vault"
   "$ansible_bin/ansible-vault" view "$vault" > /dev/null || die "$vault does not decrypt with $vault_pass"
   log "vault: $vault exists and decrypts"
+  for k in vault_hl_uf_admin_password vault_hl_s2s_token vault_hl_markers_token vault_hl_cribl_admin_password; do
+    "$ansible_bin/ansible-vault" view "$vault" | grep -q "^$k:" ||
+      log "vault: $k is missing; add it with: ansible-vault edit ${vault#"$repo"/} (see group_vars/all/vault.yml.example)"
+  done
 else
   log "vault: generating $vault with random values"
   {
@@ -138,6 +142,15 @@ else
     printf 'vault_hl_uf_admin_password: "%s"\n' "$(python3 -c 'import secrets; print(secrets.token_urlsafe(24))')"
     printf 'vault_hl_s2s_token: "%s"\n' "$(python3 -c 'import uuid; print(uuid.uuid4())')"
     printf 'vault_hl_markers_token: "%s"\n' "$(python3 -c 'import uuid; print(uuid.uuid4())')"
+    # Cribl wants 3 of 4 classes (lower, upper but not first, digit but not last, other): retry until all 4
+    printf 'vault_hl_cribl_admin_password: "%s"\n' "$(python3 -c '
+import re, secrets
+while True:
+    p = secrets.token_urlsafe(24)
+    if re.search("[a-z]", p) and re.search("[A-Z]", p[1:]) and re.search("[0-9]", p[:-1]) and re.search("[^A-Za-z0-9]", p):
+        print(p)
+        break
+')"
   } | (umask 077 && "$ansible_bin/ansible-vault" encrypt --output "$vault")
   chmod 600 "$vault"
 fi

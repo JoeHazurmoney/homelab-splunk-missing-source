@@ -40,6 +40,8 @@ hl_apps_only: []
 # A change to one of these files restarts splunkd; anything else is reloaded over REST.
 # web.conf has no REST reload (hl_server_base's dashboard risky-command setting, spec 7.8).
 hl_server_restart_confs: [indexes.conf, inputs.conf, props.conf, web.conf]
+# Restart splunkd even when nothing changed (the restart-loss test, docs/handoff/task-3b-cribl.md)
+hl_server_force_restart: false
 hl_server_reload_endpoints:
   - apps/local
   - admin/conf-collections
@@ -68,7 +70,53 @@ hl_server_health_timeout: 300        # seconds to wait for HEC and wd2l data aft
 # The role's state file on Windows hosts (spec 5.2), shared by the server and UF parts
 hl_win_state_file: 'C:\ProgramData\hl_splunk\state.json'
 
-# --- Syslog devices on the relay (set in group_vars/syslog_relay.yml) ---
+# --- Cribl Stream (splunk_server: spec 5.3 cribl/cribl_remove/cribl_block, 6.2, spike 14.7) ---
+# cribl/cribl:4.20.4, the multi-arch index digest. Docker Desktop over SSH has no credential
+# store, so the role never pulls: Taylor pulls this once in a desktop session (the play says so).
+hl_cribl_image: cribl/cribl@sha256:cb2b2e32933e492f439b5825b0c36f420df2fa986fe36d5f31fce6755190eb71
+hl_cribl_container: cribl
+hl_cribl_project: hl-cribl            # docker compose project name
+hl_cribl_volume: hl-cribl-data
+hl_cribl_volume_dir: /opt/cribl/config-volume
+# Where the role renders compose.yml on HOMEPC (no secrets in it)
+hl_cribl_compose_dir: 'C:\ProgramData\hl_splunk\cribl'
+hl_cribl_s2s_port: 9997               # published on all interfaces (the UFs)
+hl_cribl_api_port: 9000               # published on 127.0.0.1 only
+hl_cribl_api_url: "http://127.0.0.1:{{ hl_cribl_api_port }}/api/v1"
+# The repo's Cribl config tree (spec 5.2), rendered on the controller
+hl_cribl_src: "{{ playbook_dir }}/../cribl"
+# The files under hl_cribl_src/local/cribl the role writes into $CRIBL_VOLUME_DIR/local/cribl
+hl_cribl_config_files:
+  - inputs.yml
+  - outputs.yml
+  - cribl.yml
+  - pipelines/route.yml
+  - pipelines/pl_test_block/conf.yml
+  - pipelines/pl_syslog_pre/conf.yml
+hl_cribl_health_timeout: 180          # seconds to wait for Cribl's /health and its data in Splunk
+# After a config change (or the first install), send one UDP syslog line to each device port and
+# wait for it in Splunk with the device's host/index/sourcetype. It briefly makes the device look
+# alive to data health, so it runs only when something changed.
+hl_cribl_selftest: true
+# Hold Cribl around a splunkd restart (server tag): docker pause cribl, restart splunkd, wait for
+# HEC, unpause. The UFs keep their unACKed data (useACK); UDP sent meanwhile is lost. Off until
+# task 4's restart test decides (docs/handoff/task-3b-cribl.md check 6, spec 11 row 4).
+hl_cribl_hold_on_splunk_restart: false
+# cribl_block (never): set or clear one test block, e.g.
+#   --tags cribl_block -e hl_block_key='wd2l-recv|linux_secure|*' -e hl_block_minutes=30 -e hl_block_reason='E2E row 4'
+#   --tags cribl_block -e hl_block_key='wd2l-recv|linux_secure|*' -e hl_block_clear=true
+hl_block_key: ""
+hl_block_minutes: 60
+hl_block_reason: ""
+hl_block_clear: false
+hl_block_max_minutes: 1440            # a block longer than a day is refused
+
+# --- Ansible maintenance markers (spec 5.3 Markers): HEC token hl_markers, posted from the controller ---
+hl_marker_hec_url: https://192.168.1.27:8088/services/collector/event
+# wd2l-splunk's HEC certificate is self-signed (LAN only)
+hl_marker_validate_certs: false
+
+# --- Syslog devices (set in group_vars/splunk_server.yml): one Cribl syslog source per device ---
 syslog_devices: []
 
 # --- The shared input schema (spec 4). Forwarder apps (task 6) and the expected list (task 10)

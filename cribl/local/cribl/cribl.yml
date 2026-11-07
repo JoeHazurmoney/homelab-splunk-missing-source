@@ -1,0 +1,8 @@
+# Cribl Stream system settings, merged over Cribl's default/cribl.yml. Managed by the
+# homelab_splunk role (`cribl` tag). Each worker process logs a stats line every 60 s, so 10
+# workers cost ≈ 60 MB/day of Splunk licence (spike §14.7 f); 2 are plenty for a homelab.
+# Verified in task 3b: a local cribl.yml holding only `workers` is merged over the defaults, not a
+# full replacement; 2 workers cost ≈ 18 MB/day, mostly metrics (spec §14.9, check 4).
+workers:
+  count: 2
+  minimum: 2

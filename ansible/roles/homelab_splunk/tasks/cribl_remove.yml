@@ -1,0 +1,97 @@
+# cribl_remove (splunk_server, spec 5.3/5.6): marker, docker compose down with the volume, then the
+# compose folder and the state record. The image stays (Taylor pulled it; the role never pulls).
+# hl-net stays too: server_network created it, and server_remove deletes it (in a full removal,
+# run cribl_remove first: --tags cribl_remove,server_remove does, main.yml orders them).
+# The contract check at the end fails the play if anything is left.
+- name: Marker before removing Cribl
+  ansible.builtin.include_tasks: marker.yml
+  vars:
+    hl_marker_action: cribl_remove
+    hl_marker_target: cribl
+
+- name: Read the state file
+  ansible.builtin.import_tasks: win_state_read.yml
+
+- name: Look for the compose file
+  ansible.windows.win_stat:
+    path: "{{ hl_cribl_compose_dir }}\\compose.yml"
+  register: hl_cribl_rm_compose
+
+- name: Take the container and its volume down (compose)
+  ansible.windows.win_command:
+    argv: [docker, compose, -f, "{{ hl_cribl_compose_dir }}\\compose.yml", down, --volumes, --remove-orphans]
+  register: hl_cribl_rm_down
+  when: hl_cribl_rm_compose.stat.exists
+  changed_when: hl_cribl_rm_down.stderr is search('Removed|Stopped')
+
+# Without the compose file (deleted by hand), remove what the state file recorded, by name
+- name: Look for a leftover container
+  ansible.windows.win_command:
+    argv: [docker, inspect, "{{ hl_cribl_container }}"]
+  register: hl_cribl_rm_ctr
+  changed_when: false
+  failed_when: false
+
+- name: Remove a leftover container
+  ansible.windows.win_command:
+    argv: [docker, rm, -fv, "{{ hl_cribl_container }}"]
+  when:
+    - hl_cribl_rm_ctr.rc == 0
+    - "'cribl' in hl_state"
+  changed_when: true
+
+- name: Look for a leftover volume
+  ansible.windows.win_command:
+    argv: [docker, volume, inspect, "{{ hl_cribl_volume }}"]
+  register: hl_cribl_rm_vol
+  changed_when: false
+  failed_when: false
+
+- name: Remove a leftover volume
+  ansible.windows.win_command:
+    argv: [docker, volume, rm, "{{ hl_cribl_volume }}"]
+  when:
+    - hl_cribl_rm_vol.rc == 0
+    - "'cribl' in hl_state"
+  changed_when: true
+
+- name: Remove the compose folder
+  ansible.windows.win_file:
+    path: "{{ hl_cribl_compose_dir }}"
+    state: absent
+
+- name: Drop the Cribl record from the state file
+  ansible.builtin.set_fact:
+    hl_state: "{{ hl_state | dict2items | rejectattr('key', 'eq', 'cribl') | items2dict }}"
+
+- name: Write the state file
+  ansible.builtin.import_tasks: win_state_write.yml
+
+# Cribl's table went with the volume: Splunk's mirror must not show a block that no longer exists
+- name: Reset Splunk's mirror of the test-block table to the seed
+  ansible.builtin.include_tasks: cribl_mirror.yml
+  vars:
+    hl_mirror_csv: "{{ lookup('ansible.builtin.file', hl_cribl_src ~ '/data/lookups/hl_ingest_block.csv', rstrip=false) }}"
+
+# --- The contract (spec 5.6, Cribl) ---
+- name: List containers, volumes and the compose folder for the contract
+  ansible.windows.win_shell: |
+    $ctr = @(docker ps -a --filter "name=^/{{ hl_cribl_container }}$" --format '{{ '{{.Names}}' }}')
+    $vol = @(docker volume ls --filter "name=^{{ hl_cribl_volume }}$" --format '{{ '{{.Name}}' }}')
+    @{ containers = $ctr; volumes = $vol; compose = (Test-Path -LiteralPath '{{ hl_cribl_compose_dir }}') } | ConvertTo-Json -Compress
+  register: hl_cribl_rm_left
+  changed_when: false
+
+- name: Check the removal contract
+  ansible.builtin.assert:
+    that:
+      - (hl_cribl_rm_left.stdout | from_json).containers | select | list | length == 0
+      - (hl_cribl_rm_left.stdout | from_json).volumes | select | list | length == 0
+      - not (hl_cribl_rm_left.stdout | from_json).compose
+    fail_msg: "cribl_remove left something behind: {{ hl_cribl_rm_left.stdout }}"
+    success_msg: "cribl_remove contract passed: no {{ hl_cribl_container }} container, no {{ hl_cribl_volume }} volume, no compose folder"
+
+- name: Check wd2l after the removal
+  ansible.builtin.import_tasks: server_health.yml
+  vars:
+    hl_health_since: ""

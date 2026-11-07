@@ -1,0 +1,60 @@
+# Cribl Stream sources (spec §4.2, §5.5, spike §14.7). Managed by the homelab_splunk role (`cribl`
+# tag): rendered on the controller as a Jinja template (secrets from the vault), merged with one
+# syslog source per entry of `syslog_devices` (in_<name>_syslog, built by the role), and written
+# to $CRIBL_VOLUME_DIR/local/cribl/inputs.yml. Edits made in Cribl's UI are overwritten on the
+# next run that changes this file. Cribl merges this file over its default/ inputs.
+inputs:
+  # The 4 UFs, S2S v4 with a token (spike §14.7 a: UF 10.6.1.1 connects, useACK honoured).
+  in_splunk_tcp:
+    type: splunk
+    disabled: false
+    sendToRoutes: true
+    host: 0.0.0.0
+    port: 9997
+    authTokens:
+      - token: "{{ vault_hl_s2s_token }}"
+        description: homelab UFs (vault_hl_s2s_token)
+    tls:
+      disabled: true
+    maxActiveCxn: 1000
+    staleChannelFlushMs: 10000
+    useFwdTimezone: true
+    dropControlFields: true
+    extractMetrics: false
+    compress: disabled
+  # Cribl's own logs, worker processes only (spike §14.7 f): the `cribl` heartbeat, 120 s.
+  CriblLogs:
+    type: cribl
+    disabled: false
+    sendToRoutes: true
+    metadata:
+      - name: index
+        value: "'cribl'"
+  # Cribl's own metrics. Only a metrics index keeps their values (spike §14.7 f).
+  CriblMetrics:
+    type: criblmetrics
+    disabled: false
+    sendToRoutes: true
+    prefix: cribl.logstream.
+    fullFidelity: true
+    metadata:
+      - name: index
+        value: "'cribl_metrics'"
+  # Cribl's audit log (config changes), for the Cribl tamper indicator (spec §7.6). The pattern is
+  # matched against the full path, so "audit.log" alone matches nothing (spike §14.7 f).
+  in_cribl_audit:
+    type: file
+    disabled: false
+    sendToRoutes: true
+    mode: manual
+    path: $CRIBL_HOME/log
+    filenames:
+      - "*/audit.log"
+    interval: 10
+    metadata:
+      - name: index
+        value: "'cribl'"
+      - name: sourcetype
+        value: "'cribl:audit'"
+      - name: host
+        value: "'cribl'"

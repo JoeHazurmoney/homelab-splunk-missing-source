@@ -4,7 +4,7 @@
 # lookups. splunkd restarts only when a file in hl_server_restart_confs changed (indexes.conf,
 # inputs.conf, props.conf, web.conf); any other change is reloaded over REST.
 # A splunkd restart loses what Cribl sends during Splunk's shutdown (about 30 s in spike 2b,
-# spec 14.7 g) until task 3b fixes or documents it.
+# spec 14.7 g) until task 4's restart test fixes or documents it (spec 5.3 server).
 #   -e '{"hl_apps_only":["hl_server_base"]}'   limits the run to the listed apps
 - name: Select the server apps to deploy
   ansible.builtin.set_fact:
@@ -157,8 +157,8 @@
 
 - name: Decide whether splunkd must restart
   ansible.builtin.set_fact:
-    hl_server_restart_needed: "{{ hl_server_changed_files | map('basename') | select('in', hl_server_restart_confs)
-      | list | length > 0 }}"
+    hl_server_restart_needed: "{{ (hl_server_changed_files | map('basename') | select('in', hl_server_restart_confs)
+      | list | length > 0) or (hl_server_force_restart | bool) }}"
 
 - name: Show what changed
   ansible.builtin.debug:

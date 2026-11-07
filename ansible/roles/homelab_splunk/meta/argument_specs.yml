@@ -95,6 +95,10 @@ argument_specs:
         elements: str
         default: [indexes.conf, inputs.conf, props.conf, web.conf]
         description: Changing or removing one of these files restarts splunkd (web.conf has no REST reload); other changes are reloaded.
+      hl_server_force_restart:
+        type: bool
+        default: false
+        description: The server tag restarts splunkd even when nothing changed (tests).
       hl_server_reload_endpoints:
         type: list
         elements: str
@@ -136,20 +140,110 @@ argument_specs:
         type: str
         default: 'C:\ProgramData\hl_splunk\state.json'
         description: The role's state file on Windows hosts (spec 5.2).
+      hl_cribl_image:
+        type: str
+        description: Cribl image, pinned by digest (spec 6.2). The role never pulls it; pull it in a desktop session.
+      hl_cribl_container:
+        type: str
+        default: cribl
+        description: Cribl container name.
+      hl_cribl_project:
+        type: str
+        default: hl-cribl
+        description: docker compose project name.
+      hl_cribl_volume:
+        type: str
+        default: hl-cribl-data
+        description: Docker volume holding Cribl's config, lookups and persistent queue.
+      hl_cribl_volume_dir:
+        type: str
+        default: /opt/cribl/config-volume
+        description: CRIBL_VOLUME_DIR inside the container (the volume's mount point).
+      hl_cribl_compose_dir:
+        type: str
+        default: 'C:\ProgramData\hl_splunk\cribl'
+        description: Folder on HOMEPC for the rendered compose.yml.
+      hl_cribl_s2s_port:
+        type: int
+        default: 9997
+        description: Cribl's Splunk TCP port, published on all interfaces for the UFs.
+      hl_cribl_api_port:
+        type: int
+        default: 9000
+        description: Cribl's UI/API port, published on 127.0.0.1 only.
+      hl_cribl_api_url:
+        type: str
+        description: Cribl's API base URL as HOMEPC reaches it.
+      hl_cribl_src:
+        type: str
+        default: "{{ playbook_dir }}/../cribl"
+        description: The repo's Cribl config tree on the controller.
+      hl_cribl_config_files:
+        type: list
+        elements: str
+        description: Files under hl_cribl_src/local/cribl the role renders and writes into the volume.
+      hl_cribl_health_timeout:
+        type: int
+        default: 180
+        description: Seconds to wait for Cribl's health and for its data in Splunk.
+      hl_cribl_selftest:
+        type: bool
+        default: true
+        description: After a Cribl change, send one syslog line per device port and wait for it in Splunk.
+      hl_cribl_hold_on_splunk_restart:
+        type: bool
+        default: false
+        description: Pause the Cribl container while the server tag restarts splunkd.
+      hl_block_key:
+        type: str
+        default: ""
+        description: cribl_block - the block key host|sourcetype|source (* for a whole level).
+      hl_block_minutes:
+        type: int
+        default: 60
+        description: cribl_block - how long the block lasts.
+      hl_block_reason:
+        type: str
+        default: ""
+        description: cribl_block - why (required to set a block).
+      hl_block_clear:
+        type: bool
+        default: false
+        description: cribl_block - remove hl_block_key instead of setting it.
+      hl_block_max_minutes:
+        type: int
+        default: 1440
+        description: cribl_block - the longest block allowed.
+      hl_marker_hec_url:
+        type: str
+        default: https://192.168.1.27:8088/services/collector/event
+        description: HEC event endpoint the controller posts the Ansible markers to.
+      hl_marker_validate_certs:
+        type: bool
+        default: false
+        description: Check wd2l-splunk's HEC certificate (self-signed today).
       syslog_devices:
         type: list
         elements: dict
         default: []
-        description: Agentless devices relayed by the Pi (group_vars/syslog_relay.yml).
+        description: Agentless syslog devices, each with its own Cribl UDP port (group_vars/splunk_server.yml).
         options:
           name:
             type: str
             required: true
-            description: Device name, written as the host in the relayed header.
+            description: Device name; Cribl sets it as the host of everything that arrives on the device's port.
           ip:
             type: str
             required: true
-            description: Source IP the relay maps to the name (fromhost-ip) and allows through firewalld.
+            description: Device address (pi5's hl-devprobe pings it).
+          port:
+            type: int
+            required: true
+            description: Cribl UDP port for this device only (published on HOMEPC).
+          source:
+            type: str
+            required: true
+            description: Source Cribl sets on the device's events.
           index:
             type: str
             required: true
@@ -157,7 +251,7 @@ argument_specs:
           sourcetype:
             type: str
             required: true
-            description: Sourcetype set on the server for this device.
+            description: Sourcetype Cribl sets on the device's events.
           profile:
             type: str
             required: true
@@ -228,6 +322,10 @@ argument_specs:
         type: str
         no_log: true
         description: S2S token for 9997 (splunktcptoken hl_cribl on Splunk; the UFs and Cribl present it).
+      vault_hl_cribl_admin_password:
+        type: str
+        no_log: true
+        description: Cribl Stream admin password (the cribl tag sets it on a fresh container).
       vault_hl_markers_token:
         type: str
         no_log: true

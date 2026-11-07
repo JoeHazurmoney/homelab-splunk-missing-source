@@ -4,3 +4,4 @@
 vault_hl_uf_admin_password: "CHANGE-ME-uf-admin-password"   # UF local admin (user-seed.conf)
 vault_hl_s2s_token: "00000000-0000-0000-0000-000000000000"   # splunktcptoken for 9997 (S2S)
 vault_hl_markers_token: "00000000-0000-0000-0000-000000000000" # HEC token hl_markers (Ansible markers)
+vault_hl_cribl_admin_password: "CHANGE-ME-cribl-admin-password" # Cribl Stream UI/API admin (set by the cribl tag)

@@ -1,0 +1,37 @@
+# Post one Ansible maintenance marker to HEC (spec 5.3 Markers): index=data_health source=dh:marker
+# sourcetype=hl:marker, token hl_markers. hl_data_health reads action, target_host, by and run_id
+# (dh_fwd_from_markers), names the stop/start in its causes, and suppresses tamper findings within
+# dh_tamper_window_secs of any marker for the same host (the role's own work).
+#   vars: hl_marker_action (required), hl_marker_target (default: this host, short and lowercase)
+# Posted from the controller (pi5), so it works whatever state the target is in.
+- name: Fix this run's id
+  ansible.builtin.set_fact:
+    hl_run_id: "{{ hl_run_id | default(now(utc=true, fmt='%Y%m%dT%H%M%SZ') ~ '-' ~ (lookup('ansible.builtin.env', 'USER') or 'ansible')) }}"
+  when: hl_run_id is not defined
+
+- name: "Post the marker ({{ hl_marker_action }})"
+  ansible.builtin.uri:
+    url: "{{ hl_marker_hec_url }}"
+    method: POST
+    validate_certs: "{{ hl_marker_validate_certs }}"
+    headers:
+      Authorization: "Splunk {{ vault_hl_markers_token }}"
+    body_format: json
+    body:
+      time: "{{ now(utc=true).timestamp() | int }}"
+      host: "{{ hl_marker_host }}"
+      index: data_health
+      source: "dh:marker"
+      sourcetype: "hl:marker"
+      event:
+        action: "{{ hl_marker_action }}"
+        target_host: "{{ hl_marker_host }}"
+        by: "{{ lookup('ansible.builtin.env', 'USER') or 'ansible' }}"
+        run_id: "{{ hl_run_id }}"
+        tags: "{{ ansible_run_tags | default([]) | join(',') }}"
+    status_code: [200]
+  vars:
+    hl_marker_host: "{{ (hl_marker_target | default(inventory_hostname)) | lower | regex_replace('[.].*$', '') }}"
+  delegate_to: localhost
+  changed_when: false
+  no_log: true    # the HEC token is in the headers

@@ -1,0 +1,26 @@
+{# One Cribl syslog source per syslog_devices entry (spec 4.2, 5.2; spike 14.7 d). Cribl names the
+   host from the port, never from the sender (Docker Desktop's NAT shows only its gateway), and
+   sets index, sourcetype and source (otherwise Splunk fills in source=tcp:9997). Metadata values
+   are JavaScript expressions, so each is a JSON string literal. pl_syslog_pre sets _time to the
+   receive time. Rendered by vars/main.yml (hl_cribl_device_inputs) and merged into inputs.yml. #}
+{% for d in syslog_devices %}
+in_{{ d.name }}_syslog:
+  type: syslog
+  disabled: false
+  sendToRoutes: true
+  host: 0.0.0.0
+  udpPort: {{ d.port | int }}
+  pipeline: pl_syslog_pre
+  timestampTimezone: local
+  metadata:
+    - name: host
+      value: {{ d.name | to_json | to_json }}
+    - name: index
+      value: {{ d.index | to_json | to_json }}
+    - name: sourcetype
+      value: {{ d.sourcetype | to_json | to_json }}
+    - name: source
+      value: {{ d.source | to_json | to_json }}
+{% else %}
+{}
+{% endfor %}
