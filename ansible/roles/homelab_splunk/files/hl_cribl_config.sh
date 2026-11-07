@@ -7,7 +7,8 @@
 #     $CRIBL_VOLUME_DIR/local/cribl/ (or $CRIBL_HOME/local/cribl/ without a volume dir), deletes the
 #     files the role pushed before but no longer ships, and writes their sha256 to
 #     local/.hl_pushed.manifest.pending. A file counts as changed when the rendered file differs
-#     from what the role last committed, or when the pushed file is missing. The comparison is
+#     from what the role last pushed (the pending record if there is one, else the committed one),
+#     or when the pushed file is missing. The comparison is
 #     against the role's own record, not the live file, because a UI save may rewrite the file; a UI
 #     edit is the tamper indicator's business (spec 7.6). A pending record left by an earlier run
 #     (its Cribl restart or load check failed) counts as a change, so that run is retried.
@@ -37,8 +38,12 @@ install_config() {
   new=$stage/new.manifest
   (cd "$src" && find . -type f | sed 's|^\./||' | LC_ALL=C sort | xargs -r sha256sum) >"$new"
   changed=""
+  # The live files hold what the role pushed last: the pending record if an earlier run left one
+  # (a config reverted before the retry must be copied back), else the committed one
+  ref=$manifest
+  [ -f "$pending" ] && ref=$pending
   while read -r sum path; do
-    old=$(awk -v p="$path" '$2 == p { print $1 }' "$manifest" 2>/dev/null || true)
+    old=$(awk -v p="$path" '$2 == p { print $1 }' "$ref" 2>/dev/null || true)
     if [ "$old" != "$sum" ] || [ ! -f "$local_dir/cribl/$path" ]; then changed="$changed$path "; fi
   done <"$new"
   # Files the role pushed before (committed or pending) that it no longer ships

@@ -5,15 +5,46 @@
 #   vars: hl_mirror_csv (required), the whole table, header first, ending in a newline
 # Included by cribl_block (after every change), cribl (when it seeds Cribl's table) and
 # cribl_remove (back to the header).
+# With no Splunk container, or no hl_server_base (after a full server_remove), there is no mirror
+# to write: skip, so cribl_remove still reaches its contract check.
+- name: Look for the Splunk container
+  ansible.windows.win_command:
+    argv: [docker, inspect, --format, "{{ '{{.State.Running}}' }}", "{{ hl_splunk_container }}"]
+  register: hl_mirror_ctr
+  changed_when: false
+  failed_when: false
+
+- name: Look for hl_server_base's lookups folder in it
+  ansible.windows.win_command:
+    argv: [docker, exec, -u, splunk, "{{ hl_splunk_container }}", test, -d, "{{ hl_cribl_mirror_path | dirname }}"]
+  register: hl_mirror_dir
+  changed_when: false
+  failed_when: false
+  when: hl_mirror_ctr.rc == 0 and hl_mirror_ctr.stdout | trim == 'true'
+
+- name: Note whether there is a mirror to write
+  ansible.builtin.set_fact:
+    hl_mirror_target: "{{ hl_mirror_dir is not skipped and hl_mirror_dir.rc | default(1) == 0 }}"
+
+- name: Say why the mirror is skipped
+  ansible.builtin.debug:
+    msg: >-
+      no mirror to write: container {{ hl_splunk_container }}
+      {{ 'has no ' ~ (hl_cribl_mirror_path | dirname) if hl_mirror_dir is not skipped else 'is absent or not running' }}
+  when: not hl_mirror_target | bool
+
 - name: Read Splunk's copy of the test-block table
   ansible.windows.win_command:
     argv: [docker, exec, -u, splunk, "{{ hl_splunk_container }}", cat, "{{ hl_cribl_mirror_path }}"]
   register: hl_mirror_cur
   changed_when: false
   failed_when: false
+  when: hl_mirror_target | bool
 
 - name: Write Splunk's copy when it differs
-  when: (hl_mirror_cur.stdout | default('') | replace('\r', '') | trim) != (hl_mirror_csv | trim)
+  when:
+    - hl_mirror_target | bool
+    - (hl_mirror_cur.stdout | default('') | replace('\r', '') | trim) != (hl_mirror_csv | trim)
   block:
     - name: Create a staging directory on HOMEPC for the mirror
       ansible.windows.win_tempfile:

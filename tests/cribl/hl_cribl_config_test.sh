@@ -73,5 +73,21 @@ out=$(run install "$stage")
 check "an edited file reports changed" has "$out" "HL_CHANGED=a.yml"
 check "an edited file is copied" grep -q "a: 2" "$live/a.yml"
 
+# A config reverted between a failed run and its retry: the committed record says a, the pending
+# one b, the live file holds b. Installing a again must copy a back, not trust the committed sum.
+run commit >/dev/null
+echo "a: 1" >"$stage/local/cribl/a.yml"
+run install "$stage" >/dev/null
+run commit >/dev/null
+echo "a: 3" >"$stage/local/cribl/a.yml"
+run install "$stage" >/dev/null
+echo "a: 1" >"$stage/local/cribl/a.yml"
+out=$(run install "$stage")
+check "a revert before the retry reports changed" has "$out" "HL_RESULT=changed"
+check "a revert before the retry copies the file back" grep -q "a: 1" "$live/a.yml"
+run commit >/dev/null
+out=$(run install "$stage")
+check "after the reverted retry is committed: unchanged" has "$out" "HL_RESULT=unchanged"
+
 echo "$fails failure(s)"
 [ "$fails" -eq 0 ]
