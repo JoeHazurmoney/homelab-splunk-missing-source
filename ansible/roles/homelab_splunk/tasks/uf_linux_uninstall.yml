@@ -128,7 +128,9 @@
       echo "tamper=$(auditctl -l | grep -c -E -- '{{ hl_uf_tamper_key_re }}' || true)"
       if [ -f "$d/auditctl.before" ]; then
         auditctl -l | LC_ALL=C sort > "$d/auditctl.after"
-        echo "auditctl_diff=$(diff "$d/auditctl.before" "$d/auditctl.after" | grep -c '^[<>]' || true)"
+        # The STIG rules belong to audit_rules (a separate tag) and may be loaded here: not leftovers
+        stig='{{ hl_stig_key_re }}'
+        echo "auditctl_diff=$(diff <(grep -v -E -e "$stig" "$d/auditctl.before") <(grep -v -E -e "$stig" "$d/auditctl.after") | grep -c '^[<>]' || true)"
       else echo "auditctl_diff=nobaseline"; fi
       if [ -f "$d/nouser.before" ]; then
         find / -xdev \( -nouser -o -nogroup \) -print 2>/dev/null | LC_ALL=C sort > "$d/nouser.after"

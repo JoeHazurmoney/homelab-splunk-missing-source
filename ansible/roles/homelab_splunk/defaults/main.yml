@@ -311,3 +311,15 @@ hl_tas:
 # stanzas say disabled = 1).
 hl_uf_input_apps_linux: [hl_uf_linux_inputs, hl_uf_wd2l_inputs]
 hl_uf_input_apps_windows: [hl_uf_windows_inputs]
+
+# --- STIG audit rules (spec 5.3 audit_rules; uf_linux) ---
+hl_stig_rules_src: /usr/share/audit-rules/30-stig.rules
+hl_stig_privileged_src: /usr/share/audit-rules/31-privileged.rules
+# Must sort last under `ls -1v` (augenrules' sort), after zz-hl-uf-tamper.rules. `zzz-` would NOT:
+# ls -v puts punctuation after letters, so zzz-* sorts before zz-*. Why last: tasks/audit_rules.yml.
+hl_stig_rules_file: /etc/audit/rules.d/zz-hl-zz-stig.rules
+# ERE for the STIG rules in `auditctl -l` (its 12 keys + the generated rules' key). Uninstall's
+# compare ignores them, and audit_rules counts them, so a new key in the rules must be added here.
+hl_stig_key_re: "(-F key=|-k )(system-locale|identity|time-change|session|perm_mod|logins|maybe-escalation|actions|access|export|delete|MAC-policy|privileged)$"
+# STIG's -e 2 makes every later rule change need a reboot; it is never set (spec 5.3)
+hl_audit_immutable: false

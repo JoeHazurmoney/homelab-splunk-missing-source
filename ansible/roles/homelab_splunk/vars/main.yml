@@ -154,6 +154,9 @@ hl_uf_tamper_file: /etc/audit/rules.d/zz-hl-uf-tamper.rules
 # `-F key=<key>` (task 4, audit 4.0.3) and a watch rule's (`-w`) as `-k <key>`
 hl_uf_tamper_key_re: "(-F key=|-k )({{ hl_uf_tamper_rules | map(attribute='key') | unique | join('|') }})$"
 hl_wd2l_audit_key_re: "(-F key=|-k )wd2l-"
+# The script audit_rules and audit_rules_remove read the loaded set with (files/hl_stig_census.sh)
+hl_stig_census_cmd: >-
+  hl_stig_census.sh {{ hl_stig_key_re | quote }} {{ hl_wd2l_audit_key_re | quote }} {{ hl_uf_tamper_key_re | quote }}
 # ERE for the UF's splunkd.log lines that end a connection to Cribl. The UF logs a wrong token as a
 # plain "Connection closed by server" (task 4 check 7), the same as a benign close.
 hl_uf_close_re: "Invalid S2S token|Connection closed by server|unauthorized"
