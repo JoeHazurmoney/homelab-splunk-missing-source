@@ -74,7 +74,7 @@ hl_server_apps:
     templates: [default/inputs.conf]
   - name: hl_data_health
     seed_lookups: [dh_expected_ansible.csv]
-# Limit server, server_remove (and, from task 6, apps/apps_remove) to these apps; [] = all
+# Limit server, server_remove and apps_remove to these apps; [] = all
 hl_apps_only: []
 # A change to one of these files restarts splunkd; anything else is reloaded over REST.
 # web.conf has no REST reload (hl_server_base's dashboard risky-command setting, spec 7.8).
@@ -295,17 +295,16 @@ hl_audit_policy:
   - {name: Process Creation, guid: "{0CCE922B-69AE-11D9-BED3-505054503030}", success: true, failure: false}
 
 # --- Forwarder apps (spec 5.5; task 6). The TAs are deployed unmodified; the role owns only their
-# local/inputs.conf. Put the TA packages in ansible/files/packages/ and pin their sha256 here
-# (docs/handoff/task-6-forwarder-apps.md, "Before running" 2).
+# local/inputs.conf. The .spl packages go in ansible/files/packages/ on the controller (gitignored).
 hl_tas:
   Splunk_TA_nix:
     version: 10.3.4
-    file: splunk-add-on-for-unix-and-linux_1034.tgz
-    sha256: ""
+    file: splunk-add-on-for-unix-and-linux_1034.spl
+    sha256: 9bfb2061b55961841d5babba04ead35509730dc73a7b6bfbc676a7216e7f1ca2
   Splunk_TA_windows:
     version: 11.0.3
-    file: splunk-add-on-for-microsoft-windows_1103.tgz
-    sha256: ""
+    file: splunk-add-on-for-microsoft-windows_1103.spl
+    sha256: 2fd0384376afe6993c7c6df49ab9a5e8b44fe0e38c4517a41f550f42fa051fa6
 # The role-owned input apps; every stanza is written to the app's local/inputs.conf, because local/
 # beats every app's default/ (Splunk_TA_windows sorts before hl_uf_windows_inputs, and its default
 # stanzas say disabled = 1).
