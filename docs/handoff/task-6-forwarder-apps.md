@@ -13,6 +13,8 @@ pinned (`hl_tas`); the breakers were rebuilt from the TAs' `props.conf`; the Win
 `Perfmon:*` finds nothing; check 3's SPL needs `rex max_match=0 "(?<l>\n)"`, because `split(_raw,"\n")` returns 1;
 check 10's mark is the real 10 GB/day, not 500 MB.
 
+**The body below describes the draft and is superseded by spec §14.14 where they differ.**
+
 ## What the branch adds
 
 | Path | What |
