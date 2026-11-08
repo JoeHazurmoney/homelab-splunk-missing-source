@@ -1,29 +1,27 @@
 # Handoff: task 5 — Windows UF on HOMEPC → Cribl, and the audit policy
 
-Issue #6 · branch `feat/5-uf-windows`, **stacked on `feat/4-uf-linux`** · drafted in a cloud
-session on 2026-11-01 with no access to HOMEPC.
+Issue #6 · branch `feat/5-uf-windows` · drafted in a cloud session on 2026-11-01 with no access to
+HOMEPC, then brought to task 4's final Linux rules and run live on 2026-11-08.
 
-**State:** written; yamllint and ansible-lint (production) clean; `--syntax-check` OK. Every `win_shell` block was parsed by
-PowerShell 7.4's parser, with Jinja swapped for placeholders: no syntax errors (one false positive
-from the placeholder swap in `cribl_remove.yml`'s `--format '{{.Names}}'`). **Nothing has run on
-HOMEPC.**
-
-**Stop and ask Taylor first (spec §11):** the MSI install, the group changes and `auditpol` all need
-elevation on the PC. The SSH session is already elevated, but the rule is to ask before running
-anything elevated there.
+**State:** **ran live on HOMEPC on 2026-11-08; checks 1–14 pass** (spec §14.12). Three live fixes: the
+MSI arguments as one string (a quoted list item made msiexec wait on a hidden usage dialog), the
+audit-restore compare (empty global-SACL rows after `/restore`), and `cmd:` for the PowerShell blocks
+that Ansible's free-form splitter rejected. End state: the UF installed, connected and `verify`-green,
+the audit policy applied. Taylor approved the elevated changes through the role's tags (2026-11-08).
 
 ## What the branch adds
 
 | Path | What |
 |---|---|
 | `defaults/main.yml` | `hl_uf_win_home`, service, virtual account `NT SERVICE\SplunkForwarder`, groups by SID (Event Log Readers S-1-5-32-573, Performance Monitor Users S-1-5-32-558), `hl_win_state_dir`, `hl_audit_policy` (15 subcategories by GUID) |
-| `tasks/uf_windows_install.yml` | refuse an unknown UF → MSI (sha256 on both ends; `AGREETOLICENSE=Yes LAUNCHSPLUNK=0 SERVICESTARTTYPE=auto`, no credentials on the command line, log kept in `C:\ProgramData\hl_splunk`) → product code + service SID + account recorded → FIPS lines only if `HKLM\…\Lsa\FipsAlgorithmPolicy\Enabled=1` → `user-seed.conf` → `hl_uf_outputs` → groups → start → connected → mgmt listener check → FIPS check → marker |
+| `tasks/uf_windows_install.yml` | refuse an unknown UF → the `uf` record written → MSI (sha256 on both ends; `AGREETOLICENSE=Yes LAUNCHSPLUNK=0 SERVICESTARTTYPE=auto INSTALLDIR="…"` as one string, no credentials on the command line, log kept in `C:\ProgramData\hl_splunk`) → product code + service SID + account + groups recorded, the virtual account asserted → FIPS lines only if `HKLM\…\Lsa\FipsAlgorithmPolicy\Enabled=1` → `user-seed.conf` → `hl_uf_outputs` → groups → start → connected (every run) → mgmt listener check (no UF listener on 8089 or off loopback) → FIPS check (the running process) → marker (best effort) |
 | `tasks/uf_windows_outputs.yml` | the same templates as Linux (`hl_collector=127.0.0.1` from `group_vars/uf_windows.yml`); drops the stale local token on change |
-| `tasks/uf_windows_connected.yml` | the same rules as Linux, in PowerShell |
+| `tasks/uf_windows_connected.yml` | task 4's final rules (`uf_linux_connected.yml`) in PowerShell: no fast fail on a close, the Splunk-side proof counts only `_internal` after the service process's start, an unknown start fails |
 | `tasks/uf_windows_uninstall.yml` | marker → stop → out of the groups (by SID) → MSI uninstall by product code → folder → user rights still naming the SID (`secedit /export`, `win_user_right` remove) → contract (uninstall key, folder, service key, memberships, rights) |
-| `tasks/uf_windows_service.yml` | start/stop/restart + markers; status (service, build, last connect/refusal, apps) |
-| `tasks/audit_policy.yml` | `auditpol /backup` **once** (a rerun never overwrites the original), then `/set` only the subcategories whose setting differs |
-| `tasks/audit_policy_remove.yml` | `auditpol /restore`, then a fresh backup compared row by row (GUID + setting) with the original; fails on any difference; deletes the backup |
+| `tasks/uf_windows_service.yml` | start/stop/restart + markers (best effort); status (service, account, MSI version, build from `etc\splunk.version`, last connect, last close, apps, FIPS from the running process) |
+| `tasks/audit_policy.yml` | `auditpol /backup` **once** (a rerun never overwrites the original), then add-only `/set`: turn on what the subset wants, never turn off what the PC had; read back |
+| `tasks/audit_policy_remove.yml` | `auditpol /restore`, then a fresh backup compared row by row (GUID + setting) with the original, where an empty global-SACL row counts as none; fails on any other difference; deletes the backup |
+| `tasks/marker_best_effort.yml` | `marker.yml` in a block whose rescue only warns (the `cribl_hold` pattern), for the Windows UF's markers |
 | `tasks/verify.yml` | adds the Windows UF |
 
 **The subset** (spec §5.3 "focused subset"): Logon/Logoff (Logon, Logoff, Special Logon, Account
@@ -49,7 +47,7 @@ ansible-playbook site.yml --tags audit_policy --limit homepc
 ansible-playbook site.yml --tags audit_policy --limit homepc       # expect changed=0
 ```
 
-## Checks (record in spec §14.11 "Task 5 checks")
+## Checks (recorded in spec §14.12 "Task 5 checks")
 
 | # | Check | How | Pass | If it fails |
 |---|---|---|---|---|
@@ -70,6 +68,5 @@ ansible-playbook site.yml --tags audit_policy --limit homepc       # expect chan
 
 ## Then
 
-- Spec: §14.11 with the results; §4.1 (mgmt), §13 (Windows FIPS), §5.6 (anything the contract needed).
+- Spec: §14.12 with the results; §4.1 (mgmt), §13 (Windows FIPS), §5.6 (the MSI's user rights, the shared state file). Done.
 - PR: `feat(uf): Windows UF install, uninstall, service control and audit policy (task 5)`, `Closes #6`.
-- Tasks 4 and 5 can be verified in either order; both are stacked here only to keep one line of history.
