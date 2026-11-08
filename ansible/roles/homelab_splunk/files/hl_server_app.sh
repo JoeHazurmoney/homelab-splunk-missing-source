@@ -49,6 +49,30 @@ swap_dirs() {
   done | LC_ALL=C sort -u
 }
 
+# splunkd writes each splunktcptoken's token, encrypted, into the app's local/inputs.conf, and local
+# beats default. A stanza the role stops shipping (the previous token, at the end of a rotation,
+# spec 13) would keep its local copy and the old token would still be accepted, so a splunktcptoken
+# stanza default/ named before this run and doesn't any more goes from local/, whole. Stanzas the
+# role never shipped, and other apps, are not touched. <old default> <new default> <local> <temp>
+drop_stale_token_stanzas() {
+  awk -v old="$1" -v new="$2" '
+    function stanzas(f, set, line, key) {
+      while ((getline line < f) > 0) {
+        if (line ~ /^[[:space:]]*\[/) {
+          key = line; gsub(/[[:space:]]/, "", key)
+          if (key ~ /^\[splunktcptoken:\/\//) set[key] = 1
+        }
+      }
+      close(f)
+    }
+    BEGIN { stanzas(old, was); stanzas(new, now); drop = 0 }
+    /^[[:space:]]*\[/ { s = $0; gsub(/[[:space:]]/, "", s); drop = (s in was) && !(s in now) }
+    !drop { print }
+  ' "$3" >"$4"
+  cat "$4" >"$3"
+  rm -f "$4"
+}
+
 # sha256 manifest of the managed files under $1, paths relative to it.
 manifest() {
   root=$1; shift
@@ -102,6 +126,16 @@ install_app() {
     echo "HL_CHANGED="
     return 0
   fi
+
+  # Before the swap, while default/inputs.conf still names what the role owned: a failed run can
+  # then only leave a stale local copy of a stanza default still sets, which the next run handles.
+  case " $changed " in
+    *" default/inputs.conf "*)
+      if [ -f "$dst/local/inputs.conf" ] && [ -f "$dst/default/inputs.conf" ]; then
+        drop_stale_token_stanzas "$dst/default/inputs.conf" "$src/default/inputs.conf" "$dst/local/inputs.conf" "$stage/local_inputs.conf"
+      fi
+      ;;
+  esac
 
   mkdir -p "$dst/metadata" "$dst/lookups"
   for d in $dirs; do

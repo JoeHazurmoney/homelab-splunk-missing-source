@@ -1,0 +1,39 @@
+# The role's folder on Windows, with a protected ACL: SYSTEM and Administrators full control, owner
+# Administrators, nothing inherited from C:\ProgramData (whose BUILTIN\Users may create and write
+# there). Otherwise a non-admin could pre-create stage\ and swap the MSI between its sha256 check
+# and the install, or own state.json or the audit-policy backup (task 5 review M1). Changed only
+# when the ACL differs; the children inherit it.
+#   vars: hl_win_dir (the folder)
+- name: Create the role's folder
+  ansible.windows.win_file:
+    path: "{{ hl_win_dir }}"
+    state: directory
+
+- name: Protect the role's folder (SYSTEM and Administrators only)
+  ansible.windows.win_shell:
+    cmd: |
+      $ErrorActionPreference = 'Stop'
+      $d = '{{ hl_win_dir | replace("'", "''") }}'
+      $want = @('S-1-5-18', 'S-1-5-32-544')
+      $sidT = [Security.Principal.SecurityIdentifier]
+      $inh = [Security.AccessControl.InheritanceFlags]'ContainerInherit, ObjectInherit'
+      $acl = Get-Acl -LiteralPath $d
+      $rules = @($acl.GetAccessRules($true, $true, $sidT))
+      $good = @($rules | Where-Object { -not $_.IsInherited -and $_.AccessControlType -eq 'Allow' -and
+        $_.FileSystemRights -eq [Security.AccessControl.FileSystemRights]::FullControl -and
+        $_.InheritanceFlags -eq $inh -and $_.PropagationFlags -eq 'None' -and $want -contains $_.IdentityReference.Value })
+      $owner = $acl.GetOwner($sidT).Value
+      if ($acl.AreAccessRulesProtected -and $rules.Count -eq 2 -and $good.Count -eq 2 -and $owner -eq 'S-1-5-32-544') {
+        'HL_ACL=ok'; exit 0
+      }
+      $n = New-Object Security.AccessControl.DirectorySecurity
+      $n.SetAccessRuleProtection($true, $false)
+      $n.SetOwner((New-Object Security.Principal.SecurityIdentifier('S-1-5-32-544')))
+      foreach ($s in $want) {
+        $n.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule(
+          (New-Object Security.Principal.SecurityIdentifier($s)), 'FullControl', $inh, 'None', 'Allow')))
+      }
+      (Get-Item -LiteralPath $d).SetAccessControl($n)
+      "HL_ACL=set (was: protected=$($acl.AreAccessRulesProtected) rules=$($rules.Count) owner=$owner)"
+  register: hl_win_dir_acl
+  changed_when: hl_win_dir_acl.rc == 0 and hl_win_dir_acl.stdout is search('HL_ACL=set')
