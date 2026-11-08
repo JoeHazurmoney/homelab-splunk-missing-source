@@ -11,14 +11,29 @@
 
     # The straggler check before the end of a rotation (spec 13): a UF on the old token loses what
     # it sends once Cribl drops that token. Hashes only: the vault's value is hashed on the controller.
+    # The file alone isn't enough: `install` restarts the UF and drops its encrypted local copy only
+    # when the template changes, so after an interrupted install a rerun leaves the old token in use
+    # with the right file on disk (local beats default). So the running splunkd must have started at
+    # or after the file was written, and a local token must be no older than it. Unknown fails.
     - name: Compare the UF's token with the vault's current one
       ansible.builtin.shell:
         cmd: |
           set -o pipefail
-          f={{ hl_uf_home }}/etc/apps/hl_uf_outputs/default/outputs.conf
+          a={{ hl_uf_home }}/etc/apps/hl_uf_outputs
+          f=$a/default/outputs.conf
+          l=$a/local/outputs.conf
           [ -f "$f" ] || { echo HL_TOKEN=missing; exit 0; }
           have=$(sed -n 's/^[[:space:]]*token[[:space:]]*=[[:space:]]*//p' "$f" | tr -d ' \r\t\n' | sha256sum | cut -d' ' -f1)
-          if [ "$have" = "{{ vault_hl_s2s_token | hash('sha256') }}" ]; then echo HL_TOKEN=current; else echo HL_TOKEN=stale; fi
+          [ "$have" = "{{ vault_hl_s2s_token | hash('sha256') }}" ] || { echo HL_TOKEN=stale; exit 0; }
+          d=$(stat -c %Y "$f")
+          st=$(systemctl show --timestamp=unix -p ActiveEnterTimestamp --value SplunkForwarder 2>/dev/null)
+          st=${st#@}
+          case "$st" in ''|*[!0-9]*) echo "HL_TOKEN=not_applied reason=start_unknown"; exit 0;; esac
+          [ "$st" -ge "$d" ] || { echo "HL_TOKEN=not_applied reason=started_before_default"; exit 0; }
+          if [ -f "$l" ] && grep -Eq '^[[:space:]]*token[[:space:]]*=' "$l" && [ "$(stat -c %Y "$l")" -lt "$d" ]; then
+            echo "HL_TOKEN=not_applied reason=local_older"; exit 0
+          fi
+          echo HL_TOKEN=current
         executable: /bin/bash
       register: hl_verify_token
       changed_when: false
@@ -29,9 +44,11 @@
       ansible.builtin.assert:
         that: hl_verify_token.stdout | default('') is search('HL_TOKEN=current')
         fail_msg: >-
-          {{ inventory_hostname }}: default/outputs.conf is not on the vault's current S2S token
-          ({{ hl_verify_token.stdout | default('no result') | trim }}). Run --tags install --limit {{ inventory_hostname }}
-          before removing vault_hl_s2s_token_previous (spec 13).
+          {{ inventory_hostname }} is not presenting the vault's current S2S token
+          ({{ hl_verify_token.stdout | default('no result') | trim }}). HL_TOKEN=stale: run --tags install --limit {{ inventory_hostname }}.
+          HL_TOKEN=not_applied: the file is right but the running UF isn't using it, and install won't change that;
+          delete the token line from hl_uf_outputs/local/outputs.conf and run --tags restart --limit {{ inventory_hostname }}.
+          Do this before removing vault_hl_s2s_token_previous (spec 13).
         quiet: true
 
     - name: Check the UF is connected through Cribl (the whole log; the latest state counts)
@@ -51,13 +68,28 @@
     - name: Compare the UF's token with the vault's current one
       ansible.windows.win_shell:
         cmd: |
-          $f = '{{ hl_uf_win_home | replace("'", "''") }}\etc\apps\hl_uf_outputs\default\outputs.conf'
+          $ErrorActionPreference = 'Stop'
+          $a = '{{ hl_uf_win_home | replace("'", "''") }}\etc\apps\hl_uf_outputs'
+          $f = "$a\default\outputs.conf"
+          $l = "$a\local\outputs.conf"
           if (-not (Test-Path -LiteralPath $f)) { 'HL_TOKEN=missing'; exit 0 }
           $line = @(Get-Content -LiteralPath $f | Where-Object { $_ -match '^\s*token\s*=' }) | Select-Object -First 1
           $v = ($line -replace '^\s*token\s*=\s*', '').Trim()
           $sha = [Security.Cryptography.SHA256]::Create()
           $hex = -join ($sha.ComputeHash([Text.Encoding]::UTF8.GetBytes($v)) | ForEach-Object { $_.ToString('x2') })
-          if ($hex -eq '{{ vault_hl_s2s_token | hash('sha256') }}') { 'HL_TOKEN=current' } else { 'HL_TOKEN=stale' }
+          if ($hex -ne '{{ vault_hl_s2s_token | hash('sha256') }}') { 'HL_TOKEN=stale'; exit 0 }
+          # As on Linux: the running splunkd must be newer than the file, and a local token no older
+          $d = (Get-Item -LiteralPath $f).LastWriteTimeUtc
+          $st = $null
+          $svc = Get-CimInstance Win32_Service -Filter "Name='{{ hl_uf_win_service }}'"
+          if ($svc -and $svc.State -eq 'Running' -and $svc.ProcessId -gt 0) {
+            try { $st = (Get-Process -Id $svc.ProcessId).StartTime.ToUniversalTime() } catch { $st = $null }
+          }
+          if ($null -eq $st) { 'HL_TOKEN=not_applied reason=start_unknown'; exit 0 }
+          if ($st -lt $d) { 'HL_TOKEN=not_applied reason=started_before_default'; exit 0 }
+          if ((Test-Path -LiteralPath $l) -and (Select-String -LiteralPath $l -Pattern '^\s*token\s*=' -Quiet) -and
+              (Get-Item -LiteralPath $l).LastWriteTimeUtc -lt $d) { 'HL_TOKEN=not_applied reason=local_older'; exit 0 }
+          'HL_TOKEN=current'
       register: hl_verify_token
       changed_when: false
       failed_when: false
@@ -67,9 +99,11 @@
       ansible.builtin.assert:
         that: hl_verify_token.stdout | default('') is search('HL_TOKEN=current')
         fail_msg: >-
-          {{ inventory_hostname }}: default outputs.conf is not on the vault's current S2S token
-          ({{ hl_verify_token.stdout | default('no result') | trim }}). Run --tags install --limit {{ inventory_hostname }}
-          before removing vault_hl_s2s_token_previous (spec 13).
+          {{ inventory_hostname }} is not presenting the vault's current S2S token
+          ({{ hl_verify_token.stdout | default('no result') | trim }}). HL_TOKEN=stale: run --tags install --limit {{ inventory_hostname }}.
+          HL_TOKEN=not_applied: the file is right but the running UF isn't using it, and install won't change that;
+          delete the token line from hl_uf_outputs local outputs.conf and run --tags restart --limit {{ inventory_hostname }}.
+          Do this before removing vault_hl_s2s_token_previous (spec 13).
         quiet: true
 
     - name: Check the UF is connected through Cribl (the whole log; the latest state counts)

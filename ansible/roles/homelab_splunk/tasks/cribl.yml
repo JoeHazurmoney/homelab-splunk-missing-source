@@ -276,6 +276,9 @@
         }
         $routes = (Invoke-HlCribl -Path '/routes/default').Content | ConvertFrom-Json
         $out['routes'] = (@($routes.items[0].routes | ForEach-Object { $_.id }) -join ',')
+        # A count only: what the API has loaded, which a reload can leave behind the file (spec 14.13)
+        $s2s = (Invoke-HlCribl -Path '/system/inputs/in_splunk_tcp').Content | ConvertFrom-Json
+        $out['s2s_tokens'] = @($s2s.items[0].authTokens).Count
         $out | ConvertTo-Json -Compress
       environment:
         HL_CRIBL_PW: "{{ vault_hl_cribl_admin_password }}"
@@ -285,6 +288,7 @@
         hl_cribl_loaded.rc != 0
         or (hl_cribl_loaded.stdout | from_json | dict2items | selectattr('value', 'equalto', false) | list | length > 0)
         or (hl_cribl_loaded.stdout | from_json).routes != 'r_cribl_self,r_syslog_devices,r_uf,r_default'
+        or (hl_cribl_loaded.stdout | from_json).s2s_tokens != (2 if vault_hl_s2s_token_previous | default('') | length > 0 else 1)
 
     - name: Commit the pushed config record
       ansible.windows.win_command:
