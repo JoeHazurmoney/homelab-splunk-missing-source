@@ -38,9 +38,10 @@ hl_uf_breakers:
       condition: "sourcetype=='cpu'"
       type: regex
       eventBreakerRegex: /[\r\n]+(?=Datetime\s+)/
-      timestampAnchorRegex: /^/
+      timestampAnchorRegex: /\n/
       timestamp:
-        type: current
+        type: format
+        format: "%m/%d/%y_%H:%M:%S_%Z"
         length: 150
       timestampTimezone: local
       timestampEarliest: -420weeks

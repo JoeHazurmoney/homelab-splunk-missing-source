@@ -253,7 +253,7 @@
       when: hl_cribl_config_changed | bool
       changed_when: false
 
-    - name: Check Cribl loaded the role's inputs, outputs, routes and pipelines
+    - name: Check Cribl loaded the role's inputs, outputs, routes, pipelines and breakers
       ansible.windows.win_shell: |
         {{ hl_cribl_ps_prelude }}
         if (-not (Connect-HlCribl)) { throw 'Cribl login failed' }
@@ -279,9 +279,22 @@
         # A count only: what the API has loaded, which a reload can leave behind the file (spec 14.13)
         $s2s = (Invoke-HlCribl -Path '/system/inputs/in_splunk_tcp').Content | ConvertFrom-Json
         $out['s2s_tokens'] = @($s2s.items[0].authTokens).Count
+        # Cribl ignores config it doesn't understand without an error (spec 13): the UF breakers must
+        # be loaded, with the repo's rules, and attached to the UF source, or UF events are chopped
+        $b = Invoke-HlCribl -Path '/lib/breakers/hl_uf_breakers'
+        $out['/lib/breakers/hl_uf_breakers'] = $b.Code -eq 200
+        $out['breaker_rules'] = ''
+        if ($b.Code -eq 200) {
+          $out['breaker_rules'] = (@(($b.Content | ConvertFrom-Json).items[0].rules | ForEach-Object { $_.name }) -join '|')
+        }
+        $out['breaker_attached'] = @($s2s.items[0].breakerRulesets) -contains 'hl_uf_breakers'
         $out | ConvertTo-Json -Compress
       environment:
         HL_CRIBL_PW: "{{ vault_hl_cribl_admin_password }}"
+      vars:
+        hl_cribl_breaker_rule_names: >-
+          {{ (lookup('ansible.builtin.file', hl_cribl_src ~ '/local/cribl/breakers.yml') | from_yaml).hl_uf_breakers.rules
+             | map(attribute='name') | join('|') }}
       register: hl_cribl_loaded
       changed_when: false
       failed_when: >-
@@ -289,6 +302,7 @@
         or (hl_cribl_loaded.stdout | from_json | dict2items | selectattr('value', 'equalto', false) | list | length > 0)
         or (hl_cribl_loaded.stdout | from_json).routes != 'r_cribl_self,r_syslog_devices,r_uf,r_default'
         or (hl_cribl_loaded.stdout | from_json).s2s_tokens != (2 if vault_hl_s2s_token_previous | default('') | length > 0 else 1)
+        or (hl_cribl_loaded.stdout | from_json).breaker_rules != hl_cribl_breaker_rule_names
 
     - name: Commit the pushed config record
       ansible.windows.win_command:
