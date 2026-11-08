@@ -8,6 +8,9 @@
 # vault_hl_cribl_admin_password in the vault.
 
 # --- Preconditions ---
+- name: Check the previous S2S token
+  ansible.builtin.import_tasks: s2s_token_check.yml
+
 - name: Check the Cribl image is on HOMEPC
   ansible.windows.win_command:
     argv: [docker, image, inspect, --format, "{{ '{{.Id}}' }}", "{{ hl_cribl_image }}"]
@@ -157,7 +160,7 @@
       vars:
         hl_cribl_extra:
           inputs.yml:
-            inputs: "{{ hl_cribl_device_inputs }}"
+            inputs: "{{ hl_cribl_device_inputs | combine(hl_cribl_s2s_token_inputs) }}"
 
     - name: Create the staging directory on HOMEPC
       ansible.windows.win_tempfile:
@@ -231,6 +234,8 @@
 # restarts again and checks again (spec 5.3).
 - name: Restart Cribl, check what it loaded, and commit the pushed config record
   block:
+    # A restart, not `cribl reload`: the reload left the running workers on the old authTokens list and
+    # the API on the old file (measured, spec 14.13). With both tokens accepted a restart lost nothing.
     - name: Restart Cribl to load the changed config
       ansible.windows.win_command:
         argv: [docker, restart, "{{ hl_cribl_container }}"]

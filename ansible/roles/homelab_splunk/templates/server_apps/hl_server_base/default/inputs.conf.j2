@@ -5,6 +5,12 @@
 # a splunktcptoken exists, splunktcp accepts only senders that present a token: Cribl, over hl-net.
 [splunktcptoken://hl_cribl]
 token = {{ vault_hl_s2s_token }}
+{% if vault_hl_s2s_token_previous | default('') | length > 0 %}
+
+# Only during a token rotation (spec 13): the old token stays accepted until every sender has moved.
+[splunktcptoken://hl_cribl_previous]
+token = {{ vault_hl_s2s_token_previous }}
+{% endif %}
 
 # HEC token for the Ansible maintenance markers (spec 5.3 Markers): index=data_health
 # source=dh:marker sourcetype=hl:marker, read by hl_data_health.

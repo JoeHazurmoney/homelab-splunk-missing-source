@@ -7,6 +7,9 @@
 # spec 14.7 g; 3 s with maxS2Sversion v4, task 4), so server_restart.yml holds Cribl paused until
 # splunktcp is back (hl_cribl_hold_on_splunk_restart, on; nothing lost in task 4 check 15).
 #   -e '{"hl_apps_only":["hl_server_base"]}'   limits the run to the listed apps
+- name: Check the previous S2S token
+  ansible.builtin.import_tasks: s2s_token_check.yml
+
 - name: Select the server apps to deploy
   ansible.builtin.set_fact:
     hl_server_apps_run: "{{ hl_server_apps | selectattr('name', 'in', hl_apps_only) | list
