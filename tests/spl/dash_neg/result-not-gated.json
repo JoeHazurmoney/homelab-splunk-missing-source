@@ -1,0 +1,7 @@
+{
+    "about": "The adopt result is shown before its tokens are set (Studio would show its waiting message).",
+    "view": "dh_manage",
+    "pattern": "(\"viz_ad_result\": \\{[\\s\\S]*?\"showConditions\": \\[)\\s*\"cond_ad_done\"\\s*\\]",
+    "repl": "\\1]",
+    "expect": "viz_ad_result shows ds_ad_apply, which waits for"
+}

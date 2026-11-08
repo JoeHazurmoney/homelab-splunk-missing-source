@@ -2,7 +2,7 @@
 
 This guide is for anyone watching the **HL Data Health** app in Splunk: the person who runs this lab, or a SOC analyst who has never read the searches behind it. It explains every panel in screen order: what it shows, where the number comes from, what good and bad look like, and what to do next. You don't need to know SPL to use it.
 
-It is a **living document**. Any change that adds, renames or removes a panel or a filter updates this file in the same pull request. `tests/spl/run.sh` fails (check `docs-coverage`) when a panel has no entry here, or when an entry names a panel that no longer exists. Every panel's description on screen ends with "Guide: docs/data-health/dashboards.md, *dashboard* > *panel*", which points to its entry below.
+It is a **living document**. The Manage view is generated: edit `tools/gen_dh_manage.js` and run `node tools/gen_dh_manage.js` instead of editing `dh_manage.xml` (`tests/spl/run.sh`, check `manage-generated`, fails when the two differ). Any change that adds, renames or removes a panel or a filter updates this file in the same pull request. `tests/spl/run.sh` fails (check `docs-coverage`) when a panel has no entry here, or when an entry names a panel that no longer exists. Every panel's description on screen ends with "Guide (project repo): docs/data-health/dashboards.md > *dashboard* > *panel*": this file, in the project's repository, and the entry below.
 
 The macros behind the panels are explained in [macros.md](macros.md).
 
@@ -181,8 +181,8 @@ Everything about one host. Pick the host at the top, or arrive here by clicking 
   - **Status**.
   - **Silent for / limit**: "400 s / 300 s" means silent for 400 s against a limit of 300 s; "never arrived" if nothing came yet.
   - **Profile**.
-  - **Limit from**: where the limit comes from: *override* (set on Manage), *max_gap_secs* (a fixed limit written on the item's expected-list row), *learned* (from at least 3 days of history), *default* (the profile's default; "(learning)" while it has fewer than 3 days of history), *invalid_profile* (the row's profile is misspelt or unknown, so the continuous default is used), or *none* (an INFO item that never alerts). **About the limit** says the same in a sentence.
-  - **Mute or test block**: "muted until … (reason)" or "test block until hh:mm".
+  - **Limit from**: where the limit comes from: *Override (set on Manage)*, *Fixed limit on its expected row* (a limit written on the item's expected-list row), *Learned from its history* (at least 3 days), *Profile default* ("(learning)" while it has fewer than 3 days of history), *Profile default (the row's profile is unknown)* (the profile is misspelt or unknown, so the continuous default is used), or *None (INFO: never alerts)*. **About the limit** says the same in a sentence.
+  - **Mute or test block**: "muted until … (reason)" or "test block until hh:mm", each with its time zone (for example "test block until 16:46 MDT").
   - **Since**, **Cause**, **Action**.
   - **Last hour volume**: last hour against the usual count ("x0.1 of median FLAGGED" means a tenth of usual, flagged as a drop), or why it isn't judged.
   - **Clock wrong**: 1 when the data's own timestamps are far from when it arrived.
@@ -227,126 +227,266 @@ Everything about one host. Pick the host at the top, or arrive here by clicking 
 
 ## Manage
 
-Where the expected list, mutes, thresholds and test blocks are changed. It never refreshes by itself, and nothing is written until you confirm. Each change takes three steps:
+Where you change what the app expects and how it alerts: mute data during planned work, change how long an item may stay silent, keep the expected list up to date, run test blocks, and see who changed what. The page has four tabs: **Mute & thresholds**, **Expected list**, **Test blocks (admin)** and **Admin log**. Each tab holds its own forms, and each form has its preview and its result right below it.
 
-1. Fill in one form (1 to 4) and the **Reason**, then press **Submit**. The *preview* panel shows the change, before and after, or why it is refused.
-2. In that form's *confirm* list choose **Apply**, then press **Submit** again. The *result* panel says "applied: …", and the change is recorded in the admin log.
-3. Pressing Submit again, or reloading the page, does not repeat the change: the confirmation fits only the state you previewed. You then see "nothing applied: …", which is expected.
+### Before you start
 
-Muting is open to analysts. Adding or adopting expected rows, and test blocks, need the **dh_admin** role.
+- **Who may do what.** Anyone who can open the app may mute, unmute and set or clear a limit. Adding or adopting expected rows and test blocks need the **dh_admin** role; without it the preview says "Needs the dh_admin role" and nothing can be applied.
+- **Nothing is written until you choose Apply.** A form shows a preview of the change as you fill it in. The change is written only when you open that form's **Confirm (writes the change)** list and choose the line that starts with **Apply**. There is no other button: choosing that line writes the change at once and records it on the Admin log tab.
+- **Each form stands alone.** Every form has its own Reason, Ticket and Confirm, and a choice under one form's Confirm writes only that form's change.
+- **Boxes apply as you go.** There is no Submit button on Manage. A list applies as soon as you pick from it; a text box applies when you press Enter or click outside it. Lists that depend on a host (the items of a host, a host's sourcetypes and raw sources) fill as soon as you pick the host.
+- **Until a form is filled in**, its preview area shows what to fill in instead of a table. A required box (Reason, Host name) must not be empty. Optional boxes hold `-`, which means "none"; leave it there unless you have a value.
+- **The Confirm list** appears once the form is filled in. It offers the Apply line only when the preview's **Check** column says "OK: …"; otherwise it says "No results", and the Check column says what to fix.
+- **Changing the form clears the confirmation.** If you change any box of a form after choosing Apply, its Confirm choice is cleared and its result disappears; the change you already applied stays applied.
+- **A confirmation fits only once.** It fits only the state you previewed, and never again after its change was applied, even if that change has since expired and been cleaned up. After a reload, or when you come back to a tab, the result may say "Nothing written: this confirmation fits only the state you previewed, …". That is expected: the change was applied the first time. Check the tables or the Admin log tab.
+- **The tables don't refresh by themselves.** Manage never refreshes on its own. After applying a change, reload the page to see it in the tables of the tab.
+- **Times** are shown in the time zone of your Splunk account (Settings > your name > Preferences) and always end with the zone, for example `2026-10-31 17:46 MDT`. That may differ from your PC clock.
+- **If "This visualization has a potential security risk" appears after Apply** (the result stays empty with a red icon, and nothing is written until you click the icon and then **Run Query**): Dashboard Studio's risky-command check is still on. Apply writes with `outputlookup`, which is on Studio's risky list, so the server app hl_server_base turns that check off (`enable_risky_command_check_dashboard = false` in its `default/web.conf`). If the prompt appears, that setting is not in effect: check `splunk btool web list settings --debug | grep risky` (it should show `false` from `apps/hl_server_base/default/web.conf`) and that hl_server_base is deployed (the role's `server` tag, which restarts splunkd). If btool already shows `false`, splunkd hasn't restarted since the deploy or the page is stale: restart splunkd, then reload the page.
 
-### How Manage works
-- **What it shows:** the short instructions at the top of the page: the three steps above, who may do what, and what a test block does.
-- **Where it comes from:** fixed text.
-- **How to read it:** read it once; this guide has the details.
+### Item IDs
 
-### Inputs
+Every expected item has an **Item ID** of five parts, `level|index|host|sourcetype|source`, with `*` for the parts its level doesn't use:
+
+| Item ID | Shown on Manage as | What it is |
+|---|---|---|
+| `host\|*\|pi5\|*\|*` | pi5: whole host | The host itself. Muting it mutes everything it sends. |
+| `sourcetype\|enclave1\|pi5\|syslog\|*` | pi5 › syslog (enclave1) | One kind of data (sourcetype) from that host, in that index. |
+| `source\|linux\|h8\|app\|/var/log/app-*.log` | h8 › app › /var/log/app-*.log (linux) | One file or input (source) of a sourcetype. Dates and rotation numbers in file names are replaced by `*` (the normalized form). |
+
+Manage shows items in words and keeps the Item ID in the last column of its tables, for searching and for the admin log. A **test block** has a shorter key, `host|sourcetype|raw source` with `*` for "all" (`pi5|*|*` is the whole host), shown as "pi5: whole host", "pi5 › syslog" or "pi5 › linux_secure › /var/log/secure.1 (exact source)".
+
+### Mute & thresholds tab
+
+Mute an item during planned work, so it does not alert, or change its **limit**: how long it may stay silent before it counts as late.
+
+#### Recipe: Mute a host for maintenance
+
+1. Open **Manage** and stay on the **Mute & thresholds** tab.
+2. **Host**: choose the host, for example `pi5`.
+3. **Item**: choose the line that ends in **whole host**, for example "pi5: whole host (OK)". This mutes everything the host sends.
+4. **Action**: leave **Mute**. **Mute for**: choose how long, from 1 hour to 30 days.
+5. **Reason (required)**: type why, for example "patching, see CHG-123", and press Enter. **Ticket**: replace `-` with the change number if there is one.
+6. Read the preview, **Mute or limit: preview**. It shows **Change** "Mute", the item, **Now** ("Not muted; no limit override"), **After the change** ("Muted until 2026-10-31 21:46 MDT (patching); …") and **Check** "OK: choose Apply under Confirm to write this change".
+7. Open **Confirm (writes the change)** and choose the line "Apply: mute pi5: whole host for 4 hours". The change is written at once: **Mute or limit: result** says "Done: Mute pi5: whole host".
+8. Reload the page: the mute is listed under **Current mutes and limit overrides**. Within a minute the Overview shows the host and its items as MUTED.
+
+To end a mute early, do the same with **Action** **Unmute** (the Mute for list is then ignored). A mute also ends by itself at its end time.
+
+#### Recipe: Silence one noisy sourcetype
+
+Follow the recipe above, but at step 3 choose the sourcetype's line instead of the whole host, for example "pi5 › syslog (enclave1) (LATE)". Only that sourcetype is muted; the host and its other data keep alerting.
+
+#### Recipe: Change how long an item may stay silent
+
+1. In **Thresholds: how long each item may stay silent**, find the item (type a word of its name in **Search the thresholds (words separated by *)** and press Enter). **Limit applied (s)** is its limit now and **Applied from** says where it comes from.
+2. **Host** and **Item**: choose the item.
+3. **Action**: **Set limit**. **New limit in seconds (Set limit only)**: replace `-` with the new limit, for example `1800` for 30 minutes (at least 60), and press Enter.
+4. Write a **Reason** and press Enter. Check the preview: **After the change** shows "limit override 30 minutes (1800 s)".
+5. **Confirm (writes the change)**: choose "Apply: set the limit of … to 30 minutes (1800 s)". The result says "Done: Set limit …".
+6. To go back to the app's own limit later, do the same with **Action** **Clear limit**.
+
+If the item is muted when you set or clear its limit, the mute and its reason stay as they are.
+
+#### Inputs
 
 | Input | What to enter |
 |---|---|
-| Reason (required for every change) | Why you are making the change. It goes to the admin log and, for a mute, is shown as the mute reason. |
-| Ticket (- for none) | A ticket or change number, if there is one. |
-| 1 Override: host | The host whose item you want to mute or override. Press Submit to load its items. |
-| 1 Override: item (the host's own row mutes everything it sends) | The item. Choosing the host's own row mutes everything it sends. |
-| 1 Override: action | Mute, Unmute, Set threshold or Clear threshold. |
-| 1 Override: mute for | How long a mute lasts: 1 hour to 30 days (the most allowed). |
-| 1 Override: threshold in seconds | For Set threshold: how long the item may stay silent (at least 60). |
-| 1 Override: confirm | Choose Apply after checking the preview. |
-| 2 Add row: level | host, sourcetype or source. |
-| 2 Add row: index | Where the data goes (only indexes the app watches). Use "-" for a host row. |
-| 2 Add row: host | The host name (short or full; it is shortened). |
-| 2 Add row: sourcetype | For sourcetype and source rows. |
-| 2 Add row: source | For source rows: the file or input name. |
-| 2 Add row: collection | How the data arrives: uf (Splunk agent), syslog, or hec. |
-| 2 Add row: via (relay) | For data that comes through a relay host, the relay (for example pi5). |
-| 2 Add row: profile | heartbeat, periodic, continuous, sporadic or info (see [Statuses](#statuses)). |
-| 2 Add row: interval in seconds (periodic only) | How often a periodic input runs. |
-| 2 Add row: criticality | 1 (highest) to 4. Criticality 1 and 2 raise the missing-data alert. |
-| 2 Add row: owner | Who looks after it. |
-| 2 Add row: site | Where it is. |
-| 2 Add row: runbook | A link to its how-to page. |
-| 2 Add row: description | A short description. |
-| 2 Add row: confirm | Choose Apply after checking the preview. |
-| 3 Adopt: unregistered entity | An item that sends data but isn't expected (from the Unregistered table). |
-| 3 Adopt: criticality | Its criticality. |
-| 3 Adopt: confirm | Choose Apply after checking the preview. |
-| Thresholds: search text (words separated by *) | Narrows the Thresholds table. |
-| 4 Test block (admin): action | Add or Remove a block. |
-| 4 Test block: host | The host to block. Press Submit to load its sources. |
-| 4 Test block: level | The whole host, one sourcetype, or one exact source. |
-| 4 Test block: sourcetype or raw source | The sourcetype, or the exact raw source name (listed with its normalized form). |
-| 4 Test block: for | How long: 5 minutes to 24 hours. |
-| 4 Test block: confirm | Choose Apply after checking the preview. |
+| Host | The host whose item you want to change. Its items fill the next list at once. |
+| Item | The item: the host's own row ("whole host", which covers everything it sends), or one of its sourcetypes or sources, with its status in brackets. |
+| Action | Mute, Unmute, Set limit or Clear limit. |
+| Mute for | How long a mute lasts: 1 hour to 30 days (the most allowed). Used by Mute only. |
+| New limit in seconds (Set limit only) | For Set limit: how long the item may stay silent, in seconds (at least 60). Keep `-` for the other actions. |
+| Reason (required) | Why you make the change. It goes to the admin log and, for a mute, is shown as the mute reason. |
+| Ticket (optional, - for none) | A ticket or change number, or `-`. |
+| Confirm (writes the change) | Choose the Apply line to write the change shown in the preview. |
+| Search the thresholds (words separated by *) | Narrows the Thresholds table to items whose name, description or cause contains every word. `*` shows all. |
 
-### 1 Override (mute or threshold): preview
-- **What it shows:** the override you are about to make. Columns: **Action** (override_mute, override_unmute, override_threshold or override_clear), **Item ID**, **Before** and **After** (mute end, threshold, reason), and **Check**: "ok: choose Apply …" or why it is refused (for example "a mute needs an expiry of at most 30 days").
-- **Where it comes from:** your inputs checked against the current overrides. Nothing is written.
-- **How to read it:** if the check says ok, choose Apply in "1 Override: confirm" and Submit.
+#### Mute or limit: preview
+- **What it shows:** the change you are about to make. Columns: **Change** (Mute, Unmute, Set limit or Clear limit), **Item**, **Now**, **After the change** (mute end and reason; limit override), and **Check**: "OK: choose Apply under Confirm …", or what to fix (for example "Write a reason", "A mute lasts at most 30 days", "This item is not muted: nothing to unmute").
+- **Where it comes from:** your form checked against the current mutes and overrides. Nothing is written.
+- **How to read it:** when Check says OK, choose Apply under Confirm. Until the form is filled in, this area shows what to fill in.
 
-### 1 Override (mute or threshold): result
-- **What it shows:** one row: **Result** ("applied: …" once the change is written, or "nothing applied: …" when the confirmation no longer fits: a repeat, a reload, or someone changed it meanwhile), with **Time**, **Who**, **Action**, **Item ID**, **Detail**, **Reason** and **Ticket** of an applied change.
-- **Where it comes from:** the write itself.
-- **How to read it:** "nothing applied" after a reload is expected. To make another change, preview again.
+#### Mute or limit: result
+- **What it shows:** after you choose Apply, one row: **Result** ("Done: Mute pi5: whole host", or "Nothing written: …" when the confirmation no longer fits), with the **Time**, **Who**, **Change**, **Item**, **Detail** (before → after), **Reason**, **Ticket** and **Item ID** of the change.
+- **Where it comes from:** the write itself, which also adds the admin-log row.
+- **How to read it:** "Done" means it is written. "Nothing written" after a reload or a return to the tab is expected: the change was applied the first time. To make another change, change the form and choose Apply again.
 
-### Current mutes and threshold overrides
-- **What it shows:** every override in force. Columns: **Item ID**, **Muted until** ("-" if only a threshold is set), **Reason**, **Ticket**, **Threshold override (s)**, **Set by**, **Set at**.
-- **Where it comes from:** the overrides table.
-- **How to read it:** check for mutes nobody needs any more; they hide problems. Expired mutes disappear within a minute.
+#### Current mutes and limit overrides
+- **What it shows:** every mute and limit override in force. Columns: **Item**, **Muted until** ("-" if only a limit is set), **Reason**, **Ticket**, **Limit override** (for example "20 minutes (1200 s)"), **Set by**, **Set at**, **Item ID**.
+- **Where it comes from:** the overrides table (`dh_overrides`).
+- **How to read it:** look for mutes nobody needs any more: they hide problems. Expired mutes disappear within a minute. Reload the page after a change to see it here.
 
-### 2 Add an expected row: preview
-- **What it shows:** the expected-list row you are about to add or change. Columns: **Action** (expected_add), **Item ID**, **Before**, **After** and **Check** (for example "this entity is managed by ansible: change the inventory instead").
-- **Where it comes from:** your inputs checked against the expected list. Nothing is written.
-- **How to read it:** rows added by Ansible are changed through the inventory, not here. If the check says ok, confirm.
+#### Thresholds: how long each item may stay silent
+- **What it shows:** one row per expected item, with its limit and where it comes from. Columns:
 
-### 2 Add an expected row: result
-- **What it shows:** "applied: …" or "nothing applied: …", as for overrides.
-- **Where it comes from:** the write itself.
+  | Column | Meaning |
+  |---|---|
+  | Item | The item in words. |
+  | Profile | heartbeat, periodic, continuous, sporadic or info (see [Statuses](#statuses)). |
+  | Limit applied (s) | The limit in force now. |
+  | Applied from | Where it comes from: Override (set on Manage), Fixed limit on its expected row, Learned from its history, Profile default, Profile default (the row's profile is unknown), or None (INFO: never alerts). |
+  | About the applied limit | The same in a sentence. |
+  | Learned limit (s) | What the app learned from at least 3 days of history, kept within the profile's lowest and highest allowed values. |
+  | Learned before bounds (s) | The learned value before it was kept within those values. |
+  | Default limit (s) | The profile's default. |
+  | Configured limit (s) | A fixed limit written on the item's expected row, if any. |
+  | Days covered, Days skipped | Days of history learned from (the last 14 at most: the indexes keep 14 days), and days skipped because Splunk was up too little to learn from them. |
+  | Suggested profile | The profile the app would choose from what it saw. |
+  | Managed by | ansible (from the inventory) or ui (added on Manage). |
+  | Item ID | The item's ID. |
+
+- **Where it comes from:** the current statuses, the learned baselines and the expected list.
+- **How to read it:** "Profile default" with fewer than 3 days covered means the app is still learning. A learned limit far from the default can be a reason to change the profile, or to set a limit (recipe above).
+
+### Expected list tab
+
+Tell the app about data it should expect, so it alerts when that data stops. Rows that Ansible manages are changed in the Ansible inventory, not here. This tab needs the **dh_admin** role.
+
+#### Recipe: Add an expected row
+
+1. Open **Manage**, tab **Expected list**. Use the first form, **Add an expected row**.
+2. **Level**: Host (the host itself), Sourcetype (one kind of data) or Source (one file or input).
+3. **Index**: the index the data goes to (only the indexes the app watches are listed); for a host row choose "None (host row)".
+4. **Host name**: type the host, for example `pi5`, and press Enter. A domain (`.mshome.net`) is cut off.
+5. **Sourcetype (not for a host row)** and, for a source row, **Source (source rows only)**: replace `-` with the name.
+6. **Collection (how it arrives)**: uf (Splunk agent), syslog or hec. For data that comes through a relay, put the relay in **Via relay**.
+7. **Profile**: how the data arrives (see [Statuses](#statuses)); for **periodic**, also fill in **Interval in seconds (periodic only)**. **Criticality**: 1 and 2 alert when the data goes missing; 3 and 4 don't.
+8. **Owner**, **Site**, **Runbook link** and **Description** are optional (keep `-`). Write a **Reason** and press Enter.
+9. Check **Add an expected row: preview**: **Now** "Not on the expected list" (or how the row is now, for a change), **After the change**, and **Check** "OK: …".
+10. **Confirm (writes the change)**: choose "Apply: add pi5 › syslog (enclave1) to the expected list (profile continuous, criticality 2)". **Add an expected row: result** says "Done: Add expected row …".
+11. The new item starts as PENDING; it becomes OK when data arrives, or NEVER_SEEN if nothing arrives within an hour.
+
+Running the form again for an item you added here updates its row (the preview says "Update expected row"); its "expected since" time is kept.
+
+#### Recipe: Adopt something unregistered
+
+1. In **Unregistered: seen in the last 7 d but not expected**, find the item that should be watched.
+2. In the second form, **Adopt an unregistered item**: **Unregistered item**: choose it ("pi5 › cron (linux), last seen …").
+3. **Criticality**: choose it. Write a **Reason** and press Enter.
+4. Check **Adopt: preview**: the collection and profile the app suggests are in **After the change**.
+5. **Confirm (writes the change)**: choose "Apply: adopt …". **Adopt: result** says "Done: Adopt …". After a reload, the item has left the Unregistered table; it gets a status within a minute.
+
+#### Inputs
+
+| Input | What to enter |
+|---|---|
+| Level | Host, Sourcetype or Source. |
+| Index | Where the data goes; only the indexes the app watches are listed. "None (host row)" for a host row. |
+| Host name | The host name, short or full (it is shortened). Required. |
+| Sourcetype (not for a host row) | For sourcetype and source rows. |
+| Source (source rows only) | For source rows: the file or input name. |
+| Collection (how it arrives) | uf (Splunk agent), syslog, or hec (HTTP Event Collector). |
+| Via relay (optional, - for none) | For data that comes through a relay host, the relay (for example pi5). |
+| Profile | heartbeat, periodic, continuous, sporadic or info; each label gives its default limit. |
+| Interval in seconds (periodic only) | How often a periodic input runs. |
+| Criticality | 1 (highest) to 4. Criticality 1 and 2 raise the missing-data alert. |
+| Owner (optional, - for none) | Who looks after it. |
+| Site (optional, - for none) | Where it is. |
+| Runbook link (optional, - for none) | A link to its how-to page. |
+| Description (optional, - for none) | A short description. |
+| Unregistered item | Adopt form: an item that sends data but isn't expected, from the Unregistered table. |
+| Reason (required) | Why you make the change (each form has its own). |
+| Ticket (optional, - for none) | A ticket or change number, or `-`. |
+| Confirm (writes the change) | Choose the Apply line to write the change shown in the preview. |
+
+The adopt form's **Criticality** is the same list as the add form's.
+
+#### Add an expected row: preview
+- **What it shows:** the expected-list row you are about to add or change. Columns: **Change** (Add expected row or Update expected row), **Item**, **Now**, **After the change** (profile, criticality, how it arrives) and **Check** (for example "Enter the sourcetype", or "This item is managed by ansible: change the Ansible inventory instead").
+- **Where it comes from:** your form checked against the expected list. Nothing is written.
+- **How to read it:** when Check says OK, choose Apply under Confirm.
+
+#### Add an expected row: result
+- **What it shows:** "Done: Add expected row …" or "Nothing written: …", with the details of the change, as for mutes.
+- **Where it comes from:** the write itself, which also adds the admin-log row.
 - **How to read it:** a new row starts as PENDING and becomes NEVER_SEEN if nothing arrives within an hour.
 
-### Unregistered: seen in the last 7 d but not expected
-- **What it shows:** hosts and sourcetypes that sent data in the last 7 days but are not on the expected list. Columns: **Item ID**, **Level**, **Index**, **Host**, **Sourcetype**, **Sources** (how many), **Last seen**, **First seen**, **Suggested profile** (from what the app learned, once it has 3 days), **Days covered**.
+#### Unregistered: seen in the last 7 d but not expected
+- **What it shows:** hosts and sourcetypes that sent data in the last 7 days but are not on the expected list. Columns: **Item**, **Level**, **Index**, **Host**, **Sourcetype**, **Sources** (how many), **Last seen**, **First seen**, **Suggested profile** (once the app has 3 days of history), **Days covered**, **Item ID**.
 - **Where it comes from:** the arrival records compared with the expected list.
-- **How to read it:** each row is either something new that should be watched (adopt it in form 3) or noise to ignore. Unregistered data is never alerted on.
+- **How to read it:** each row is either something new that should be watched (adopt it with the form below) or noise to ignore. Unregistered data is never alerted on.
 
-### 3 Adopt: preview
-- **What it shows:** the expected row that adopting the chosen item would add (collection and profile filled in from what the app knows). Columns: **Action** (expected_adopt), **Item ID**, **Before**, **After**, **Check**.
-- **Where it comes from:** the unregistered item, its baseline and its forwarder facts. Nothing is written.
-- **How to read it:** if the check says ok, confirm.
+#### Adopt: preview
+- **What it shows:** the expected row that adopting the chosen item would add, with the collection and profile filled in from what the app knows. Columns as for the add preview.
+- **Where it comes from:** the unregistered item, its learned baseline and its forwarder facts. Nothing is written.
+- **How to read it:** when Check says OK, choose Apply under Confirm.
 
-### 3 Adopt: result
-- **What it shows:** "applied: …" or "nothing applied: …".
+#### Adopt: result
+- **What it shows:** "Done: Adopt …" or "Nothing written: …".
 - **Where it comes from:** the write itself.
 - **How to read it:** the item leaves the Unregistered table and gets a status within a minute.
 
-### Thresholds: learned against configured
-- **What it shows:** for each item: **Item ID**; **Profile**; **Managed by** (ansible or ui); **Configured limit (s)** (a fixed limit written on its expected-list row, if any); **Default limit (s)** of its profile; **Learned before bounds (s)** and **Learned limit (s)** (what the app learned, before and after it is kept within the profile's lowest and highest allowed values); **Days covered** and **Days skipped** (days with too little Splunk uptime to learn from); **Suggested profile**; and the **Limit applied (s)** with where it comes from (**Applied from**) and **About the applied limit**.
-- **Where it comes from:** the current statuses, the learned baselines and the expected list.
-- **How to read it:** "learning" with fewer than 3 days means the default is used for now. A learned limit far from the default can be a reason to change the profile, or to set a threshold override in form 1.
+### Test blocks (admin) tab
 
-### 4 Test block: raw sources of the host (24 h)
-- **What it shows:** the exact source names the chosen host sent to the linux, windows and network indexes in the last 24 hours. Columns: **Index**, **Sourcetype**, **Source (raw name)**, **Normalized source** (the name with dates and rotation numbers as `*`), **Events**, **Last seen**.
-- **Where it comes from:** the indexed data of this host only.
-- **How to read it:** a source-level block must use one of these exact raw names; a rotated or dated file name won't match later files (block its sourcetype instead).
+A **test block** throws a host's real data away when it reaches Splunk, before it is indexed, so you can check that the app notices the data going missing. It applies only to the linux, windows and network indexes, needs the **dh_admin** role, starts within about a minute and ends by itself. The affected items show their real status (late, then missing) with the label "test block until hh:mm". Remove a block as soon as the test is over: in production, a block control is itself a way to blind monitoring.
 
-### Current test blocks
-- **What it shows:** every block in the test-block table. Columns: **Block key** (host, host|sourcetype, or host|sourcetype|exact source), **Until**, **Reason**, **Set by**, and **State** ("test block until hh:mm", or "expired" until it is cleaned up within about 2 minutes).
-- **Where it comes from:** the test-block table that Splunk reads at ingest.
-- **How to read it:** blocked data is **thrown away** before indexing, so a block is a real outage, on purpose. The affected items show their real status labelled "test block until hh:mm". Remove blocks as soon as a test ends; in production a block control is itself a way to blind monitoring.
+This tab writes the block table that Splunk reads at ingest. When the data flows through Cribl, the block moves into Cribl and this tab will change to show the command to run instead (task 11b).
 
-### 4 Test block: preview
-- **What it shows:** the block you are about to add or remove. Columns: **Action** (block_add or block_remove), **Block key**, **Normalized source** (for reference only), **Before**, **After**, **Check**.
-- **Where it comes from:** your inputs checked against the current block table. Nothing is written.
-- **How to read it:** if the check says ok, confirm.
+#### Recipe: Run a test block
 
-### 4 Test block: result
-- **What it shows:** "applied: …" or "nothing applied: …".
-- **Where it comes from:** the rewrite of the block table.
+1. Open **Manage**, tab **Test blocks (admin)**.
+2. **Action**: Add a test block. **Host**: choose the host. The table **Raw sources of the host (24 h)** fills with what it sent.
+3. **Block level**: Whole host, One sourcetype, or One exact raw source. For the last two, choose it in **Sourcetype or raw source**.
+4. **Block for**: 5 minutes to 24 hours. Write a **Reason** and press Enter.
+5. Check **Test block: preview**: **After the change** says "Blocked until … ; Splunk applies it within about a minute".
+6. **Confirm (writes the change)**: choose "Apply: block pi5: whole host for 15 minutes". **Test block: result** says "Done: Add test block …".
+7. Watch the Overview: the blocked items turn LATE, then MISSING, labelled "test block until hh:mm".
+8. To end it early: **Action** Remove a test block, the same host and level, a reason, then the Apply line. After a reload, **Current test blocks** no longer lists it.
+
+A source block needs the **exact raw source** name, as listed in the raw sources table; a rotated or dated file name won't match later files, so block that file's sourcetype instead.
+
+#### Inputs
+
+| Input | What to enter |
+|---|---|
+| Action | Add a test block or Remove a test block. |
+| Host | The host to block. Its raw sources fill the table and the next list at once. |
+| Block level | Whole host (all its data), One sourcetype, or One exact raw source. |
+| Sourcetype or raw source | For the lower levels: the sourcetype, or the exact raw source name (listed with its normalized form). Not needed for a whole-host block. |
+| Block for | How long: 5 minutes to 24 hours (the most allowed). |
+
+The form also has its own **Reason (required)**, **Ticket (optional, - for none)** and **Confirm (writes the change)**, as above.
+
+#### Test block: preview
+- **What it shows:** the block you are about to add or remove. Columns: **Change**, **Item** (the block key in words), **Now**, **After the change**, **Check** and **Normalized source** (for reference only).
+- **Where it comes from:** your form checked against the current block table. Nothing is written.
+- **How to read it:** when Check says OK, choose Apply under Confirm.
+
+#### Test block: result
+- **What it shows:** "Done: Add test block …" or "Nothing written: …", with the details of the change.
+- **Where it comes from:** the rewrite of the block table, which also adds the admin-log row.
 - **How to read it:** Splunk picks up the change within about a minute.
 
-### Admin log (every change made here)
-- **What it shows:** the last 1000 changes. Columns: **Time**, **Who**, **Action** (for example override_mute or block_add), **Item ID** (for a test block, its key), **Detail** (before -> after), **Reason**, **Ticket**.
-- **Where it comes from:** the admin log, written by every applied change.
-- **How to read it:** use it to answer "who muted this, and why?". It is also copied to the `data_health` index every 5 minutes and kept 90 days in the table.
+#### Raw sources of the host (24 h)
+- **What it shows:** the exact source names the chosen host sent to the linux, windows and network indexes in the last 24 hours. Columns: **Index**, **Sourcetype**, **Source (raw name)**, **Normalized source** (the name with dates and rotation numbers as `*`), **Events**, **Last seen**.
+- **Where it comes from:** the indexed data of this one host (one of the four panels that read raw events; see the start of this guide).
+- **How to read it:** a source-level block must use one of these exact raw names.
+
+#### Current test blocks
+- **What it shows:** every block in the test-block table. Columns: **Item** (the block key in words), **Until**, **Reason**, **Set by**, **State** ("test block until hh:mm", or "expired (removed within about 2 min)"), **Block key**.
+- **Where it comes from:** the test-block table that Splunk reads at ingest.
+- **How to read it:** blocked data is **thrown away** before indexing, so a block is a real outage, on purpose. Remove blocks as soon as a test ends.
+
+### Admin log tab
+
+Every change made on Manage, newest first.
+
+#### Recipe: Find who muted something
+
+1. Open **Manage**, tab **Admin log**.
+2. **Search the log (words separated by *)**: type words that must all appear, for example `mute*pi5`, and press Enter.
+3. Read **Who**, **Time**, **Reason** and **Ticket** of the rows. **Detail** shows the state before → after.
+
+#### Inputs
+
+| Input | What to enter |
+|---|---|
+| Search the log (words separated by *) | Words that must all appear in a row (who, change, item, detail, reason or ticket), separated by `*`; not case-sensitive. `*` shows all. |
+
+#### Admin log (every change made on Manage)
+- **What it shows:** the last 1000 changes that match the search. Columns: **Time**, **Who**, **Change** (Mute, Unmute, Set limit, Clear limit, Add expected row, Adopt, Add test block or Remove test block), **Item**, **Detail** (before → after, as recorded at the time; times in it are in the time zone of whoever made the change), **Reason**, **Ticket**, **Item ID** (for a test block, its key).
+- **Where it comes from:** the admin log, written by every applied change. It is also copied to the `data_health` index every 5 minutes (which keeps 14 days) and kept 90 days in the table.
+- **How to read it:** use it to answer "who muted this, and why?".
 
 ## Daily state of health
 
@@ -405,7 +545,7 @@ The engineering view: the report made every day at 07:00, plus the live unregist
 ### Unregistered: seen in the last 7 d but not expected
 - **What it shows:** the same live list and columns as on Manage: data that arrives but isn't on the expected list.
 - **Where it comes from:** the arrival records compared with the expected list.
-- **How to read it:** adopt what should be watched (Manage, form 3); ignore the rest.
+- **How to read it:** adopt what should be watched (Manage, Expected list tab); ignore the rest.
 
 ### Slow arrival (lag p95 of 60 s or more)
 - **What it shows:** sourcetypes whose data usually arrives a minute or more after it was written, on the latest day. Columns: **Item ID**, **Delay p95 (s)** (95 % of events arrived within this many seconds), **Day**.

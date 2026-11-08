@@ -1,0 +1,2 @@
+time,actor,action,entity_id,detail,reason,ticket
+NOW-60,taylor,block_add,h1|*|*,x,y,-

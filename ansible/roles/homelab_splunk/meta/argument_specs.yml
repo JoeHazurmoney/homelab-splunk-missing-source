@@ -50,6 +50,14 @@ argument_specs:
         type: int
         default: 180
         description: Seconds to wait for the UF to connect to Cribl and for its _internal in Splunk.
+      hl_uninstall_without_baseline:
+        type: bool
+        default: false
+        description: Let uninstall check its contract without the install baselines (missing although an install is recorded).
+      hl_uninstall_accept_new_units:
+        type: bool
+        default: false
+        description: Let the uninstall contract pass when unit files appeared while the UF was installed (still listed), e.g. from an unrelated package.
       hl_s2s_port:
         type: int
         default: 9997
@@ -133,8 +141,8 @@ argument_specs:
       hl_server_restart_confs:
         type: list
         elements: str
-        default: [indexes.conf, inputs.conf, props.conf]
-        description: Changing or removing one of these files restarts splunkd; other changes are reloaded.
+        default: [indexes.conf, inputs.conf, props.conf, web.conf]
+        description: Changing or removing one of these files restarts splunkd (web.conf has no REST reload); other changes are reloaded.
       hl_server_force_restart:
         type: bool
         default: false
@@ -232,8 +240,8 @@ argument_specs:
         description: After a Cribl change, send one syslog line per device port and wait for it in Splunk.
       hl_cribl_hold_on_splunk_restart:
         type: bool
-        default: false
-        description: Pause the Cribl container while the server tag restarts splunkd.
+        default: true
+        description: Pause the Cribl container while the server tag restarts splunkd, until splunktcp accepts connections.
       hl_block_key:
         type: str
         default: ""
