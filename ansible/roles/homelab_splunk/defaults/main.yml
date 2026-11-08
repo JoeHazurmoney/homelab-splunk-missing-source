@@ -74,7 +74,7 @@ hl_server_apps:
     templates: [default/inputs.conf]
   - name: hl_data_health
     seed_lookups: [dh_expected_ansible.csv]
-# Limit server, server_remove (and, from task 6, apps/apps_remove) to these apps; [] = all
+# Limit server, server_remove and apps_remove to these apps; [] = all
 hl_apps_only: []
 # A change to one of these files restarts splunkd; anything else is reloaded over REST.
 # web.conf has no REST reload (hl_server_base's dashboard risky-command setting, spec 7.8).
@@ -129,6 +129,7 @@ hl_cribl_config_files:
   - inputs.yml
   - outputs.yml
   - cribl.yml
+  - breakers.yml
   - pipelines/route.yml
   - pipelines/pl_test_block/conf.yml
   - pipelines/pl_syslog_pre/conf.yml
@@ -169,6 +170,7 @@ syslog_devices: []
 #   criticality   1 (most critical) .. 4
 #   enabled       false keeps the row documented but neither rendered nor expected
 #   track_source  also expect each source (level=source), not only the sourcetype
+#   hosts         optional: only these inventory hosts get the input (and its expectation)
 
 # wd2l's audit sourcetype differs per host (host_vars); hosts without wd2l disable its stanza.
 hl_wd2l_audit_sourcetype: "wd2l:audit"
@@ -222,6 +224,11 @@ hl_linux_inputs:
   - {stanza: "script://./bin/version.sh", app: Splunk_TA_nix, index: linux, sourcetype: "Unix:Version",
      source: "Unix:Version", interval: 86400, profile: periodic, criticality: 4, enabled: true, track_source: false}
 
+  # pi5 only: the device probe's file (task 8 writes it)
+  - {stanza: "monitor:///var/log/hl-devprobe/probe.log", app: hl_uf_linux_inputs, index: network, sourcetype: "hl:devprobe",
+     source: /var/log/hl-devprobe/probe.log, interval: 60, profile: periodic, criticality: 2, enabled: true, track_source: false,
+     hosts: [pi5]}
+
 hl_windows_inputs:
   # Event log channels (app hl_uf_windows_inputs), renderXml=true, so sourcetype XmlWinEventLog and
   # source XmlWinEventLog:<channel>; all channels share the sourcetype, so each is tracked by source.
@@ -244,11 +251,12 @@ hl_windows_inputs:
   - {stanza: "WinEventLog://Microsoft-Windows-Hyper-V-Worker-Admin", app: hl_uf_windows_inputs, index: windows,
      sourcetype: XmlWinEventLog, source: "XmlWinEventLog:Microsoft-Windows-Hyper-V-Worker-Admin",
      profile: sporadic, criticality: 3, enabled: true, track_source: true}
-  # Splunk_TA_windows 11.0.3 perfmon stanzas, enabled in its local/inputs.conf at 60 s
-  - {stanza: "perfmon://CPU", app: Splunk_TA_windows, index: windows, sourcetype: "Perfmon:CPU",
-     source: "Perfmon:CPU", interval: 60, profile: periodic, criticality: 3, enabled: true, track_source: false}
-  - {stanza: "perfmon://Memory", app: Splunk_TA_windows, index: windows, sourcetype: "Perfmon:Memory",
-     source: "Perfmon:Memory", interval: 60, profile: periodic, criticality: 3, enabled: true, track_source: false}
+  # Splunk_TA_windows 11.0.3 perfmon stanzas, enabled in its local/inputs.conf at 60 s. The TA's
+  # mode = multikv makes them PerfmonMk:<stanza>: one event per collection, one result per instance.
+  - {stanza: "perfmon://CPU", app: Splunk_TA_windows, index: windows, sourcetype: "PerfmonMk:CPU",
+     source: "PerfmonMk:CPU", interval: 60, profile: periodic, criticality: 3, enabled: true, track_source: false}
+  - {stanza: "perfmon://Memory", app: Splunk_TA_windows, index: windows, sourcetype: "PerfmonMk:Memory",
+     source: "PerfmonMk:Memory", interval: 60, profile: periodic, criticality: 3, enabled: true, track_source: false}
 
 # The Splunk server host (REST searches are delegated to it)
 hl_server_host: homepc
@@ -286,3 +294,20 @@ hl_audit_policy:
   - {name: System Integrity, guid: "{0CCE9212-69AE-11D9-BED3-505054503030}", success: true, failure: true}
   # No command line: ProcessCreationIncludeCmdLine_Enabled is left alone (spec 5.3)
   - {name: Process Creation, guid: "{0CCE922B-69AE-11D9-BED3-505054503030}", success: true, failure: false}
+
+# --- Forwarder apps (spec 5.5; task 6). The TAs are deployed unmodified; the role owns only their
+# local/inputs.conf. The .spl packages go in ansible/files/packages/ on the controller (gitignored).
+hl_tas:
+  Splunk_TA_nix:
+    version: 10.3.4
+    file: splunk-add-on-for-unix-and-linux_1034.spl
+    sha256: 9bfb2061b55961841d5babba04ead35509730dc73a7b6bfbc676a7216e7f1ca2
+  Splunk_TA_windows:
+    version: 11.0.3
+    file: splunk-add-on-for-microsoft-windows_1103.spl
+    sha256: 2fd0384376afe6993c7c6df49ab9a5e8b44fe0e38c4517a41f550f42fa051fa6
+# The role-owned input apps; every stanza is written to the app's local/inputs.conf, because local/
+# beats every app's default/ (Splunk_TA_windows sorts before hl_uf_windows_inputs, and its default
+# stanzas say disabled = 1).
+hl_uf_input_apps_linux: [hl_uf_linux_inputs, hl_uf_wd2l_inputs]
+hl_uf_input_apps_windows: [hl_uf_windows_inputs]

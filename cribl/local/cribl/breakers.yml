@@ -1,0 +1,82 @@
+# Cribl event breakers for UF data (spec 13, 11 row 6). Splunk applies no index-time rule to what
+# Cribl delivers (spike 14.7 c), so Cribl, not Splunk, now breaks and timestamps UF data and the TAs'
+# props.conf on the indexer no longer apply. This ruleset reproduces them (task 6 checks 3-5):
+# - TA_nix tables (ps, top, df, ...): one event per script run, stamped with the current time (TA_nix:
+#   LINE_BREAKER that never fires, or only on blank lines, and DATETIME_CONFIG = CURRENT);
+# - cpu: one event per sample, each starting at its "Datetime" header (TA_nix cpu);
+# - linux_audit: one event per record, time from msg=audit(<epoch>);
+# - wd2l's audit trails: one JSON record per line, time from "ts", which is too deep for Cribl's scan;
+# - no Windows rule: the UF frames event log records and Perfmon tables itself and sends their time,
+#   and Cribl's default keeps both (task 6: 1,546 XML events whole, _time within 1 ms of TimeCreated);
+# - everything else, Unix:Service and the other line-per-record scripts included: Cribl's default
+#   (one event per line, timestamp found automatically), as Splunk's defaults for those.
+# Managed by the homelab_splunk role (`cribl` tag).
+hl_uf_breakers:
+  lib: custom
+  description: Homelab UF data - TA_nix tables and cpu samples, auditd per record, wd2l audit
+  tags: homelab
+  minRawLength: 256
+  rules:
+    - name: TA_nix scripted output, one event per run
+      condition: >-
+        ['ps','top','vmstat','interfaces','netstat','df','openPorts','lastlog','package'].includes(sourcetype)
+      type: regex
+      # Never matches: nothing inside one run's output breaks it
+      eventBreakerRegex: /(?!)/
+      timestampAnchorRegex: /^/
+      timestamp:
+        type: current
+        length: 150
+      timestampTimezone: local
+      timestampEarliest: -420weeks
+      timestampLatest: +1week
+      maxEventBytes: 1048576
+      parserEnabled: false
+      shouldUseDataRaw: false
+      disabled: false
+    - name: TA_nix cpu, one event per sample
+      condition: "sourcetype=='cpu'"
+      type: regex
+      eventBreakerRegex: /[\r\n]+(?=Datetime\s+)/
+      timestampAnchorRegex: /\n/
+      timestamp:
+        type: format
+        format: "%m/%d/%y_%H:%M:%S_%Z"
+        length: 150
+      timestampTimezone: local
+      timestampEarliest: -420weeks
+      timestampLatest: +1week
+      maxEventBytes: 1048576
+      parserEnabled: false
+      shouldUseDataRaw: false
+      disabled: false
+    - name: linux_audit, one event per record
+      condition: "sourcetype=='linux_audit'"
+      type: regex
+      eventBreakerRegex: /[\n\r]+(?=type=)/
+      timestampAnchorRegex: /msg=audit\(/
+      timestamp:
+        type: auto
+        length: 150
+      timestampTimezone: local
+      timestampEarliest: -420weeks
+      timestampLatest: +1week
+      maxEventBytes: 51200
+      parserEnabled: false
+      shouldUseDataRaw: false
+      disabled: false
+    - name: wd2l audit trails, one record per line
+      condition: /^wd2l:/.test(sourcetype)
+      type: regex
+      eventBreakerRegex: /[\r\n]+/
+      timestampAnchorRegex: /"ts":"/
+      timestamp:
+        type: auto
+        length: 150
+      timestampTimezone: utc
+      timestampEarliest: -420weeks
+      timestampLatest: +1week
+      maxEventBytes: 1048576
+      parserEnabled: false
+      shouldUseDataRaw: false
+      disabled: false

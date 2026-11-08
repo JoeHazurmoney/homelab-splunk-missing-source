@@ -1,5 +1,68 @@
-# apps_remove (uf_linux): remove the role-owned apps (or hl_apps_only)
-# Placeholder until task 6 (spec 11) fills it in.
-- name: Placeholder for apps_remove
-  ansible.builtin.debug:
-    msg: "apps_remove on {{ inventory_hostname }}: not implemented yet (task 6)"
+# apps_remove (uf_linux, spec 5.3/5.5): delete the role-owned input apps (only those whose
+# default/app.conf says [hl] managed = true) and the role's local/inputs.conf inside Splunk_TA_nix.
+# hl_uf_outputs stays unless named in hl_apps_only (without it the UF sends nothing, heartbeat
+# included). Restart once, marker. The TA itself goes with --tags uninstall.
+#   -e '{"hl_apps_only":["hl_uf_wd2l_inputs"]}' --tags apps_remove
+- name: Pick the apps to remove
+  ansible.builtin.set_fact:
+    hl_rm_apps: "{{ hl_apps_only if hl_apps_only | length > 0 else (hl_uf_input_apps_linux + ['Splunk_TA_nix']) }}"
+
+- name: Read each app's role marker
+  ansible.builtin.command:
+    argv: [grep, -A3, -E, '^\[hl\]', "{{ hl_uf_home }}/etc/apps/{{ item }}/default/app.conf"]
+  loop: "{{ hl_rm_apps | reject('equalto', 'Splunk_TA_nix') | list }}"
+  register: hl_rm_marker
+  changed_when: false
+  failed_when: false
+
+- name: Remove the role-owned apps
+  ansible.builtin.file:
+    path: "{{ hl_uf_home }}/etc/apps/{{ item.item }}"
+    state: absent
+  loop: "{{ hl_rm_marker.results | selectattr('stdout', 'search', 'managed\\s*=\\s*(true|1)') | list }}"
+  loop_control:
+    label: "{{ item.item }}"
+  register: hl_rm_apps_done
+
+- name: Remove the role's local/inputs.conf from Splunk_TA_nix
+  ansible.builtin.file:
+    path: "{{ hl_uf_home }}/etc/apps/Splunk_TA_nix/local/inputs.conf"
+    state: absent
+  when: "'Splunk_TA_nix' in hl_rm_apps"
+  register: hl_rm_ta_inputs
+
+- name: Note whether the UF must restart
+  ansible.builtin.set_fact:
+    hl_rm_restart: "{{ hl_rm_apps_done is changed or hl_rm_ta_inputs is changed }}"
+
+# "<lines> <epoch>": where splunkd.log ends and the host's clock, just before the restart
+- name: Note where splunkd.log ends
+  ansible.builtin.shell:
+    cmd: |
+      set -o pipefail
+      f={{ hl_uf_home }}/var/log/splunk/splunkd.log
+      if [ -f "$f" ]; then echo "$(wc -l < "$f") $(date +%s)"; else echo "0 $(date +%s)"; fi
+    executable: /bin/bash
+  register: hl_rm_log_lines
+  changed_when: false
+  when: hl_rm_restart | bool
+
+- name: Marker for the removal
+  ansible.builtin.include_tasks: marker_best_effort.yml
+  vars:
+    hl_marker_action: apps_remove
+  when: hl_rm_restart | bool
+
+- name: Restart the UF
+  ansible.builtin.systemd_service:
+    name: SplunkForwarder
+    state: restarted
+  when: hl_rm_restart | bool
+
+# The heartbeat must survive the removal (spec 5.5); not when hl_uf_outputs itself was removed
+- name: Check the UF is still connected through Cribl
+  ansible.builtin.include_tasks: uf_linux_connected.yml
+  vars:
+    hl_uf_log_from: "{{ hl_rm_log_lines.stdout.split()[0] | int }}"
+    hl_uf_since: "{{ hl_rm_log_lines.stdout.split()[1] | int }}"
+  when: hl_rm_restart | bool and 'hl_uf_outputs' not in hl_rm_apps
