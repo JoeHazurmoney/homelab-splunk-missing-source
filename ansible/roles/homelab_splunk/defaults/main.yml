@@ -252,3 +252,34 @@ hl_server_host: homepc
 # Syscall ABIs each audit rule is written for (b32 and b64, like wd2l's). If pi5's aarch64 kernel
 # rejects arch=b32, set [b64] in host_vars/pi5.yml (task 4 check 3).
 hl_audit_arches: [b32, b64]
+
+# --- The Windows UF (spec 5.3, 5.6 Windows contract) ---
+hl_uf_win_home: 'C:\Program Files\SplunkUniversalForwarder'
+hl_uf_win_service: SplunkForwarder
+# The MSI runs the UF as this virtual account (least privilege, UF 9.1+)
+hl_uf_win_account: 'NT SERVICE\SplunkForwarder'
+# Local groups the virtual account joins (by SID, so the names' language doesn't matter)
+hl_uf_win_groups:
+  - {sid: S-1-5-32-573, name: Event Log Readers}
+  - {sid: S-1-5-32-558, name: Performance Monitor Users}
+# The role's folder on Windows (state file, auditpol backup, MSI log)
+hl_win_state_dir: 'C:\ProgramData\hl_splunk'
+
+# --- Windows audit policy (spec 5.3 audit_policy): the focused subset, by subcategory GUID ---
+hl_audit_policy:
+  - {name: Logon, guid: "{0CCE9215-69AE-11D9-BED3-505054503030}", success: true, failure: true}
+  - {name: Logoff, guid: "{0CCE9216-69AE-11D9-BED3-505054503030}", success: true, failure: false}
+  - {name: Special Logon, guid: "{0CCE921B-69AE-11D9-BED3-505054503030}", success: true, failure: false}
+  - {name: Account Lockout, guid: "{0CCE9217-69AE-11D9-BED3-505054503030}", success: false, failure: true}
+  - {name: Other Logon/Logoff Events, guid: "{0CCE921C-69AE-11D9-BED3-505054503030}", success: true, failure: true}
+  - {name: Group Membership, guid: "{0CCE9249-69AE-11D9-BED3-505054503030}", success: true, failure: false}
+  - {name: User Account Management, guid: "{0CCE9235-69AE-11D9-BED3-505054503030}", success: true, failure: true}
+  - {name: Security Group Management, guid: "{0CCE9237-69AE-11D9-BED3-505054503030}", success: true, failure: true}
+  - {name: Computer Account Management, guid: "{0CCE9236-69AE-11D9-BED3-505054503030}", success: true, failure: true}
+  - {name: Other Account Management Events, guid: "{0CCE923A-69AE-11D9-BED3-505054503030}", success: true, failure: true}
+  - {name: Audit Policy Change, guid: "{0CCE922F-69AE-11D9-BED3-505054503030}", success: true, failure: true}
+  - {name: Authentication Policy Change, guid: "{0CCE9230-69AE-11D9-BED3-505054503030}", success: true, failure: false}
+  - {name: Security System Extension, guid: "{0CCE9211-69AE-11D9-BED3-505054503030}", success: true, failure: true}
+  - {name: System Integrity, guid: "{0CCE9212-69AE-11D9-BED3-505054503030}", success: true, failure: true}
+  # No command line: ProcessCreationIncludeCmdLine_Enabled is left alone (spec 5.3)
+  - {name: Process Creation, guid: "{0CCE922B-69AE-11D9-BED3-505054503030}", success: true, failure: false}

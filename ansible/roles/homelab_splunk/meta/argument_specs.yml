@@ -267,6 +267,56 @@ argument_specs:
         elements: str
         default: [b32, b64]
         description: Syscall ABIs each role audit rule is written for.
+      hl_uf_win_home:
+        type: str
+        default: 'C:\Program Files\SplunkUniversalForwarder'
+        description: SPLUNK_HOME of the Windows UF.
+      hl_uf_win_service:
+        type: str
+        default: SplunkForwarder
+        description: The Windows UF's service name.
+      hl_uf_win_account:
+        type: str
+        default: 'NT SERVICE\SplunkForwarder'
+        description: The virtual account the Windows UF runs as.
+      hl_uf_win_groups:
+        type: list
+        elements: dict
+        description: Local groups (by SID) the virtual account joins; removed on uninstall.
+        options:
+          sid:
+            type: str
+            required: true
+            description: The group's well-known SID.
+          name:
+            type: str
+            required: true
+            description: The group's English name (for messages only).
+      hl_win_state_dir:
+        type: str
+        default: 'C:\ProgramData\hl_splunk'
+        description: The role's folder on Windows hosts.
+      hl_audit_policy:
+        type: list
+        elements: dict
+        description: The Windows audit subcategories audit_policy enables (spec 5.3).
+        options:
+          name:
+            type: str
+            required: true
+            description: Subcategory name (messages only).
+          guid:
+            type: str
+            required: true
+            description: Subcategory GUID (locale-independent).
+          success:
+            type: bool
+            required: true
+            description: Audit success.
+          failure:
+            type: bool
+            required: true
+            description: Audit failure.
       hl_server_host:
         type: str
         default: homepc

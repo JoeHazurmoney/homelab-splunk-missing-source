@@ -1,0 +1,12 @@
+# One marker.yml post that warns instead of failing (controller ruling R1 for task 5, the pattern of
+# server_restart.yml's cribl_hold/cribl_release): a marker that can't reach HEC never blocks the
+# Windows UF's install, service action or uninstall.
+#   vars: hl_marker_action (required), hl_marker_target (optional), as marker.yml
+- name: "Marker, best effort ({{ hl_marker_action }})"
+  block:
+    - name: Post the marker
+      ansible.builtin.include_tasks: marker.yml
+  rescue:
+    - name: Warn that the marker failed
+      ansible.builtin.debug:
+        msg: "WARNING: the {{ hl_marker_action }} marker could not be posted to {{ hl_marker_hec_url }}; the play goes on without it."
