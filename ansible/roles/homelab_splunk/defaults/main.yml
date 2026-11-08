@@ -3,6 +3,9 @@
 # --- Where forwarders send (spec 5.2, 5.5): Cribl on HOMEPC. uf_windows overrides it with 127.0.0.1. ---
 hl_collector: 192.168.1.27
 hl_s2s_port: 9997
+# The old S2S token during a rotation (spec 13): set in the vault for expand and migrate, removed
+# for contract. Splunk and Cribl then accept both tokens; empty renders exactly a normal run's files.
+vault_hl_s2s_token_previous: ""
 
 # --- The Universal Forwarder (spec 5.3 install/uninstall, 14.3 packages) ---
 hl_uf_version: 10.6.1.1

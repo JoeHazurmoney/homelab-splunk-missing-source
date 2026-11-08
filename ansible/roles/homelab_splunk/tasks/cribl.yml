@@ -8,6 +8,9 @@
 # vault_hl_cribl_admin_password in the vault.
 
 # --- Preconditions ---
+- name: Check the previous S2S token
+  ansible.builtin.import_tasks: s2s_token_check.yml
+
 - name: Check the Cribl image is on HOMEPC
   ansible.windows.win_command:
     argv: [docker, image, inspect, --format, "{{ '{{.Id}}' }}", "{{ hl_cribl_image }}"]
@@ -157,7 +160,7 @@
       vars:
         hl_cribl_extra:
           inputs.yml:
-            inputs: "{{ hl_cribl_device_inputs }}"
+            inputs: "{{ hl_cribl_device_inputs | combine(hl_cribl_s2s_token_inputs) }}"
 
     - name: Create the staging directory on HOMEPC
       ansible.windows.win_tempfile:
@@ -231,6 +234,8 @@
 # restarts again and checks again (spec 5.3).
 - name: Restart Cribl, check what it loaded, and commit the pushed config record
   block:
+    # A restart, not `cribl reload`: the reload left the running workers on the old authTokens list and
+    # the API on the old file (measured, spec 14.13). With both tokens accepted a restart lost nothing.
     - name: Restart Cribl to load the changed config
       ansible.windows.win_command:
         argv: [docker, restart, "{{ hl_cribl_container }}"]
@@ -271,6 +276,9 @@
         }
         $routes = (Invoke-HlCribl -Path '/routes/default').Content | ConvertFrom-Json
         $out['routes'] = (@($routes.items[0].routes | ForEach-Object { $_.id }) -join ',')
+        # A count only: what the API has loaded, which a reload can leave behind the file (spec 14.13)
+        $s2s = (Invoke-HlCribl -Path '/system/inputs/in_splunk_tcp').Content | ConvertFrom-Json
+        $out['s2s_tokens'] = @($s2s.items[0].authTokens).Count
         $out | ConvertTo-Json -Compress
       environment:
         HL_CRIBL_PW: "{{ vault_hl_cribl_admin_password }}"
@@ -280,6 +288,7 @@
         hl_cribl_loaded.rc != 0
         or (hl_cribl_loaded.stdout | from_json | dict2items | selectattr('value', 'equalto', false) | list | length > 0)
         or (hl_cribl_loaded.stdout | from_json).routes != 'r_cribl_self,r_syslog_devices,r_uf,r_default'
+        or (hl_cribl_loaded.stdout | from_json).s2s_tokens != (2 if vault_hl_s2s_token_previous | default('') | length > 0 else 1)
 
     - name: Commit the pushed config record
       ansible.windows.win_command:

@@ -429,6 +429,11 @@ argument_specs:
         type: str
         no_log: true
         description: S2S token for 9997 (splunktcptoken hl_cribl on Splunk; the UFs and Cribl present it).
+      vault_hl_s2s_token_previous:
+        type: str
+        default: ""
+        no_log: true
+        description: The old S2S token during a rotation (spec 13); Splunk and Cribl accept both while set. Empty otherwise.
       vault_hl_cribl_admin_password:
         type: str
         no_log: true

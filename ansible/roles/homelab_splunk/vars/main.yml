@@ -123,6 +123,15 @@ hl_cribl_ps_prelude: |
     return Invoke-HlCriblWeb -Method GET -Uri ($HlCriblApi + '/health')
   }
 
+# During a token rotation (spec 13) in_splunk_tcp accepts both tokens. Merged over the repo's
+# inputs.yml (a list replaces the file's list), so the file stays plain YAML for yamllint and an empty
+# vault_hl_s2s_token_previous adds nothing: the rendered file is byte for byte a normal run's.
+hl_cribl_s2s_token_inputs: "{{ {} if vault_hl_s2s_token_previous | default('') | length == 0 else
+  {'in_splunk_tcp': {'authTokens': [{'token': vault_hl_s2s_token, 'description': 'homelab UFs (vault_hl_s2s_token)'},
+    {'token': vault_hl_s2s_token_previous, 'description': 'the old token, during a rotation (vault_hl_s2s_token_previous)'}]}} }}"
+# A valid S2S token: a UUID, what bootstrap-pi.sh generates (uuid4)
+hl_s2s_token_re: '^[0-9a-fA-F]{8}(-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}$'
+
 # One Cribl syslog source per syslog_devices entry, merged into cribl/local/cribl/inputs.yml
 hl_cribl_device_inputs: "{{ lookup('ansible.builtin.template', 'cribl/device_inputs.yml.j2') | from_yaml }}"
 
