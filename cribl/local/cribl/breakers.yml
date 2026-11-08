@@ -6,14 +6,14 @@
 # - cpu: one event per sample, each starting at its "Datetime" header (TA_nix cpu);
 # - linux_audit: one event per record, time from msg=audit(<epoch>);
 # - wd2l's audit trails: one JSON record per line, time from "ts", which is too deep for Cribl's scan;
-# - XmlWinEventLog: one event per record, time from TimeCreated (the backfill keeps its real times);
-# - Perfmon tables: one event per collection, current time (no timestamp of their own);
+# - no Windows rule: the UF frames event log records and Perfmon rows itself and sends their time, and
+#   Cribl's default keeps both (task 6: 1,546 XML events whole, _time within 1 ms of TimeCreated);
 # - everything else, Unix:Service and the other line-per-record scripts included: Cribl's default
 #   (one event per line, timestamp found automatically), as Splunk's defaults for those.
 # Managed by the homelab_splunk role (`cribl` tag).
 hl_uf_breakers:
   lib: custom
-  description: Homelab UF data - TA_nix tables and cpu samples, auditd per record, wd2l audit, Windows XML and Perfmon
+  description: Homelab UF data - TA_nix tables and cpu samples, auditd per record, wd2l audit
   tags: homelab
   minRawLength: 256
   rules:
@@ -73,39 +73,6 @@ hl_uf_breakers:
         type: auto
         length: 150
       timestampTimezone: utc
-      timestampEarliest: -420weeks
-      timestampLatest: +1week
-      maxEventBytes: 1048576
-      parserEnabled: false
-      shouldUseDataRaw: false
-      disabled: false
-    # Windows, as Splunk_TA_windows' props (LINE_BREAKER on <Event xmlns): one event per record, its
-    # own time from TimeCreated, so the backfill (start_from = oldest) keeps the real times
-    - name: Windows XML events, one per record
-      condition: "sourcetype=='XmlWinEventLog'"
-      type: regex
-      eventBreakerRegex: /[\r\n]+(?=<Event\sxmlns)/
-      timestampAnchorRegex: /SystemTime=['"]/
-      timestamp:
-        type: auto
-        length: 150
-      timestampTimezone: utc
-      timestampEarliest: -420weeks
-      timestampLatest: +1week
-      maxEventBytes: 1048576
-      parserEnabled: false
-      shouldUseDataRaw: false
-      disabled: false
-    # Perfmon tables (mode = multikv in the TA) carry no timestamp of their own
-    - name: Perfmon tables, one event per collection
-      condition: /^Perfmon/.test(sourcetype)
-      type: regex
-      eventBreakerRegex: /(?!)/
-      timestampAnchorRegex: /^/
-      timestamp:
-        type: current
-        length: 150
-      timestampTimezone: local
       timestampEarliest: -420weeks
       timestampLatest: +1week
       maxEventBytes: 1048576

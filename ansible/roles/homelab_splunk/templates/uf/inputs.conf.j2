@@ -13,7 +13,14 @@ sourcetype = {{ r.sourcetype }}
 {% if r.stanza.startswith('script://') or r.stanza.startswith('perfmon://') %}
 interval = {{ r.interval }}
 {% endif %}
+{% if r.stanza.startswith('perfmon://') %}
+# Through Cribl, multikv arrives as header-less rows, so one event per counter (Perfmon:<stanza>)
+mode = single
+{% endif %}
 {% if r.stanza.startswith('WinEventLog://') %}
+# Splunk_TA_windows sets these two at index time, which Cribl-delivered data skips (spec 14.7 c)
+sourcetype = {{ r.sourcetype }}
+source = {{ r.source }}
 renderXml = true
 start_from = oldest
 current_only = 0
