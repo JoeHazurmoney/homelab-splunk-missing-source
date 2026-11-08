@@ -12,14 +12,15 @@
 
 # "<lines> <epoch>": where splunkd.log ends and the host's clock, just before the (re)start
 - name: Note where splunkd.log ends
-  ansible.windows.win_shell: |
-    $f = '{{ hl_uf_win_home }}\var\log\splunk\splunkd.log'
-    $n = 0
-    if (Test-Path -LiteralPath $f) {
-      $fs = [IO.File]::Open($f, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]'ReadWrite, Delete')
-      try { $sr = New-Object IO.StreamReader($fs); while ($null -ne $sr.ReadLine()) { $n++ } } finally { $fs.Dispose() }
-    }
-    "$n $([DateTimeOffset]::UtcNow.ToUnixTimeSeconds())"
+  ansible.windows.win_shell:
+    cmd: |
+      $f = '{{ hl_uf_win_home | replace("'", "''") }}\var\log\splunk\splunkd.log'
+      $n = 0
+      if (Test-Path -LiteralPath $f) {
+        $fs = [IO.File]::Open($f, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]'ReadWrite, Delete')
+        try { $sr = New-Object IO.StreamReader($fs); while ($null -ne $sr.ReadLine()) { $n++ } } finally { $fs.Dispose() }
+      }
+      "$n $([DateTimeOffset]::UtcNow.ToUnixTimeSeconds())"
   register: hl_svcw_log_lines
   changed_when: false
   when: hl_service_action in ['start', 'restart']
@@ -48,7 +49,7 @@
 - name: Read the UF's status
   ansible.windows.win_shell:
     cmd: |
-      $home_ = '{{ hl_uf_win_home }}'
+      $home_ = '{{ hl_uf_win_home | replace("'", "''") }}'
       $log = "$home_\var\log\splunk\splunkd.log"
       $svc = Get-CimInstance Win32_Service -Filter "Name='{{ hl_uf_win_service }}'"
       $keys = @('HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*',
@@ -75,8 +76,9 @@
       "last_connect=$($c.Substring(0, [Math]::Min(23, $c.Length)))"
       "last_close=$($r.Substring(0, [Math]::Min(23, $r.Length)))"
       "apps=$(@(Get-ChildItem -LiteralPath "$home_\etc\apps" -Directory -ErrorAction SilentlyContinue | ForEach-Object Name) -join ' ')"
-      $f = 'off'
-      if ($svc -and $svc.ProcessId -gt 0) {
+      $f = 'unknown (not running)'
+      if ($svc -and $svc.State -eq 'Running' -and $svc.ProcessId -gt 0) {
+        $f = 'off'
         $mods = (Get-Process -Id $svc.ProcessId -ErrorAction SilentlyContinue).Modules
         $m = @($mods | Where-Object { $_.FileName -match '\\ossl-modules\\fips140-3\\fips\.dll$' })
         if ($m.Count -gt 0) { $f = 'on' }

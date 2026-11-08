@@ -24,7 +24,7 @@
         try { $st = [DateTimeOffset]::new((Get-Process -Id $svc.ProcessId).StartTime).ToUnixTimeSeconds() } catch { $st = 'unknown' }
       }
       "HL_STARTED=$st"
-      $log = '{{ hl_uf_win_home }}\var\log\splunk\splunkd.log'
+      $log = '{{ hl_uf_win_home | replace("'", "''") }}\var\log\splunk\splunkd.log'
       $from = {{ hl_uf_log_from | default(0) | int }}
       $conn = 'Connected to idx={{ hl_collector }}:{{ hl_s2s_port }}'
       $closeRe = '{{ hl_uf_close_re }}'
@@ -80,12 +80,13 @@
   when: hl_uf_conn.stdout is not search('HL_STARTED=[0-9]+')
 
 - name: Wait for this host's _internal in Splunk (through Cribl, from the running splunkd)
-  ansible.windows.win_shell: |
-    {{ hl_ps_prelude }}
-    $h = '{{ inventory_hostname | lower | regex_replace('[.].*$', '') }}'
-    $rows = Invoke-HlSearch ("| tstats count max(_time) as t where index=_internal (host=$h OR host=$h.*) earliest={{ hl_uf_seen_since }}")
-    $r = $rows | Select-Object -First 1
-    @{ count = [int]("0" + $r.count); since = {{ hl_uf_seen_since }}; latest = "$($r.t)" } | ConvertTo-Json -Compress
+  ansible.windows.win_shell:
+    cmd: |
+      {{ hl_ps_prelude }}
+      $h = '{{ inventory_hostname | lower | regex_replace('[.].*$', '') }}'
+      $rows = Invoke-HlSearch ("| tstats count max(_time) as t where index=_internal (host=$h OR host=$h.*) earliest={{ hl_uf_seen_since }}")
+      $r = $rows | Select-Object -First 1
+      @{ count = [int]("0" + $r.count); since = {{ hl_uf_seen_since }}; latest = "$($r.t)" } | ConvertTo-Json -Compress
   vars:
     hl_uf_started_at: "{{ hl_uf_conn.stdout | regex_search('HL_STARTED=([0-9]+)', '\\1') | first | int }}"
     hl_uf_now: "{{ hl_uf_conn.stdout | regex_search('HL_NOW=([0-9]+)', '\\1') | first | int }}"

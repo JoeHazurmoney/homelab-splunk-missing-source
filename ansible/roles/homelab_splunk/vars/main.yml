@@ -153,3 +153,49 @@ hl_uf_outputs_files: [app.conf, outputs.conf, limits.conf, web.conf]
 # The UF's CLI. The role runs it only as root, for boot-start (enable/disable), which needs root;
 # status, FIPS and the connection are read from systemd, /proc, the rpm and splunkd.log instead.
 hl_uf_cli: "{{ hl_uf_home }}/bin/splunk"
+
+# PowerShell for the Windows UF's group memberships and user rights (install, uninstall and its
+# contract). Every read error throws, so a check that can't read fails instead of passing
+# (task 5 review I1). Get-LocalGroupMember throws on a group that holds an orphaned SID
+# (PowerShell #2996), which is the case the uninstall contract exists for, so members are read
+# through ADSI (WinNT) and compared by SID.
+#   Get-HlGroupMemberSids <group SID>         -> the members' SIDs (strings; wrap the call in @())
+#   Remove-HlGroupMember <group SID> <SID>    -> removes it (the cmdlet, else ADSI by SID), then checks
+#   Get-HlUserRights <SID[]>                  -> the user rights (Se…) that name any of them (secedit; wrap in @())
+hl_win_acct_ps: |
+  function Get-HlGroupName {
+    param([string]$GroupSid)
+    return (New-Object Security.Principal.SecurityIdentifier($GroupSid)).Translate([Security.Principal.NTAccount]).Value.Split('\')[-1]
+  }
+  function Get-HlGroupMemberSids {
+    param([string]$GroupSid)
+    $grp = [ADSI]("WinNT://$env:COMPUTERNAME/$(Get-HlGroupName $GroupSid),group")
+    $out = @()
+    foreach ($m in @($grp.Invoke('Members'))) {
+      $b = $m.GetType().InvokeMember('objectSid', 'GetProperty', $null, $m, $null)
+      $out += (New-Object Security.Principal.SecurityIdentifier([byte[]]$b, 0)).Value
+    }
+    return $out
+  }
+  function Remove-HlGroupMember {
+    param([string]$GroupSid, [string]$MemberSid)
+    try { Remove-LocalGroupMember -SID $GroupSid -Member $MemberSid -ErrorAction Stop }
+    catch { ([ADSI]("WinNT://$env:COMPUTERNAME/$(Get-HlGroupName $GroupSid),group")).Remove("WinNT://$MemberSid") }
+    if (@(Get-HlGroupMemberSids $GroupSid) -contains $MemberSid) { throw "$MemberSid is still in $GroupSid after the removal" }
+  }
+  function Get-HlUserRights {
+    param([string[]]$Sids)
+    $tmp = Join-Path $env:TEMP ("hl_secedit_" + [guid]::NewGuid() + ".inf")
+    try {
+      $o = secedit /export /areas USER_RIGHTS /cfg $tmp | Out-String
+      if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $tmp)) { throw "secedit /export failed (exit $LASTEXITCODE): $($o.Trim())" }
+      $rights = @()
+      foreach ($line in (Get-Content -LiteralPath $tmp)) {
+        if ($line -match '^(Se\w+)\s*=\s*(.*)$') {
+          $name = $Matches[1]; $val = $Matches[2]
+          foreach ($s in $Sids) { if ($val -match ('(^|,)\*' + [regex]::Escape($s) + '(,|$)')) { $rights += $name } }
+        }
+      }
+      return @($rights | Sort-Object -Unique)
+    } finally { Remove-Item -LiteralPath $tmp -Force -ErrorAction SilentlyContinue }
+  }

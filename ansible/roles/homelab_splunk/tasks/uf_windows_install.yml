@@ -5,16 +5,20 @@
 # and seen in Splunk (every run) → the mgmt listener checked → marker (best effort). Needs the
 # elevated SSH session (administrators_authorized_keys, spec 5.1). The rules are uf_linux_install's
 # (task 4's final ones): records before the step that can fail, FIPS from the running splunkd.
+# PowerShell blocks use `cmd: |`: the free-form form is split like k=v arguments and fails on
+# unbalanced quotes, even in a comment (task 5). Jinja values in single-quoted PowerShell strings
+# double their single quotes.
 - name: Read the state file
   ansible.builtin.import_tasks: win_state_read.yml
 
 - name: Look for an installed UF (uninstall keys)
-  ansible.windows.win_shell: |
-    $keys = @('HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*',
-              'HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*')
-    $p = Get-ItemProperty $keys -ErrorAction SilentlyContinue | Where-Object { $_.DisplayName -like 'UniversalForwarder*' } | Select-Object -First 1
-    if ($p) { @{ installed = $true; version = [string]$p.DisplayVersion; product_code = [string]$p.PSChildName } | ConvertTo-Json -Compress }
-    else { @{ installed = $false } | ConvertTo-Json -Compress }
+  ansible.windows.win_shell:
+    cmd: |
+      $keys = @('HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*',
+                'HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*')
+      $p = Get-ItemProperty $keys -ErrorAction SilentlyContinue | Where-Object { $_.DisplayName -like 'UniversalForwarder*' } | Select-Object -First 1
+      if ($p) { @{ installed = $true; version = [string]$p.DisplayVersion; product_code = [string]$p.PSChildName } | ConvertTo-Json -Compress }
+      else { @{ installed = $false } | ConvertTo-Json -Compress }
   register: hl_ufw_msi
   changed_when: false
 
@@ -56,6 +60,18 @@
       register: hl_ufw_pkg_local
       failed_when: not hl_ufw_pkg_local.stat.exists or hl_ufw_pkg_local.stat.checksum != hl_uf_packages.windows.sha256
 
+    # The protected ACL first: then nobody but SYSTEM and Administrators can create stage\ or swap
+    # the MSI in it between the sha256 check and the install (task 5 review M1)
+    - name: Protect the role's folder
+      ansible.builtin.include_tasks: win_state_dir.yml
+      vars:
+        hl_win_dir: "{{ hl_win_state_dir }}"
+
+    - name: Remove a staging folder left from before
+      ansible.windows.win_file:
+        path: "{{ hl_win_state_dir }}\\stage"
+        state: absent
+
     - name: Create the staging folder
       ansible.windows.win_file:
         path: "{{ hl_win_state_dir }}\\stage"
@@ -73,18 +89,42 @@
       register: hl_ufw_pkg_remote
       failed_when: hl_ufw_pkg_remote.stat.checksum | lower != hl_uf_packages.windows.sha256
 
-    # No credentials on the command line (they'd land in the MSI log): user-seed.conf instead.
-    # One string, not a list: win_package quotes a list item with a space as a whole
-    # ("INSTALLDIR=C:\Program Files\…"), which msiexec doesn't parse, so it shows its "Command line
-    # options" dialog in the invisible SSH session and waits forever, with no log (task 5 check 1).
-    - name: Install the MSI (LAUNCHSPLUNK=0)
-      ansible.windows.win_package:
-        path: "{{ hl_win_state_dir }}\\stage\\{{ hl_uf_packages.windows.file }}"
-        arguments: >-
-          AGREETOLICENSE=Yes LAUNCHSPLUNK=0 SERVICESTARTTYPE=auto INSTALLDIR="{{ hl_uf_win_home }}"
-        log_path: "{{ hl_win_state_dir }}\\uf-msi-install.log"
-        creates_path: "{{ hl_uf_win_home }}\\bin\\splunkd.exe"
-        state: present
+    - name: Install the MSI, or fail within 15 min
+      block:
+        # No credentials on the command line (they'd land in the MSI log): user-seed.conf instead.
+        # One string, not a list: win_package quotes a list item with a space as a whole
+        # ("INSTALLDIR=C:\Program Files\…"), which msiexec doesn't parse, so it shows its "Command
+        # line options" dialog in the invisible SSH session and waits forever, with no log (task 5
+        # check 1). The async timeout turns any such hang into a failure (task 5 review M2).
+        - name: Install the MSI (LAUNCHSPLUNK=0)
+          ansible.windows.win_package:
+            path: "{{ hl_win_state_dir }}\\stage\\{{ hl_uf_packages.windows.file }}"
+            arguments: >-
+              AGREETOLICENSE=Yes LAUNCHSPLUNK=0 SERVICESTARTTYPE=auto INSTALLDIR="{{ hl_uf_win_home }}"
+            log_path: "{{ hl_win_state_dir }}\\uf-msi-install.log"
+            creates_path: "{{ hl_uf_win_home }}\\bin\\splunkd.exe"
+            state: present
+          async: 900
+          poll: 10
+
+      rescue:
+        - name: Stop an msiexec still running on the staged MSI
+          ansible.windows.win_shell:
+            cmd: |
+              $msi = '{{ (hl_win_state_dir ~ '\\stage\\' ~ hl_uf_packages.windows.file) | replace("'", "''") }}'
+              $p = @(Get-CimInstance Win32_Process -Filter "Name='msiexec.exe'" | Where-Object { $_.CommandLine -and $_.CommandLine.Contains($msi) })
+              foreach ($x in $p) { Stop-Process -Id $x.ProcessId -Force }
+              "HL_STOPPED=$($p.Count)"
+          register: hl_ufw_msi_kill
+          changed_when: hl_ufw_msi_kill.rc == 0 and hl_ufw_msi_kill.stdout is not search('HL_STOPPED=0')
+
+        - name: Fail with where to look
+          ansible.builtin.fail:
+            msg: >-
+              The MSI install failed or ran past 900 s ({{ ansible_failed_result.msg | default('no message') }}).
+              Look in {{ hl_win_state_dir }}\uf-msi-install.log (search for "Return value 3"). No log at all means
+              msiexec didn't start the install: it waits on a dialog in the SSH session, usually because it
+              couldn't parse its command line.
 
   always:
     - name: Remove the staging folder
@@ -93,14 +133,15 @@
         state: absent
 
 - name: Read the installed product code, the service SID and its account
-  ansible.windows.win_shell: |
-    $keys = @('HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*',
-              'HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*')
-    $p = Get-ItemProperty $keys -ErrorAction SilentlyContinue | Where-Object { $_.DisplayName -like 'UniversalForwarder*' } | Select-Object -First 1
-    $sid = ((sc.exe showsid {{ hl_uf_win_service }}) -match 'SERVICE SID' | ForEach-Object { ($_ -split ':\s*')[1].Trim() } | Select-Object -First 1)
-    $svc = Get-CimInstance Win32_Service -Filter "Name='{{ hl_uf_win_service }}'"
-    @{ product_code = [string]$p.PSChildName; version = [string]$p.DisplayVersion
-       service_sid = [string]$sid; account = [string]$svc.StartName } | ConvertTo-Json -Compress
+  ansible.windows.win_shell:
+    cmd: |
+      $keys = @('HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*',
+                'HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*')
+      $p = Get-ItemProperty $keys -ErrorAction SilentlyContinue | Where-Object { $_.DisplayName -like 'UniversalForwarder*' } | Select-Object -First 1
+      $sid = ((sc.exe showsid {{ hl_uf_win_service }}) -match 'SERVICE SID' | ForEach-Object { ($_ -split ':\s*')[1].Trim() } | Select-Object -First 1)
+      $svc = Get-CimInstance Win32_Service -Filter "Name='{{ hl_uf_win_service }}'"
+      @{ product_code = [string]$p.PSChildName; version = [string]$p.DisplayVersion
+         service_sid = [string]$sid; account = [string]$svc.StartName } | ConvertTo-Json -Compress
   register: hl_ufw_ids
   changed_when: false
   failed_when: >-
@@ -117,7 +158,7 @@
 - name: Write the state file
   ansible.builtin.include_tasks: win_state_write.yml
 
-# The groups below grant read access to the event logs and perfmon to this account only
+# The groups below give this account, and only it, read access to the event logs and perfmon
 - name: Check the service runs as the virtual account (check 2)
   ansible.builtin.assert:
     that: (hl_ufw_ids.stdout | from_json).account == hl_uf_win_account
@@ -137,16 +178,17 @@
     hl_ufw_fips_on: "{{ hl_ufw_fips.exists | default(false) and (hl_ufw_fips.value | default(0) | int) == 1 }}"
 
 - name: Turn on the UF's FIPS mode before its first start (only when Windows' FIPS policy is on)
-  ansible.windows.win_shell: |
-    $f = '{{ hl_uf_win_home }}\etc\splunk-launch.conf'
-    $text = if (Test-Path -LiteralPath $f) { [IO.File]::ReadAllText($f) } else { '' }
-    $added = @()
-    foreach ($l in 'SPLUNK_FIPS=1', 'SPLUNK_FIPS_VERSION=140-3') {
-      if ($text -notmatch ('(?m)^' + [regex]::Escape($l) + '\s*$')) { Add-Content -LiteralPath $f -Value $l; $added += $l }
-    }
-    "HL_ADDED=$($added -join ',')"
+  ansible.windows.win_shell:
+    cmd: |
+      $f = '{{ hl_uf_win_home | replace("'", "''") }}\etc\splunk-launch.conf'
+      $text = if (Test-Path -LiteralPath $f) { [IO.File]::ReadAllText($f) } else { '' }
+      $added = @()
+      foreach ($l in 'SPLUNK_FIPS=1', 'SPLUNK_FIPS_VERSION=140-3') {
+        if ($text -notmatch ('(?m)^' + [regex]::Escape($l) + '\s*$')) { Add-Content -LiteralPath $f -Value $l; $added += $l }
+      }
+      "HL_ADDED=$($added -join ',')"
   register: hl_ufw_fips_lines
-  changed_when: hl_ufw_fips_lines.stdout is search('HL_ADDED=\\S')
+  changed_when: hl_ufw_fips_lines.rc == 0 and hl_ufw_fips_lines.stdout is search('HL_ADDED=\\S')
   when: hl_ufw_fips_on | bool
 
 - name: Look for the UF's passwd file (user-seed.conf is read only when it is absent)
@@ -168,29 +210,38 @@
   ansible.builtin.import_tasks: uf_windows_outputs.yml
 
 # --- The virtual account's groups (spec 5.3: Event Log Readers; perfmon needs Performance Monitor Users) ---
+# Members read through ADSI, which survives an orphaned SID in the group (hl_win_acct_ps); each
+# addition is read back
 - name: Add the virtual account to its groups
-  ansible.windows.win_shell: |
-    $sid = '{{ (hl_ufw_ids.stdout | from_json).service_sid }}'
-    $added = @()
-    foreach ($g in @({{ hl_uf_win_groups | map(attribute='sid') | map('to_json') | join(', ') }})) {
-      $m = @(Get-LocalGroupMember -SID $g -ErrorAction Stop | Where-Object { $_.SID.Value -eq $sid })
-      if ($m.Count -eq 0) { Add-LocalGroupMember -SID $g -Member $sid -ErrorAction Stop; $added += $g }
-    }
-    @{ added = $added } | ConvertTo-Json -Compress
+  ansible.windows.win_shell:
+    cmd: |
+      $ErrorActionPreference = 'Stop'
+      {{ hl_win_acct_ps }}
+      $sid = '{{ (hl_ufw_ids.stdout | from_json).service_sid }}'
+      $added = @()
+      foreach ($g in @({{ hl_uf_win_groups | map(attribute='sid') | map('to_json') | join(', ') }})) {
+        if (@(Get-HlGroupMemberSids $g) -notcontains $sid) {
+          Add-LocalGroupMember -SID $g -Member $sid -ErrorAction Stop
+          if (@(Get-HlGroupMemberSids $g) -notcontains $sid) { throw "$sid is not in $g after the addition" }
+          $added += $g
+        }
+      }
+      @{ added = $added } | ConvertTo-Json -Compress
   register: hl_ufw_groups
-  changed_when: (hl_ufw_groups.stdout | from_json).added | length > 0
+  changed_when: hl_ufw_groups.rc == 0 and (hl_ufw_groups.stdout | from_json).added | length > 0
 
 # --- Start, then prove the path through Cribl ---
 # "<lines> <epoch>": where splunkd.log ends and the host's clock, just before the (re)start
 - name: Note where splunkd.log ends before the start
-  ansible.windows.win_shell: |
-    $f = '{{ hl_uf_win_home }}\var\log\splunk\splunkd.log'
-    $n = 0
-    if (Test-Path -LiteralPath $f) {
-      $fs = [IO.File]::Open($f, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]'ReadWrite, Delete')
-      try { $sr = New-Object IO.StreamReader($fs); while ($null -ne $sr.ReadLine()) { $n++ } } finally { $fs.Dispose() }
-    }
-    "$n $([DateTimeOffset]::UtcNow.ToUnixTimeSeconds())"
+  ansible.windows.win_shell:
+    cmd: |
+      $f = '{{ hl_uf_win_home | replace("'", "''") }}\var\log\splunk\splunkd.log'
+      $n = 0
+      if (Test-Path -LiteralPath $f) {
+        $fs = [IO.File]::Open($f, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]'ReadWrite, Delete')
+        try { $sr = New-Object IO.StreamReader($fs); while ($null -ne $sr.ReadLine()) { $n++ } } finally { $fs.Dispose() }
+      }
+      "$n $([DateTimeOffset]::UtcNow.ToUnixTimeSeconds())"
   register: hl_ufw_log_lines
   changed_when: false
 
@@ -212,13 +263,14 @@
 # Spec 4.1: 127.0.0.1:8089 on HOMEPC is Docker Desktop's publish of the Splunk container's REST.
 # The UF must never listen on 8089, and anything it has on its own port must be loopback only.
 - name: Check the UF's management listener (spec 4.1)
-  ansible.windows.win_shell: |
-    $svc = Get-CimInstance Win32_Service -Filter "Name='{{ hl_uf_win_service }}'"
-    $mine = @(Get-NetTCPConnection -State Listen -ErrorAction SilentlyContinue | Where-Object { $_.OwningProcess -eq $svc.ProcessId })
-    @{ pid = [int]$svc.ProcessId
-       uf_listeners = @($mine | ForEach-Object { "$($_.LocalAddress):$($_.LocalPort)" })
-       on_8089 = @(Get-NetTCPConnection -State Listen -LocalPort 8089 -ErrorAction SilentlyContinue |
-         ForEach-Object { "$($_.LocalAddress) $((Get-Process -Id $_.OwningProcess).Name)" }) } | ConvertTo-Json -Compress
+  ansible.windows.win_shell:
+    cmd: |
+      $svc = Get-CimInstance Win32_Service -Filter "Name='{{ hl_uf_win_service }}'"
+      $mine = @(Get-NetTCPConnection -State Listen -ErrorAction SilentlyContinue | Where-Object { $_.OwningProcess -eq $svc.ProcessId })
+      @{ pid = [int]$svc.ProcessId
+         uf_listeners = @($mine | ForEach-Object { "$($_.LocalAddress):$($_.LocalPort)" })
+         on_8089 = @(Get-NetTCPConnection -State Listen -LocalPort 8089 -ErrorAction SilentlyContinue |
+           ForEach-Object { "$($_.LocalAddress) $((Get-Process -Id $_.OwningProcess).Name)" }) } | ConvertTo-Json -Compress
   register: hl_ufw_mgmt
   changed_when: false
   failed_when: >-
@@ -237,7 +289,8 @@
       $svc = Get-CimInstance Win32_Service -Filter "Name='{{ hl_uf_win_service }}'"
       if (-not $svc -or $svc.ProcessId -eq 0) { 'HL_PID=none'; exit 0 }
       "HL_PID=$($svc.ProcessId)"
-      Select-String -LiteralPath '{{ hl_uf_win_home }}\etc\splunk-launch.conf' -Pattern '^SPLUNK_FIPS(_VERSION)?=' | ForEach-Object { $_.Line.Trim() }
+      $lc = '{{ hl_uf_win_home | replace("'", "''") }}\etc\splunk-launch.conf'
+      Select-String -LiteralPath $lc -Pattern '^SPLUNK_FIPS(_VERSION)?=' | ForEach-Object { $_.Line.Trim() }
       $m = @((Get-Process -Id $svc.ProcessId).Modules | Where-Object { $_.FileName -match '\\ossl-modules\\fips140-3\\fips\.dll$' })
       "HL_FIPS_MODULE=$(if ($m.Count -gt 0) { 'loaded' } else { 'absent' })"
   register: hl_ufw_fips_mode
