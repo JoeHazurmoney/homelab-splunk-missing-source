@@ -10,7 +10,7 @@ routes:
   - id: r_cribl_self
     name: cribl_self
     description: Cribl's own logs, metrics and audit log -> index cribl / cribl_metrics
-    filter: "__inputId.startsWith('cribl:') || __inputId.startsWith('cribl_metrics:') || __inputId.startsWith('file:in_cribl_audit')"
+    filter: "__inputId.startsWith('cribl:') || __inputId.startsWith('criblmetrics:') || __inputId.startsWith('file:in_cribl_audit')"
     pipeline: passthru
     output: out_splunk
     final: true

@@ -1,0 +1,5 @@
+c,entity_id,dh_action,dh_secs,reason,ticket,actor
+o1,sourcetype|enclave1|pi5|syslog|*,mute,14400,patching,CHG-1,taylor
+o2,host|*|e5|*|*,threshold,1800,noisy,,taylor
+o3,host|*|e5|*|*,unmute,,done,,taylor
+o4,sourcetype|linux|e6|syslog|*,clear,,back to normal,,taylor

@@ -16,6 +16,8 @@ the deployed app, so it needs only the standard library.
                                         stanza; every panel and input title of the four views has an
                                         entry in its section of dashboards.md, every entry there is
                                         a current title, and each panel's "Guide:" pointer resolves
+  negative <app_dir> <neg_dir>          each tests/spl/dash_neg/*.json breaks a view on purpose and
+                                        the check must reject it with the expected problem
 """
 import json
 import os
@@ -91,6 +93,26 @@ def input_tokens(definition):
     return {i["options"]["token"]: i for i in definition.get("inputs", {}).values()}
 
 
+def structures(layout):
+    """Every layout structure of a view: the single layout's, or each tab's (layoutDefinitions)."""
+    out = [layout.get("structure", [])]
+    out += [ld.get("structure", []) for ld in layout.get("layoutDefinitions", {}).values()]
+    return out
+
+
+def tokens_of(q):
+    return {t for t, _ in TOKEN.findall(q)}
+
+
+def gates(obj, conditions):
+    """The tokens an element's show conditions require to be set: isSet($tok$) in a showConditions
+    condition (all of them must hold for the element to show)."""
+    out = set()
+    for c in obj.get("containerOptions", {}).get("visibility", {}).get("showConditions", []):
+        out |= set(re.findall(r"isSet\(\$([A-Za-z0-9_]+)\$\)", conditions.get(c, {}).get("value", "")))
+    return out
+
+
 def split_args(s):
     """Macro arguments split on commas outside double quotes."""
     out, cur, q = [], "", False
@@ -128,15 +150,24 @@ def check(app_dir):
             p("not in the app nav")
         sources, vizs, inputs = d.get("dataSources", {}), d.get("visualizations", {}), d.get("inputs", {})
         layout = d.get("layout", {})
-        placed = [s["item"] for s in layout.get("structure", [])]
+        items = [s for st in structures(layout) for s in st]
+        placed = [s["item"] for s in items if s.get("type", "block") == "block"]
+        on_canvas = [s["item"] for s in items if s.get("type") == "input"]
         for v in vizs:
-            if v not in placed:
-                p(f"visualization {v} is not in the layout")
+            if placed.count(v) != 1:
+                p(f"visualization {v} must be in the layout exactly once")
         for item in placed:
             if item not in vizs:
                 p(f"layout item {item} is not a visualization")
-        if sorted(layout.get("globalInputs", [])) != sorted(inputs):
-            p("globalInputs must list every input exactly once")
+        global_inputs = layout.get("globalInputs", [])
+        if sorted(global_inputs + on_canvas) != sorted(inputs):
+            p("every input must be placed exactly once, in globalInputs or in one layout structure")
+        conditions = d.get("expressions", {}).get("conditions", {})
+        for k, obj in list(vizs.items()) + list(inputs.items()):
+            vis = obj.get("containerOptions", {}).get("visibility", {})
+            for c in vis.get("showConditions", []) + vis.get("hideConditions", []):
+                if c not in conditions:
+                    p(f"{k} uses missing condition {c}")
         for k, ds in sources.items():
             if ds["type"] == "ds.chain" and ds["options"].get("extend") not in sources:
                 p(f"{k} extends a missing data source")
@@ -164,9 +195,6 @@ def check(app_dir):
                 if t not in toks:
                     p(f"{k} uses token ${t}$, which no input sets")
                     continue
-                opts = toks[t]["options"]
-                if "defaultValue" not in opts and not opts.get("selectFirstSearchResult") and not submit:
-                    p(f"{k}: token {t} has no default (allowed only behind a submit button)")
             for m, args in MACRO.findall(q):
                 n = 0 if not args else len(split_args(args))
                 if n not in known.get(m, set()):
@@ -189,14 +217,62 @@ def check(app_dir):
                     p(f"{k}: its base search must use the window {allowed[1]}")
                 if RAW.search(q.lstrip()[len(head):]):
                     p(f"{k} reads more raw data after its base search")
+        # A token without a default leaves its searches waiting, and Studio then shows "Set token value
+        # to render visualization". Behind a submit button (global inputs) that is the expected idle
+        # state; on the canvas every element that shows such a search must be hidden until the token
+        # is set (a show condition with isSet($tok$)), so an untouched page shows no waiting messages.
+        no_default = {t for t, i in toks.items() if "defaultValue" not in i["options"] and not i["options"].get("selectFirstSearchResult")}
+        for k, obj in list(vizs.items()) + list(inputs.items()):
+            for ref in obj.get("dataSources", {}).values():
+                if ref not in sources or submit:
+                    continue
+                missing = (tokens_of(resolve(ref, sources)) & no_default) - gates(obj, conditions)
+                if missing:
+                    p(f"{k} shows {ref}, which waits for {', '.join(sorted(missing))}: hide it until set (showConditions with isSet)")
         if writes:
-            if not submit or layout["options"].get("submitOnDashboardLoad") is not False:
-                p("writes need submitButton=true and submitOnDashboardLoad=false (spec §7.8)")
+            if layout.get("options", {}).get("submitOnDashboardLoad") is True:
+                p("a dashboard that writes must not submit on load (spec §7.8)")
             if '"refresh"' in refresh:
                 p("a dashboard that writes must not auto-refresh (spec §7.8)")
             for t, i in toks.items():
                 if t.endswith("_confirm") and ("defaultValue" in i["options"] or i["options"].get("selectFirstSearchResult")):
                     p(f"confirmation {t} must have no default")
+            # Writes on global inputs need the Submit button. On the canvas (Studio applies a canvas
+            # input at once, Submit or not) each write is its own two-step form (spec §7.8, task 12e):
+            # its confirmation is a dropdown with no default whose only choices come from a chain of the
+            # very plan the write runs, and it resets whenever an input of that plan changes; and no
+            # token is shared by two writes, so one change can never write two forms.
+            seen = {}
+            for k in writes:
+                q = sources[k]["options"]["query"]
+                confirms = [t for t in tokens_of(q) if t.endswith("_confirm")]
+                if len(confirms) != 1:
+                    p(f"{k} must use exactly one confirmation token")
+                    continue
+                c = confirms[0]
+                ci = toks.get(c)
+                if ci is None:
+                    continue
+                cid = next(i for i, v in inputs.items() if v is ci)
+                if cid in global_inputs:
+                    if not submit:
+                        p(f"{k}: a write on global inputs needs submitButton=true (spec §7.8)")
+                    continue
+                base = sources.get(ci.get("dataSources", {}).get("primary", ""), {})
+                plan = base.get("options", {}).get("extend")
+                if ci["type"] != "input.dropdown" or base.get("type") != "ds.chain" or plan not in sources:
+                    p(f"{k}: confirmation {c} must be a dropdown fed by a chain of the write's plan")
+                    continue
+                if not q.startswith(sources[plan]["options"]["query"] + " "):
+                    p(f"{k} must run its plan {plan} unchanged before the write (the confirmation fits only that plan)")
+                if not ci["options"].get("isCascadingInput"):
+                    p(f"confirmation {c} must reset when its form changes (options.isCascadingInput)")
+                if ci.get("context", {}).get("statics"):
+                    p(f"confirmation {c} must have no static items (its only choice is the plan's Apply line)")
+                for t in tokens_of(q):
+                    if t in seen and seen[t] != k:
+                        p(f"{k} and {seen[t]} share token {t}: one change could write two forms")
+                    seen[t] = k
         want_refresh = name == "dh_overview"
         has_refresh = d.get("defaults", {}).get("dataSources", {}).get("ds.search", {}).get("options", {}).get("refresh") == "60s"
         if want_refresh != has_refresh:
@@ -245,11 +321,23 @@ def queries(app_dir, view, pairs, chains=False):
     return 0
 
 
-# dashboards.md: "## <view label>" sections; in each, an entry is a "### <title>" heading or the
-# first cell of a row in a table whose first header cell is "Tile" or "Input". These headings group
-# entries and are not panels themselves.
-GROUP_HEADINGS = {"KPI tiles", "Filters", "Inputs"}
-GUIDE = re.compile(r"Guide: docs/data-health/dashboards\.md, ([^>]+?) > (.+)$")
+# dashboards.md: "## <view label>" sections; in each, an entry is a "### <title>" or "#### <title>"
+# heading or the first cell of a row in a table whose first header cell is "Tile" or "Input". These
+# headings group entries (Manage's tabs and recipes among them) and are not panels themselves.
+GROUP_HEADINGS = {
+    "KPI tiles", "Filters", "Inputs", "Before you start", "Item IDs",
+    "Mute & thresholds tab", "Expected list tab", "Test blocks (admin) tab", "Admin log tab",
+    "Recipe: Mute a host for maintenance", "Recipe: Silence one noisy sourcetype",
+    "Recipe: Change how long an item may stay silent", "Recipe: Add an expected row",
+    "Recipe: Adopt something unregistered", "Recipe: Run a test block", "Recipe: Find who muted something",
+}
+# Each panel's description ends with its guide pointer (task 12e: worded so that a reader in Splunk
+# sees that the guide is a file in the project repository).
+GUIDE = re.compile(r"Guide \(project repo\): docs/data-health/dashboards\.md > ([^>]+?) > (.+)$")
+
+
+def is_group(t):
+    return t in GROUP_HEADINGS
 
 
 def doc_sections(text):
@@ -262,8 +350,8 @@ def doc_sections(text):
             table_kind = None
         elif cur is None:
             continue
-        elif line.startswith("### "):
-            out[cur]["headings"].append(line[4:].strip())
+        elif line.startswith("### ") or line.startswith("#### "):
+            out[cur]["headings"].append(line.split(" ", 1)[1].strip())
             table_kind = None
         elif line.startswith("|"):
             cells = [c.strip() for c in line.strip().strip("|").split("|")]
@@ -304,8 +392,8 @@ def docs(app_dir, docs_dir):
             if t not in documented:
                 problems.append(f"dashboards.md, {label}: no entry for '{t}'")
         for t in sec["headings"]:
-            if t not in panels and t not in inputs and t not in GROUP_HEADINGS:
-                problems.append(f"dashboards.md, {label}: '### {t}' is not a panel or input of {name}")
+            if t not in panels and t not in inputs and not is_group(t):
+                problems.append(f"dashboards.md, {label}: heading '{t}' is not a panel or input of {name}")
         for t in sec["rows"]:
             if t not in panels and t not in inputs:
                 problems.append(f"dashboards.md, {label}: table entry '{t}' is not a panel or input of {name}")
@@ -314,7 +402,7 @@ def docs(app_dir, docs_dir):
                 continue
             g = GUIDE.search(v.get("description", ""))
             if not g:
-                problems.append(f"{name}.{k}: its description has no 'Guide: docs/data-health/dashboards.md, <view> > <entry>' at its end")
+                problems.append(f"{name}.{k}: its description has no 'Guide (project repo): docs/data-health/dashboards.md > <view> > <entry>' at its end")
             elif g.group(1) != label or g.group(2) not in set(sec["headings"]):
                 problems.append(f"{name}.{k}: its guide pointer '{g.group(1)} > {g.group(2)}' is not a heading of '## {label}'")
     for msg in problems:
@@ -322,10 +410,49 @@ def docs(app_dir, docs_dir):
     return 1 if problems else 0
 
 
+def negative(app_dir, neg_dir):
+    """The static rules reject what they should: each neg_dir/*.json breaks one view on purpose
+    ({"view": ..., "pattern": regex, "repl": replacement, "expect": text of the problem}); the check
+    of an app copy with that view must fail with the expected problem."""
+    import contextlib
+    import io
+    import shutil
+    import tempfile
+    bad = 0
+    for f in sorted(os.listdir(neg_dir)):
+        if not f.endswith(".json"):
+            continue
+        spec = json.load(open(os.path.join(neg_dir, f), encoding="utf-8"))
+        tmp = tempfile.mkdtemp(prefix="dhneg_")
+        try:
+            shutil.copytree(os.path.join(app_dir, "default"), os.path.join(tmp, "default"))
+            path = views(tmp)[spec["view"]]
+            text = open(path, encoding="utf-8").read()
+            broken, n = re.subn(spec["pattern"], spec["repl"], text, count=1)
+            if n != 1:
+                print(f"FAIL {f}: pattern not found in {spec['view']}")
+                bad = 1
+                continue
+            open(path, "w", encoding="utf-8").write(broken)
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out):
+                rc = check(tmp)
+            if rc == 1 and spec["expect"] in out.getvalue():
+                print(f"PASS {f}: rejected ({spec['expect']})")
+            else:
+                print(f"FAIL {f}: not rejected with '{spec['expect']}'; check said: {out.getvalue().strip()[:300]}")
+                bad = 1
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+    return bad
+
+
 if __name__ == "__main__":
     mode, app = sys.argv[1], sys.argv[2]
     if mode == "docs":
         sys.exit(docs(app, sys.argv[3]))
+    if mode == "negative":
+        sys.exit(negative(app, sys.argv[3]))
     if mode == "check":
         sys.exit(check(app))
     sys.exit(queries(app, sys.argv[3], sys.argv[4:], chains=(mode == "chains")))

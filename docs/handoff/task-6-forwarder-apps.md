@@ -3,10 +3,17 @@
 Issue #7 · branch `feat/6-forwarder-apps`, **stacked on `feat/5-uf-windows`** · drafted in a cloud
 session on 2026-11-01 with no access to the hosts.
 
-**State:** written; yamllint and ansible-lint (production) clean. Every host's `inputs.conf` was rendered from the real
-inventory (pi5 alone gets `probe.log`; wd2l-recv gets 4 file monitors + 16 TA_nix stanzas; HOMEPC
-gets 7 event-log channels + 2 perfmon stanzas). **Nothing has run on a host, and the TA packages'
-sha256 are not pinned yet.**
+**State:** **ran live on all four UFs on 2026-11-08; checks 1–10 are in spec §14.14.** The Linux hosts ran from
+pi5; HOMEPC's `apps` runs were done by the controller on Taylor's direct approval, in stages (Hyper-V and
+Perfmon, then PowerShell, then the big channels). End state: every §4 row with data to send arrives
+(`probe.log` waits for task 8), and `verify` is green on all four. Steady licence use is ≈ 529 MB/day; the Windows
+backfill was a one-time ≈ 111 MB. **What the live run changed from the table below:** the TA packages are `.spl` and
+pinned (`hl_tas`); the breakers were rebuilt from the TAs' `props.conf`; the Windows stanzas set `source` and
+`sourcetype`, which Cribl-delivered data would otherwise lose; Perfmon is `PerfmonMk:*`, so check 6's
+`Perfmon:*` finds nothing; check 3's SPL needs `rex max_match=0 "(?<l>\n)"`, because `split(_raw,"\n")` returns 1;
+check 10's mark is the real 10 GB/day, not 500 MB.
+
+**The body below describes the draft and is superseded by spec §14.14 where they differ.**
 
 ## What the branch adds
 
@@ -46,7 +53,7 @@ ansible-playbook site.yml --tags apps --limit wd2l-recv     # expect changed=0
 # then wd2l-logsrv, pi5, homepc
 ```
 
-## Checks (record in spec §14.12 "Task 6 checks")
+## Checks (recorded in spec §14.14 "Task 6 checks")
 
 | # | Check | How | Pass | If it fails |
 |---|---|---|---|---|
@@ -63,6 +70,6 @@ ansible-playbook site.yml --tags apps --limit wd2l-recv     # expect changed=0
 
 ## Then
 
-- Spec: §14.12; §13's "Index-time parsing moved to Cribl" risk, with the breaker as the fix.
+- Spec: §14.14; §13's "Index-time parsing moved to Cribl" risk, with the breaker as the fix.
 - `docs/data-health/*.md`: no macro or panel changed.
 - PR: `feat(apps): forwarder apps, TA inputs, toggles and Cribl event breakers (task 6)`, `Closes #7`.

@@ -4,21 +4,17 @@ Issue #8 · branch `feat/7-audit-rules`, **stacked on `feat/6-forwarder-apps`** 
 except the shared state helpers, so it can be verified any time after task 4) · drafted in a cloud
 session on 2026-11-01.
 
-**State:** written; yamllint and ansible-lint clean. The rule-building script was run here against fake `30-stig.rules`/`31-privileged.rules` files: `-D/-b/-f/-e` are filtered out, the privileged rules are
-generated and de-duplicated, and `b32` is dropped when `hl_audit_arches` has no `b32`. **Not run on a
-host.**
+**State:** ran live on wd2l-recv, wd2l-logsrv and pi5 on 2026-11-08 (task 7, issue #8); the results are in spec §14.15, which supersedes the body below wherever the two differ. As written, the draft could not work: the `-k` counts, the `##` generator match and pi5's syscall names were all wrong (see the controller's rulings R1 to R3 in spec §14.15).
 
 ## What the branch adds
 
 | Path | What |
 |---|---|
-| `defaults/main.yml` | source paths, `hl_stig_rules_file: /etc/audit/rules.d/50-hl-stig.rules`, `hl_audit_immutable: false` (argument spec allows only false) |
+| `defaults/main.yml` | source paths, `hl_stig_rules_file: /etc/audit/rules.d/zz-hl-zz-stig.rules`, `hl_audit_immutable: false` (argument spec allows only false) |
 | `tasks/audit_rules.yml` | baseline `auditctl -l` (first run only) → build: 30-stig.rules without `-D/-b/-f/-e` and comments, + the output of the `## find …`/`## filecap …` commands from 31-privileged.rules (sorted, de-duplicated) → write → `augenrules --load` on change → check wd2l's rule count is unchanged and `enabled` isn't 2 → **rescue: remove the file, reload, fail** |
 | `tasks/audit_rules_remove.yml` | delete → reload → `auditctl -l` equals the baseline (the UF's own `hl-*` tamper rules left out of the comparison) and wd2l's rules still loaded |
 
-**Why the rollback:** `50-hl-stig.rules` sorts **before** `wd2l.rules`. augenrules stops at a failing
-file, so a rejected line would drop wd2l's rules (spec §5.3 `uninstall` describes the same trap). The
-rescue puts the host back the way it was.
+**Why the rollback:** `zz-hl-zz-stig.rules` sorts **last** (spec §5.3 says why it must, and why not `zzz-`). A rejected STIG line stops augenrules after wd2l's and the tamper rules are loaded, so it costs only the STIG rules; the rescue removes the file and reloads, and also covers a wrong order or count after the load.
 
 ## Before running
 
@@ -35,11 +31,11 @@ ansible-playbook site.yml --tags audit_rules --limit wd2l-recv -v
 ansible-playbook site.yml --tags audit_rules --limit wd2l-recv     # expect changed=0
 ```
 
-## Checks (record in spec §14.13 "Task 7 checks")
+## Checks (record in spec §14.15 "Task 7 checks")
 
 | # | Check | How | Pass | If it fails |
 |---|---|---|---|---|
-| 1 | Rules loaded | the play prints `HL_RULES`, `HL_PRIV`, wd2l's count; `sudo auditctl -l \| wc -l` | about 66 STIG rules (33 b32 + 33 b64, spec §5.3) plus the privileged ones; wd2l unchanged | the play rolled back: run `sudo auditctl -R /tmp/copy-of-50-hl-stig.rules` on a copy to find the rejected line |
+| 1 | Rules loaded | the play prints `HL_RULES`, `HL_PRIV`, wd2l's count; `sudo auditctl -l \| wc -l` | 52 STIG rules (26 b32 + 26 b64, spec §5.3) plus the privileged ones; wd2l unchanged | the play rolled back: run `sudo auditctl -R /tmp/copy-of-zz-hl-zz-stig.rules` on a copy to find the rejected line |
 | 2 | Not immutable | `sudo auditctl -s` | `enabled 1` | — |
 | 3 | Idempotence | second run | `changed=0` (the build is sorted; a package update that adds a setuid binary changes it, as it should) | — |
 | 4 | Volume (§13 risk) | after an hour: `index=linux sourcetype=linux_audit earliest=-1h \| stats count by host` and the licence by `idx=linux` | acceptable (record it) | drop the noisiest keys with `hl_input_overrides`, or exclude rules by key in the build |
@@ -52,5 +48,5 @@ Then wd2l-logsrv and pi5.
 
 ## Then
 
-- Spec: §14.13; §12 row 6 (whether `service auditd stop` works and emits `SERVICE_STOP`).
+- Spec: §14.15; §12 row 6 (whether `service auditd stop` works and emits `SERVICE_STOP`).
 - PR: `feat(audit): STIG audit rules with rollback and exact removal (task 7)`, `Closes #8`.

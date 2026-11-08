@@ -50,6 +50,14 @@ argument_specs:
         type: int
         default: 180
         description: Seconds to wait for the UF to connect to Cribl and for its _internal in Splunk.
+      hl_uninstall_without_baseline:
+        type: bool
+        default: false
+        description: Let uninstall check its contract without the install baselines (missing although an install is recorded).
+      hl_uninstall_accept_new_units:
+        type: bool
+        default: false
+        description: Let the uninstall contract pass when unit files appeared while the UF was installed (still listed), e.g. from an unrelated package.
       hl_s2s_port:
         type: int
         default: 9997
@@ -133,8 +141,8 @@ argument_specs:
       hl_server_restart_confs:
         type: list
         elements: str
-        default: [indexes.conf, inputs.conf, props.conf]
-        description: Changing or removing one of these files restarts splunkd; other changes are reloaded.
+        default: [indexes.conf, inputs.conf, props.conf, web.conf]
+        description: Changing or removing one of these files restarts splunkd (web.conf has no REST reload); other changes are reloaded.
       hl_server_force_restart:
         type: bool
         default: false
@@ -232,8 +240,8 @@ argument_specs:
         description: After a Cribl change, send one syslog line per device port and wait for it in Splunk.
       hl_cribl_hold_on_splunk_restart:
         type: bool
-        default: false
-        description: Pause the Cribl container while the server tag restarts splunkd.
+        default: true
+        description: Pause the Cribl container while the server tag restarts splunkd, until splunktcp accepts connections.
       hl_block_key:
         type: str
         default: ""
@@ -330,8 +338,13 @@ argument_specs:
         description: The file whose comments hold the commands that generate the privileged-command rules.
       hl_stig_rules_file:
         type: str
-        default: /etc/audit/rules.d/50-hl-stig.rules
-        description: Where the role writes the STIG rules.
+        default: /etc/audit/rules.d/zz-hl-zz-stig.rules
+        description: Where the role writes the STIG rules. Must sort last under `ls -1v`, after zz-hl-uf-tamper.rules.
+      hl_stig_key_re:
+        type: str
+        default: "(-F key=|-k )(system-locale|identity|time-change|session|perm_mod|logins|\
+          maybe-escalation|actions|access|export|delete|MAC-policy|privileged)$"
+        description: ERE for the STIG rules in `auditctl -l`; uninstall's compare ignores them and audit_rules counts them.
       hl_audit_immutable:
         type: bool
         default: false
@@ -465,6 +478,11 @@ argument_specs:
         type: str
         no_log: true
         description: S2S token for 9997 (splunktcptoken hl_cribl on Splunk; the UFs and Cribl present it).
+      vault_hl_s2s_token_previous:
+        type: str
+        default: ""
+        no_log: true
+        description: The old S2S token during a rotation (spec 13); Splunk and Cribl accept both while set. Empty otherwise.
       vault_hl_cribl_admin_password:
         type: str
         no_log: true

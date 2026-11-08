@@ -1,6 +1,6 @@
-| inputlookup @req@ | `dh_ui_block_plan(@blk@, @NOW@)` | eval has_token=if(isnotnull(dh_token), 1, 0), g="plan"
-| append [| inputlookup @q1@ | `dh_ui_block_plan(@blk@, @NOW@)` | eval dh_confirm=dh_token | `dh_ui_block_rows(@blk@, @NOW@)` | eval g="add"]
-| append [| inputlookup @q2@ | `dh_ui_block_plan(@blk@, @NOW@)` | eval dh_confirm=dh_token | `dh_ui_block_rows(@blk@, @NOW@)` | eval g="remove"]
-| append [| inputlookup @q2@ | `dh_ui_block_plan(@blk2@, @NOW@)` | eval dh_confirm=dh_token | `dh_ui_block_rows(@blk2@, @NOW@)` | eval g="last"]
-| append [| inputlookup @q1@ | `dh_ui_block_plan(@blk@, @NOW@)` | eval dh_confirm="nope" | `dh_ui_block_rows(@blk@, @NOW@)` | eval g="unconfirmed"]
+| inputlookup @req@ | `dh_ui_block_plan(@blk@, @log@, @NOW@)` | eval has_token=if(isnotnull(dh_token), 1, 0), g="plan"
+| append [| inputlookup @q1@ | `dh_ui_block_plan(@blk@, @log@, @NOW@)` | eval dh_confirm=dh_token | `dh_ui_block_rows(@blk@, @NOW@)` | eval g="add"]
+| append [| inputlookup @q2@ | `dh_ui_block_plan(@blk@, @log@, @NOW@)` | eval dh_confirm=dh_token | `dh_ui_block_rows(@blk@, @NOW@)` | eval g="remove"]
+| append [| inputlookup @q2@ | `dh_ui_block_plan(@blk2@, @log@, @NOW@)` | eval dh_confirm=dh_token | `dh_ui_block_rows(@blk2@, @NOW@)` | eval g="last"]
+| append [| inputlookup @q1@ | `dh_ui_block_plan(@blk@, @log@, @NOW@)` | eval dh_confirm="nope" | `dh_ui_block_rows(@blk@, @NOW@)` | eval g="unconfirmed"]
 | eval g=g.":".coalesce(c, "file")

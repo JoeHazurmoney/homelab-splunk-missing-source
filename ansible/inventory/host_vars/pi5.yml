@@ -2,3 +2,6 @@
 # firewalld bindings that the Ansible venv lacks.
 ansible_connection: local
 ansible_python_interpreter: /usr/bin/python3
+# pi5 runs wd2l's sender and receiver on one box; /var/log/wd2l/audit-*.jsonl is the receiver's
+# trail (component "receiver"), so wd2l:audit. The sender's is in /var/log/wd2l/sender/, not this glob.
+hl_wd2l_audit_sourcetype: "wd2l:audit"

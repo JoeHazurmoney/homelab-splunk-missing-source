@@ -1,2 +1,2 @@
-| inputlookup @req@ | `dh_ui_expected_plan(@exp@, @NOW@)` | eval has_token=if(isnotnull(dh_token), 1, 0)
-| append [| inputlookup @pick@ | `dh_ui_adopt_row(@baseline@, @fwd@)` | eval criticality=2, reason="adopt", actor="taylor", actor_roles="admin" | `dh_ui_expected_plan(@exp@, @NOW@)` | eval has_token=if(isnotnull(dh_token), 1, 0), c="adopt"]
+| inputlookup @req@ | `dh_ui_expected_plan(@exp@, @log@, @NOW@)` | eval has_token=if(isnotnull(dh_token), 1, 0)
+| append [| inputlookup @pick@ | `dh_ui_adopt_row(@baseline@, @fwd@)` | eval criticality=2, reason="adopt", actor="taylor", actor_roles="admin" | `dh_ui_expected_plan(@exp@, @log@, @NOW@)` | eval has_token=if(isnotnull(dh_token), 1, 0), c="adopt"]

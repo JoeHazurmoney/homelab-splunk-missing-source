@@ -1,8 +1,8 @@
-c,pos,entity,status,age_vs_threshold,origin,label,volume,fact,value,time,event_id,meaning
-children,1,host (liveness: heartbeat),OK,20 s / 90 s,default,,median below 100,,,,,
-children,2,linux / syslog,LATE,400 s / 300 s,learned,,x0.1 of median FLAGGED,,,,,
-children,3,linux / linux_secure,MUTED,100 s / 86400 s,default (learning),muted until 2033-05-18 04:33 (patching),,,,,,
-children,4,linux / df / df,NEVER_SEEN,never arrived / 660 s,default,test block until 04:03,,,,,,
+c,pos,ui_item,status,age_vs_threshold,origin,label,volume,fact,value,time,event_id,meaning
+children,1,host (liveness: heartbeat),OK,20 s / 90 s,Profile default,,median below 100,,,,,
+children,2,linux / syslog,LATE,400 s / 300 s,Learned from its history,,x0.1 of median FLAGGED,,,,,
+children,3,linux / linux_secure,MUTED,100 s / 86400 s,Profile default (learning),muted until 2033-05-18 04:33 GMT (patching),,,,,,
+children,4,linux / df / df,NEVER_SEEN,never arrived / 660 s,Profile default,test block until 04:03 GMT,,,,,,
 fwd,,,,,,,,Agent version,10.6.0.0 (expected 10.6.1.1),,,
 fwd,,,,,,,,Operating system,Linux,,,
 fwd,,,,,,,,Agent type,uf,,,

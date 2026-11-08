@@ -1,29 +1,47 @@
-# Cribl event breakers for UF data (spec §13, §11 row 6). Splunk applies no index-time rule to
-# what Cribl delivers (spike §14.7 c), so Cribl, not Splunk, now breaks and timestamps UF data,
-# and Splunk_TA_nix's props.conf on the indexer no longer apply. This ruleset reproduces them:
-# - the TA_nix scripted inputs (tables such as ps, top, df): one event per script run, stamped with
-#   the current time (TA_nix: LINE_BREAKER = ^((?!))$, DATETIME_CONFIG = CURRENT). The run ends when the
-#   channel goes quiet (in_splunk_tcp staleChannelFlushMs) or at maxEventBytes;
+# Cribl event breakers for UF data (spec 13, 11 row 6). Splunk applies no index-time rule to what
+# Cribl delivers (spike 14.7 c), so Cribl, not Splunk, now breaks and timestamps UF data and the TAs'
+# props.conf on the indexer no longer apply. This ruleset reproduces them (task 6 checks 3-5):
+# - TA_nix tables (ps, top, df, ...): one event per script run, stamped with the current time (TA_nix:
+#   LINE_BREAKER that never fires, or only on blank lines, and DATETIME_CONFIG = CURRENT);
+# - cpu: one event per sample, each starting at its "Datetime" header (TA_nix cpu);
 # - linux_audit: one event per record, time from msg=audit(<epoch>);
-# - everything else: Cribl's default (one event per line, timestamp found automatically).
-# Task 6 checks it against the TA's props.conf (docs/handoff/task-6-forwarder-apps.md, check 3).
+# - wd2l's audit trails: one JSON record per line, time from "ts", which is too deep for Cribl's scan;
+# - no Windows rule: the UF frames event log records and Perfmon tables itself and sends their time,
+#   and Cribl's default keeps both (task 6: 1,546 XML events whole, _time within 1 ms of TimeCreated);
+# - everything else, Unix:Service and the other line-per-record scripts included: Cribl's default
+#   (one event per line, timestamp found automatically), as Splunk's defaults for those.
 # Managed by the homelab_splunk role (`cribl` tag).
 hl_uf_breakers:
   lib: custom
-  description: Homelab UF data - TA_nix tables as one event per run, auditd per record
+  description: Homelab UF data - TA_nix tables and cpu samples, auditd per record, wd2l audit
   tags: homelab
   minRawLength: 256
   rules:
     - name: TA_nix scripted output, one event per run
       condition: >-
-        ['cpu','ps','top','vmstat','interfaces','netstat','df','openPorts','lastlog','package','Unix:Service',
-        'Linux:SELinuxConfig','Unix:SSHDConfig','Unix:UserAccounts','Unix:Uptime','Unix:Version'].includes(sourcetype)
+        ['ps','top','vmstat','interfaces','netstat','df','openPorts','lastlog','package'].includes(sourcetype)
       type: regex
       # Never matches: nothing inside one run's output breaks it
       eventBreakerRegex: /(?!)/
       timestampAnchorRegex: /^/
       timestamp:
         type: current
+        length: 150
+      timestampTimezone: local
+      timestampEarliest: -420weeks
+      timestampLatest: +1week
+      maxEventBytes: 1048576
+      parserEnabled: false
+      shouldUseDataRaw: false
+      disabled: false
+    - name: TA_nix cpu, one event per sample
+      condition: "sourcetype=='cpu'"
+      type: regex
+      eventBreakerRegex: /[\r\n]+(?=Datetime\s+)/
+      timestampAnchorRegex: /\n/
+      timestamp:
+        type: format
+        format: "%m/%d/%y_%H:%M:%S_%Z"
         length: 150
       timestampTimezone: local
       timestampEarliest: -420weeks
@@ -44,6 +62,21 @@ hl_uf_breakers:
       timestampEarliest: -420weeks
       timestampLatest: +1week
       maxEventBytes: 51200
+      parserEnabled: false
+      shouldUseDataRaw: false
+      disabled: false
+    - name: wd2l audit trails, one record per line
+      condition: /^wd2l:/.test(sourcetype)
+      type: regex
+      eventBreakerRegex: /[\r\n]+/
+      timestampAnchorRegex: /"ts":"/
+      timestamp:
+        type: auto
+        length: 150
+      timestampTimezone: utc
+      timestampEarliest: -420weeks
+      timestampLatest: +1week
+      maxEventBytes: 1048576
       parserEnabled: false
       shouldUseDataRaw: false
       disabled: false

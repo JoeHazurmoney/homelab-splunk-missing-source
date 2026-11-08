@@ -3,6 +3,9 @@
 # --- Where forwarders send (spec 5.2, 5.5): Cribl on HOMEPC. uf_windows overrides it with 127.0.0.1. ---
 hl_collector: 192.168.1.27
 hl_s2s_port: 9997
+# The old S2S token during a rotation (spec 13): set in the vault for expand and migrate, removed
+# for contract. Splunk and Cribl then accept both tokens; empty renders exactly a normal run's files.
+vault_hl_s2s_token_previous: ""
 
 # --- The Universal Forwarder (spec 5.3 install/uninstall, 14.3 packages) ---
 hl_uf_version: 10.6.1.1
@@ -33,6 +36,12 @@ hl_linux_state_dir: /var/lib/hl_splunk
 hl_uf_linux_packages: [sysstat]
 # How long install/start wait for the UF to connect to Cribl and for its _internal in Splunk
 hl_uf_connect_timeout: 180
+# uninstall: accept a contract without the install baselines (they are missing although the state file
+# records an install, e.g. deleted by hand); the play refuses otherwise
+hl_uninstall_without_baseline: false
+# uninstall: accept unit files that appeared while the UF was installed (listed, not removed),
+# when they belong to something else
+hl_uninstall_accept_new_units: false
 
 # --- Expectation metadata (spec 7.2 dh_expected). Set per group or host. ---
 hl_owner: taylorb
@@ -65,10 +74,11 @@ hl_server_apps:
     templates: [default/inputs.conf]
   - name: hl_data_health
     seed_lookups: [dh_expected_ansible.csv]
-# Limit server, server_remove (and, from task 6, apps/apps_remove) to these apps; [] = all
+# Limit server, server_remove and apps_remove to these apps; [] = all
 hl_apps_only: []
-# A change to one of these files restarts splunkd; anything else is reloaded over REST
-hl_server_restart_confs: [indexes.conf, inputs.conf, props.conf]
+# A change to one of these files restarts splunkd; anything else is reloaded over REST.
+# web.conf has no REST reload (hl_server_base's dashboard risky-command setting, spec 7.8).
+hl_server_restart_confs: [indexes.conf, inputs.conf, props.conf, web.conf]
 # Restart splunkd even when nothing changed (the restart-loss test, docs/handoff/task-3b-cribl.md)
 hl_server_force_restart: false
 hl_server_reload_endpoints:
@@ -129,9 +139,10 @@ hl_cribl_health_timeout: 180          # seconds to wait for Cribl's /health and 
 # alive to data health, so it runs only when something changed.
 hl_cribl_selftest: true
 # Hold Cribl around a splunkd restart (server tag): docker pause cribl, restart splunkd, wait for
-# HEC, unpause. The UFs keep their unACKed data (useACK); UDP sent meanwhile is lost. Off until
-# task 3b's restart test decides (docs/handoff/task-3b-cribl.md, check 6).
-hl_cribl_hold_on_splunk_restart: false
+# splunktcp to accept connections, unpause. The UFs keep their unACKed data (useACK); UDP sent
+# meanwhile is lost. On, because it is the only option that lost nothing: task 4 check 15 (spec
+# 13, 14.10) lost 3 s of a 1/s sequence with maxS2Sversion v4 alone and none with the hold.
+hl_cribl_hold_on_splunk_restart: true
 # cribl_block (never): set or clear one test block, e.g.
 #   --tags cribl_block -e hl_block_key='wd2l-recv|linux_secure|*' -e hl_block_minutes=30 -e hl_block_reason='E2E row 4'
 #   --tags cribl_block -e hl_block_key='wd2l-recv|linux_secure|*' -e hl_block_clear=true
@@ -240,11 +251,12 @@ hl_windows_inputs:
   - {stanza: "WinEventLog://Microsoft-Windows-Hyper-V-Worker-Admin", app: hl_uf_windows_inputs, index: windows,
      sourcetype: XmlWinEventLog, source: "XmlWinEventLog:Microsoft-Windows-Hyper-V-Worker-Admin",
      profile: sporadic, criticality: 3, enabled: true, track_source: true}
-  # Splunk_TA_windows 11.0.3 perfmon stanzas, enabled in its local/inputs.conf at 60 s
-  - {stanza: "perfmon://CPU", app: Splunk_TA_windows, index: windows, sourcetype: "Perfmon:CPU",
-     source: "Perfmon:CPU", interval: 60, profile: periodic, criticality: 3, enabled: true, track_source: false}
-  - {stanza: "perfmon://Memory", app: Splunk_TA_windows, index: windows, sourcetype: "Perfmon:Memory",
-     source: "Perfmon:Memory", interval: 60, profile: periodic, criticality: 3, enabled: true, track_source: false}
+  # Splunk_TA_windows 11.0.3 perfmon stanzas, enabled in its local/inputs.conf at 60 s. The TA's
+  # mode = multikv makes them PerfmonMk:<stanza>: one event per collection, one result per instance.
+  - {stanza: "perfmon://CPU", app: Splunk_TA_windows, index: windows, sourcetype: "PerfmonMk:CPU",
+     source: "PerfmonMk:CPU", interval: 60, profile: periodic, criticality: 3, enabled: true, track_source: false}
+  - {stanza: "perfmon://Memory", app: Splunk_TA_windows, index: windows, sourcetype: "PerfmonMk:Memory",
+     source: "PerfmonMk:Memory", interval: 60, profile: periodic, criticality: 3, enabled: true, track_source: false}
 
 # The Splunk server host (REST searches are delegated to it)
 hl_server_host: homepc
@@ -284,17 +296,16 @@ hl_audit_policy:
   - {name: Process Creation, guid: "{0CCE922B-69AE-11D9-BED3-505054503030}", success: true, failure: false}
 
 # --- Forwarder apps (spec 5.5; task 6). The TAs are deployed unmodified; the role owns only their
-# local/inputs.conf. Put the TA packages in ansible/files/packages/ and pin their sha256 here
-# (docs/handoff/task-6-forwarder-apps.md, "Before running" 2).
+# local/inputs.conf. The .spl packages go in ansible/files/packages/ on the controller (gitignored).
 hl_tas:
   Splunk_TA_nix:
     version: 10.3.4
-    file: splunk-add-on-for-unix-and-linux_1034.tgz
-    sha256: ""
+    file: splunk-add-on-for-unix-and-linux_1034.spl
+    sha256: 9bfb2061b55961841d5babba04ead35509730dc73a7b6bfbc676a7216e7f1ca2
   Splunk_TA_windows:
     version: 11.0.3
-    file: splunk-add-on-for-microsoft-windows_1103.tgz
-    sha256: ""
+    file: splunk-add-on-for-microsoft-windows_1103.spl
+    sha256: 2fd0384376afe6993c7c6df49ab9a5e8b44fe0e38c4517a41f550f42fa051fa6
 # The role-owned input apps; every stanza is written to the app's local/inputs.conf, because local/
 # beats every app's default/ (Splunk_TA_windows sorts before hl_uf_windows_inputs, and its default
 # stanzas say disabled = 1).
@@ -304,7 +315,12 @@ hl_uf_input_apps_windows: [hl_uf_windows_inputs]
 # --- STIG audit rules (spec 5.3 audit_rules; uf_linux) ---
 hl_stig_rules_src: /usr/share/audit-rules/30-stig.rules
 hl_stig_privileged_src: /usr/share/audit-rules/31-privileged.rules
-hl_stig_rules_file: /etc/audit/rules.d/50-hl-stig.rules
+# Must sort last under `ls -1v` (augenrules' sort), after zz-hl-uf-tamper.rules. `zzz-` would NOT:
+# ls -v puts punctuation after letters, so zzz-* sorts before zz-*. Why last: tasks/audit_rules.yml.
+hl_stig_rules_file: /etc/audit/rules.d/zz-hl-zz-stig.rules
+# ERE for the STIG rules in `auditctl -l` (its 12 keys + the generated rules' key). Uninstall's
+# compare ignores them, and audit_rules counts them, so a new key in the rules must be added here.
+hl_stig_key_re: "(-F key=|-k )(system-locale|identity|time-change|session|perm_mod|logins|maybe-escalation|actions|access|export|delete|MAC-policy|privileged)$"
 # STIG's -e 2 makes every later rule change need a reboot; it is never set (spec 5.3)
 hl_audit_immutable: false
 

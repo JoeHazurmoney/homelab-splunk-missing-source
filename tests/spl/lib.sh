@@ -20,9 +20,14 @@ dh_curl() {
   printf 'user = "admin:%s"\n' "$p" | curl -sk --config - "$@"
 }
 
+# Every test search runs in one fixed time zone (the jobs endpoints take tz=), so the formatted
+# times in the fixtures don't depend on the admin account's time zone preference (America/Denver
+# since 2026-10-31; the fixtures are written in GMT).
+DH_TZ=${DH_TZ:-GMT}
+
 # dh_search '<SPL>' [output_mode]: run a search in the app's namespace, stream the results.
 dh_search() {
-  dh_curl "$DH_MGMT/servicesNS/admin/$DH_APP/search/jobs/export" \
+  dh_curl "$DH_MGMT/servicesNS/admin/$DH_APP/search/jobs/export" -d "tz=$DH_TZ" \
     -d "output_mode=${2:-csv}" --data-urlencode "search=$1"
 }
 

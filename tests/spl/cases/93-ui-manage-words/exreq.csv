@@ -1,0 +1,4 @@
+c,dh_action,level,index,host,sourcetype,source,collection,via,profile,interval_secs,criticality,owner,site,runbook,description,reason,ticket,actor,actor_roles
+x1,add,source,linux,newh,cpu,cpu,uf,-,periodic,60,2,-,-,-,-,add cpu,-,taylor,admin
+x2,add,sourcetype,linux,h6,syslog,-,uf,-,continuous,-,2,ops,lab,-,-,change,-,taylor,admin
+x3,add,sourcetype,linux,newh,-,-,uf,-,continuous,-,2,-,-,-,-,r,-,taylor,admin
