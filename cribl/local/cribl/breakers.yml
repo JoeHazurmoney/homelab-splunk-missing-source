@@ -6,8 +6,8 @@
 # - cpu: one event per sample, each starting at its "Datetime" header (TA_nix cpu);
 # - linux_audit: one event per record, time from msg=audit(<epoch>);
 # - wd2l's audit trails: one JSON record per line, time from "ts", which is too deep for Cribl's scan;
-# - no Windows rule: the UF frames event log records and Perfmon rows itself and sends their time, and
-#   Cribl's default keeps both (task 6: 1,546 XML events whole, _time within 1 ms of TimeCreated);
+# - no Windows rule: the UF frames event log records and Perfmon tables itself and sends their time,
+#   and Cribl's default keeps both (task 6: 1,546 XML events whole, _time within 1 ms of TimeCreated);
 # - everything else, Unix:Service and the other line-per-record scripts included: Cribl's default
 #   (one event per line, timestamp found automatically), as Splunk's defaults for those.
 # Managed by the homelab_splunk role (`cribl` tag).

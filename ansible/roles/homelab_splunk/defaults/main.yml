@@ -251,11 +251,12 @@ hl_windows_inputs:
   - {stanza: "WinEventLog://Microsoft-Windows-Hyper-V-Worker-Admin", app: hl_uf_windows_inputs, index: windows,
      sourcetype: XmlWinEventLog, source: "XmlWinEventLog:Microsoft-Windows-Hyper-V-Worker-Admin",
      profile: sporadic, criticality: 3, enabled: true, track_source: true}
-  # Splunk_TA_windows 11.0.3 perfmon stanzas, enabled in its local/inputs.conf at 60 s
-  - {stanza: "perfmon://CPU", app: Splunk_TA_windows, index: windows, sourcetype: "Perfmon:CPU",
-     source: "Perfmon:CPU", interval: 60, profile: periodic, criticality: 3, enabled: true, track_source: false}
-  - {stanza: "perfmon://Memory", app: Splunk_TA_windows, index: windows, sourcetype: "Perfmon:Memory",
-     source: "Perfmon:Memory", interval: 60, profile: periodic, criticality: 3, enabled: true, track_source: false}
+  # Splunk_TA_windows 11.0.3 perfmon stanzas, enabled in its local/inputs.conf at 60 s. The TA's
+  # mode = multikv makes them PerfmonMk:<stanza>: one event per collection, one result per instance.
+  - {stanza: "perfmon://CPU", app: Splunk_TA_windows, index: windows, sourcetype: "PerfmonMk:CPU",
+     source: "PerfmonMk:CPU", interval: 60, profile: periodic, criticality: 3, enabled: true, track_source: false}
+  - {stanza: "perfmon://Memory", app: Splunk_TA_windows, index: windows, sourcetype: "PerfmonMk:Memory",
+     source: "PerfmonMk:Memory", interval: 60, profile: periodic, criticality: 3, enabled: true, track_source: false}
 
 # The Splunk server host (REST searches are delegated to it)
 hl_server_host: homepc
