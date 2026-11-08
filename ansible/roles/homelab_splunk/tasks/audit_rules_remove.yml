@@ -1,9 +1,30 @@
-# audit_rules_remove (uf_linux, spec 5.3/§11 row 7): delete 50-hl-stig.rules, augenrules --load,
-# then check `auditctl -l` matches the baseline taken before the first audit_rules run (the UF's
-# own hl-* tamper rules are left out of the comparison: they come and go with install/uninstall),
-# and that wd2l's rules are still loaded.
+# audit_rules_remove (uf_linux, spec 5.3/11 row 7): delete the STIG rules file, reload, then prove
+# `auditctl -l` equals the baseline taken before the first audit_rules run (the UF's tamper rules are
+# left out: they come and go with install/uninstall) and that wd2l's rules are still loaded.
 - name: Read the state file
   ansible.builtin.import_tasks: linux_state_read.yml
+
+- name: Look for the rules file
+  ansible.builtin.stat:
+    path: "{{ hl_stig_rules_file }}"
+  register: hl_stig_file
+
+- name: Read what is loaded before
+  ansible.builtin.script:
+    cmd: "{{ hl_stig_census_cmd }}"
+    executable: /bin/bash
+  register: hl_stig_before
+  changed_when: false
+
+- name: Note whether the STIG rules are still loaded
+  ansible.builtin.set_fact:
+    hl_stig_still_loaded: "{{ 'HL_STIG=0' not in hl_stig_before.stdout_lines }}"
+
+- name: Marker before the rules change
+  ansible.builtin.include_tasks: marker_best_effort.yml
+  vars:
+    hl_marker_action: audit_rules_remove
+  when: hl_stig_file.stat.exists or hl_stig_still_loaded | bool
 
 - name: Remove the rules file
   ansible.builtin.file:
@@ -11,35 +32,58 @@
     state: absent
   register: hl_stig_rm
 
+# Also when the file is already gone but its rules are still loaded (a rerun after a failure)
 - name: Reload the audit rules without it
   ansible.builtin.command:
     argv: [augenrules, --load]
-  when: hl_stig_rm.changed or hl_stig_force_reload | default(false)
+  when: hl_stig_rm.changed or hl_stig_still_loaded | bool
   changed_when: true
 
+- name: Read what is loaded after
+  ansible.builtin.script:
+    cmd: "{{ hl_stig_census_cmd }}"
+    executable: /bin/bash
+  register: hl_stig_after
+  changed_when: false
+
 - name: Compare the loaded rules with the baseline
-  ansible.builtin.shell: |
-    set -o pipefail
-    f={{ hl_linux_state_dir }}/auditctl.before_stig
-    [ -f "$f" ] || { echo "HL_DIFF=nobaseline"; exit 0; }
-    strip() { grep -v -E -- '-k hl-(uf|syslog|audit)-config' || true; }
-    diff <(strip < "$f") <(auditctl -l | LC_ALL=C sort | strip) > /tmp/hl_stig_diff.$$ || true
-    echo "HL_DIFF=$(grep -c '^[<>]' /tmp/hl_stig_diff.$$ || true)"
-    head -20 /tmp/hl_stig_diff.$$ | sed 's/^/HL_LINE=/'
-    rm -f /tmp/hl_stig_diff.$$
-    echo "HL_WD2L=$(auditctl -l | grep -c -- '-k wd2l' || true)"
-  args:
+  ansible.builtin.shell:
+    cmd: |
+      set -o pipefail
+      f={{ hl_linux_state_dir }}/auditctl.before_stig
+      if [ ! -f "$f" ]; then echo HL_DIFF=nobaseline; exit 0; fi
+      old=$(mktemp); new=$(mktemp); out=$(mktemp)
+      trap 'rm -f "$old" "$new" "$out"' EXIT
+      strip() { grep -v -E -e '{{ hl_uf_tamper_key_re }}' || true; }
+      strip < "$f" > "$old"
+      auditctl -l | LC_ALL=C sort | strip > "$new"
+      diff "$old" "$new" > "$out" || true
+      echo "HL_DIFF=$(grep -c '^[<>]' "$out" || true)"
+      head -n 20 "$out" | sed 's/^/HL_LINE=/'
     executable: /bin/bash
   register: hl_stig_cmp
   changed_when: false
+
+- name: Refuse a removal the baseline can't prove
+  ansible.builtin.assert:
+    that: >-
+      hl_state.audit_rules is not defined or hl_uninstall_without_baseline | bool
+      or 'HL_DIFF=nobaseline' not in hl_stig_cmp.stdout_lines
+    fail_msg: >-
+      The state file records the STIG rules, but the baseline from before them is gone from
+      {{ hl_linux_state_dir }}, so "restored" can't be proven. The rules are removed: rerun with
+      -e hl_uninstall_without_baseline=true to accept it.
+    quiet: true
 
 - name: Check the rules are restored
   ansible.builtin.assert:
     that:
       - "'HL_DIFF=0' in hl_stig_cmp.stdout_lines or 'HL_DIFF=nobaseline' in hl_stig_cmp.stdout_lines"
-      - "'HL_WD2L=0' not in hl_stig_cmp.stdout_lines"
-    fail_msg: "auditctl -l differs from the baseline: {{ hl_stig_cmp.stdout_lines }}"
-    success_msg: "audit rules restored: {{ hl_stig_cmp.stdout_lines | join(', ') }}"
+      - "'HL_STIG=0' in hl_stig_after.stdout_lines"
+      - (hl_stig_before.stdout_lines | select('match', '^HL_WD2L=') | first) in hl_stig_after.stdout_lines
+      - (hl_stig_before.stdout_lines | select('match', '^HL_UF=') | first) in hl_stig_after.stdout_lines
+    fail_msg: "auditctl -l differs from the baseline: {{ hl_stig_cmp.stdout_lines }} {{ hl_stig_after.stdout_lines }}"
+    success_msg: "audit rules restored: {{ hl_stig_cmp.stdout_lines | join(', ') }}, {{ hl_stig_after.stdout_lines | join(', ') }}"
 
 - name: Remove the baseline
   ansible.builtin.file:

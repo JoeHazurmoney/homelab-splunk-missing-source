@@ -338,8 +338,13 @@ argument_specs:
         description: The file whose comments hold the commands that generate the privileged-command rules.
       hl_stig_rules_file:
         type: str
-        default: /etc/audit/rules.d/50-hl-stig.rules
-        description: Where the role writes the STIG rules.
+        default: /etc/audit/rules.d/zz-hl-zz-stig.rules
+        description: Where the role writes the STIG rules. Must sort last under `ls -1v`, after zz-hl-uf-tamper.rules.
+      hl_stig_key_re:
+        type: str
+        default: "(-F key=|-k )(system-locale|identity|time-change|session|perm_mod|logins|\
+          maybe-escalation|actions|access|export|delete|MAC-policy|privileged)$"
+        description: ERE for the STIG rules in `auditctl -l`; uninstall's compare ignores them and audit_rules counts them.
       hl_audit_immutable:
         type: bool
         default: false
