@@ -1,15 +1,25 @@
-# start / stop / restart / status (uf_windows, spec 5.3): service control + marker, as on Linux.
-# main.yml imports this file once per action, with hl_service_action set.
+# start / stop / restart / status (uf_windows, spec 5.3): service control + marker, as
+# uf_linux_service.yml. main.yml imports this file once per action, with hl_service_action set. A
+# stop posts its marker first (so a finding during the stop is the role's own work); start/restart
+# post theirs once connected. Markers are best effort (they warn, never fail the action).
+# status = service state, MSI version and build, apps, the outputs connection (from splunkd.log)
+# and FIPS (the running splunkd).
 - name: Marker before the stop
-  ansible.builtin.include_tasks: marker.yml
+  ansible.builtin.include_tasks: marker_best_effort.yml
   vars:
     hl_marker_action: stop
   when: hl_service_action == 'stop'
 
+# "<lines> <epoch>": where splunkd.log ends and the host's clock, just before the (re)start
 - name: Note where splunkd.log ends
   ansible.windows.win_shell: |
     $f = '{{ hl_uf_win_home }}\var\log\splunk\splunkd.log'
-    if (Test-Path -LiteralPath $f) { @(Get-Content -LiteralPath $f).Count } else { 0 }
+    $n = 0
+    if (Test-Path -LiteralPath $f) {
+      $fs = [IO.File]::Open($f, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]'ReadWrite, Delete')
+      try { $sr = New-Object IO.StreamReader($fs); while ($null -ne $sr.ReadLine()) { $n++ } } finally { $fs.Dispose() }
+    }
+    "$n $([DateTimeOffset]::UtcNow.ToUnixTimeSeconds())"
   register: hl_svcw_log_lines
   changed_when: false
   when: hl_service_action in ['start', 'restart']
@@ -18,40 +28,67 @@
   ansible.windows.win_service:
     name: "{{ hl_uf_win_service }}"
     state: "{{ {'start': 'started', 'stop': 'stopped', 'restart': 'restarted'}[hl_service_action] }}"
+  register: hl_svcw_result
   when: hl_service_action in ['start', 'stop', 'restart']
 
+# A start of a running UF changes nothing: then the whole log, where the latest state counts
 - name: Check the UF is connected through Cribl
   ansible.builtin.include_tasks: uf_windows_connected.yml
   vars:
-    hl_uf_log_from: "{{ hl_svcw_log_lines.stdout | trim | int }}"
+    hl_uf_log_from: "{{ (hl_svcw_log_lines.stdout.split()[0] | int) if hl_svcw_result is changed else 0 }}"
+    hl_uf_since: "{{ (hl_svcw_log_lines.stdout.split()[1] | int) if hl_svcw_result is changed else 0 }}"
   when: hl_service_action in ['start', 'restart']
 
 - name: Marker after the start
-  ansible.builtin.include_tasks: marker.yml
+  ansible.builtin.include_tasks: marker_best_effort.yml
   vars:
     hl_marker_action: "{{ hl_service_action }}"
   when: hl_service_action in ['start', 'restart']
 
 - name: Read the UF's status
-  ansible.windows.win_shell: |
-    $log = '{{ hl_uf_win_home }}\var\log\splunk\splunkd.log'
-    $svc = Get-Service -Name '{{ hl_uf_win_service }}' -ErrorAction SilentlyContinue
-    $lines = if (Test-Path -LiteralPath $log) { Get-Content -LiteralPath $log -Tail 5000 } else { @() }
-    $b = ($lines | Select-String -Pattern 'Splunkd starting \(build ([0-9a-f]+)\)' | Select-Object -Last 1)
-    $c = ($lines | Select-String -SimpleMatch 'Connected to idx=' | Select-Object -Last 1)
-    $r = ($lines | Select-String -Pattern 'Invalid S2S token|Connection closed by server' | Select-Object -Last 1)
-    [ordered]@{
-      service = $(if ($svc) { [string]$svc.Status } else { 'absent' })
-      build = $(if ($b) { $b.Matches[0].Groups[1].Value } else { '' })
-      last_connect = $(if ($c) { $c.Line.Substring(0, [Math]::Min(23, $c.Line.Length)) } else { '' })
-      last_refusal = $(if ($r) { $r.Line.Substring(0, [Math]::Min(23, $r.Line.Length)) } else { '' })
-      apps = @(Get-ChildItem -LiteralPath '{{ hl_uf_win_home }}\etc\apps' -Directory -ErrorAction SilentlyContinue | ForEach-Object Name)
-    } | ConvertTo-Json -Compress
+  ansible.windows.win_shell:
+    cmd: |
+      $home_ = '{{ hl_uf_win_home }}'
+      $log = "$home_\var\log\splunk\splunkd.log"
+      $svc = Get-CimInstance Win32_Service -Filter "Name='{{ hl_uf_win_service }}'"
+      $keys = @('HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*',
+                'HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*')
+      $p = Get-ItemProperty $keys -ErrorAction SilentlyContinue | Where-Object { $_.DisplayName -like 'UniversalForwarder*' } | Select-Object -First 1
+      "service=$(if ($svc) { $svc.State } else { 'absent' })"
+      "account=$(if ($svc) { $svc.StartName } else { '' })"
+      "msi=$(if ($p) { $p.DisplayVersion } else { 'none' })"
+      # The build from etc\splunk.version and FIPS from the running splunkd: splunkd.log's start lines
+      # are gone once the log rotates (task 4 fix round 1)
+      $b = Select-String -LiteralPath "$home_\etc\splunk.version" -Pattern '^BUILD=(.*)$' -ErrorAction SilentlyContinue | Select-Object -First 1
+      "build=$(if ($b) { $b.Matches[0].Groups[1].Value.Trim() } else { '' })"
+      $c = ''; $r = ''
+      if (Test-Path -LiteralPath $log) {
+        $fs = [IO.File]::Open($log, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]'ReadWrite, Delete')
+        try {
+          $sr = New-Object IO.StreamReader($fs)
+          while ($null -ne ($l = $sr.ReadLine())) {
+            if ($l.Contains('Connected to idx=')) { $c = $l }
+            if ($l -cmatch '{{ hl_uf_close_re }}') { $r = $l }
+          }
+        } finally { $fs.Dispose() }
+      }
+      "last_connect=$($c.Substring(0, [Math]::Min(23, $c.Length)))"
+      "last_close=$($r.Substring(0, [Math]::Min(23, $r.Length)))"
+      "apps=$(@(Get-ChildItem -LiteralPath "$home_\etc\apps" -Directory -ErrorAction SilentlyContinue | ForEach-Object Name) -join ' ')"
+      $f = 'off'
+      if ($svc -and $svc.ProcessId -gt 0) {
+        $mods = (Get-Process -Id $svc.ProcessId -ErrorAction SilentlyContinue).Modules
+        $m = @($mods | Where-Object { $_.FileName -match '\\ossl-modules\\fips140-3\\fips\.dll$' })
+        if ($m.Count -gt 0) { $f = 'on' }
+      }
+      $lf = @(Select-String -LiteralPath "$home_\etc\splunk-launch.conf" -Pattern '^SPLUNK_FIPS=1' -ErrorAction SilentlyContinue).Count
+      $wf = (Get-ItemProperty HKLM:\SYSTEM\CurrentControlSet\Control\Lsa\FipsAlgorithmPolicy -ErrorAction SilentlyContinue).Enabled
+      "fips=$f (launch.conf SPLUNK_FIPS=1: $lf; Windows FIPS policy: $wf)"
   register: hl_svcw_status
   changed_when: false
   when: hl_service_action == 'status'
 
 - name: Show the UF's status
   ansible.builtin.debug:
-    msg: "{{ hl_svcw_status.stdout | from_json }}"
+    msg: "{{ hl_svcw_status.stdout_lines }}"
   when: hl_service_action == 'status'

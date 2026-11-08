@@ -1,12 +1,13 @@
 # uninstall (uf_windows, spec 5.3/5.6 Windows): marker → stop → the virtual account out of its
 # groups (by SID, while it still resolves) → MSI uninstall by product code → leftovers → user
 # rights that still name the service SID (secedit export; win_user_right removes orphans) →
-# the contract (fails on any leftover) → state.
+# the contract (fails on any leftover) → state. The marker is best effort (it warns, never blocks
+# the uninstall).
 - name: Read the state file
   ansible.builtin.import_tasks: win_state_read.yml
 
 - name: Marker for the uninstall
-  ansible.builtin.include_tasks: marker.yml
+  ansible.builtin.include_tasks: marker_best_effort.yml
   vars:
     hl_marker_action: uninstall
 
@@ -16,7 +17,8 @@
               'HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*')
     $p = Get-ItemProperty $keys -ErrorAction SilentlyContinue | Where-Object { $_.DisplayName -like 'UniversalForwarder*' } | Select-Object -First 1
     $sid = ((sc.exe showsid {{ hl_uf_win_service }}) -match 'SERVICE SID' | ForEach-Object { ($_ -split ':\s*')[1].Trim() } | Select-Object -First 1)
-    @{ product_code = [string]$p.PSChildName; service_sid = [string]$sid } | ConvertTo-Json -Compress
+    $svc = @(Get-Service -Name '{{ hl_uf_win_service }}' -ErrorAction SilentlyContinue).Count -gt 0
+    @{ product_code = [string]$p.PSChildName; service_sid = [string]$sid; service = $svc } | ConvertTo-Json -Compress
   register: hl_unw_ids
   changed_when: false
 
@@ -31,7 +33,7 @@
   ansible.windows.win_service:
     name: "{{ hl_uf_win_service }}"
     state: stopped
-  failed_when: false
+  when: (hl_unw_ids.stdout | from_json).service
 
 - name: Take the virtual account out of its groups
   ansible.windows.win_shell: |
@@ -78,7 +80,7 @@
 - name: Remove the service SID from those rights
   ansible.windows.win_user_right:
     name: "{{ item.0 }}"
-    users: ["*{{ item.1 }}"]
+    users: ["{{ item.1 }}"]
     action: remove
   loop: "{{ (hl_unw_rights.stdout | from_json).rights | product(hl_unw_sids) | list }}"
   loop_control:
@@ -112,6 +114,7 @@
       product = $prod.Count
       folder = (Test-Path -LiteralPath '{{ hl_uf_win_home }}')
       service_key = (Test-Path -LiteralPath 'HKLM:\SYSTEM\CurrentControlSet\Services\{{ hl_uf_win_service }}')
+      stage = (Test-Path -LiteralPath '{{ hl_win_state_dir }}\stage')
       members = $members
       rights = $rights
     } | ConvertTo-Json -Compress
@@ -124,10 +127,11 @@
       - (hl_unw_left.stdout | from_json).product == 0
       - not (hl_unw_left.stdout | from_json).folder
       - not (hl_unw_left.stdout | from_json).service_key
+      - not (hl_unw_left.stdout | from_json).stage
       - (hl_unw_left.stdout | from_json).members | length == 0
       - (hl_unw_left.stdout | from_json).rights | length == 0
     fail_msg: "uninstall left something behind: {{ hl_unw_left.stdout }}"
-    success_msg: "uninstall contract passed: no product, folder, service key, group membership or user right"
+    success_msg: "uninstall contract passed: no product, folder, service key, staging folder, group membership or user right ({{ hl_unw_left.stdout }})"
 
 - name: Drop the UF record from the state file
   ansible.builtin.set_fact:

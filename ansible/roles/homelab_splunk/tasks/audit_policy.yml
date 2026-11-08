@@ -1,6 +1,6 @@
 # audit_policy (uf_windows, spec 5.3): back up the whole audit policy once (auditpol /backup; a
 # rerun never overwrites the first backup), then enable the focused subset by subcategory GUID
-# (locale-independent). Only subcategories whose setting differs are changed. Needs the elevated
+# (locale-independent). Only missing Success/Failure settings are turned on. Needs the elevated
 # SSH session. audit_policy_remove restores the backup exactly.
 - name: Read the state file
   ansible.builtin.import_tasks: win_state_read.yml
@@ -27,22 +27,44 @@
 - name: Write the state file
   ansible.builtin.import_tasks: win_state_write.yml
 
+# Add-only: a wanted Success/Failure is turned on, but a setting the PC already had is never turned
+# off (HOMEPC audits Account Lockout success by default; the subset asks only for its failures).
+# The setting is read as auditpol /backup's locale-independent Setting Value (bit 1 = success,
+# bit 2 = failure), not /get's localized "Inclusion Setting" text.
 - name: Apply the focused subset
   ansible.windows.win_shell: |
+    $ErrorActionPreference = 'Stop'
     $want = '{{ hl_audit_policy | to_json }}' | ConvertFrom-Json
+    function Get-HlAuditBits {
+      $tmp = Join-Path $env:TEMP ("hl_auditpol_" + [guid]::NewGuid() + ".csv")
+      auditpol /backup /file:"$tmp" | Out-Null
+      if ($LASTEXITCODE -ne 0) { throw "auditpol /backup failed ($LASTEXITCODE)" }
+      $bits = @{}
+      foreach ($r in (Import-Csv -LiteralPath $tmp)) {
+        if ($r.'Subcategory GUID' -match '^\{[0-9A-Fa-f-]{36}\}$') { $bits[$r.'Subcategory GUID'.ToUpper()] = [int]("0" + $r.'Setting Value') }
+      }
+      Remove-Item -LiteralPath $tmp -Force
+      return $bits
+    }
+    $cur = Get-HlAuditBits
     $changed = @()
     foreach ($w in $want) {
-      # /r = CSV: Machine Name,Policy Target,Subcategory,Subcategory GUID,Inclusion Setting,Exclusion Setting
-      $cur = (auditpol /get /subcategory:"$($w.guid)" /r | ConvertFrom-Csv | Select-Object -First 1).'Inclusion Setting'
-      $s = [bool]($cur -match 'Success'); $f = [bool]($cur -match 'Failure')
-      if ($s -ne [bool]$w.success -or $f -ne [bool]$w.failure) {
-        $sa = if ($w.success) { 'enable' } else { 'disable' }
-        $fa = if ($w.failure) { 'enable' } else { 'disable' }
-        auditpol /set /subcategory:"$($w.guid)" /success:$sa /failure:$fa | Out-Null
+      $g = $w.guid.ToUpper()
+      if (-not $cur.ContainsKey($g)) { throw "auditpol has no subcategory $g ($($w.name))" }
+      $args_ = @()
+      if ($w.success -and -not ($cur[$g] -band 1)) { $args_ += '/success:enable' }
+      if ($w.failure -and -not ($cur[$g] -band 2)) { $args_ += '/failure:enable' }
+      if ($args_.Count -gt 0) {
+        auditpol /set /subcategory:"$g" @args_ | Out-Null
         if ($LASTEXITCODE -ne 0) { throw "auditpol /set $($w.name) failed ($LASTEXITCODE)" }
-        $changed += $w.name
+        $changed += "$($w.name) ($($args_ -join ' '))"
       }
     }
-    @{ changed = $changed } | ConvertTo-Json -Compress
+    # Read back: every wanted bit is on now
+    $now = Get-HlAuditBits
+    $missing = @($want | Where-Object { ($_.success -and -not ($now[$_.guid.ToUpper()] -band 1)) -or
+      ($_.failure -and -not ($now[$_.guid.ToUpper()] -band 2)) } | ForEach-Object { $_.name })
+    @{ changed = $changed; missing = $missing } | ConvertTo-Json -Compress
   register: hl_ap_apply
   changed_when: (hl_ap_apply.stdout | from_json).changed | length > 0
+  failed_when: hl_ap_apply.rc != 0 or (hl_ap_apply.stdout | from_json).missing | length > 0

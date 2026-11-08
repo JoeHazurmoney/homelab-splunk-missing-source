@@ -5,20 +5,26 @@
   ansible.builtin.import_tasks: win_state_read.yml
 
 - name: Restore the audit policy and compare it with the backup
-  ansible.windows.win_shell: |
-    $f = '{{ hl_win_state_dir }}\auditpol.before.csv'
-    if (-not (Test-Path -LiteralPath $f)) { @{ restored = $false; diff = @() } | ConvertTo-Json -Compress; exit 0 }
-    auditpol /restore /file:"$f" | Out-Null
-    if ($LASTEXITCODE -ne 0) { throw "auditpol /restore failed ($LASTEXITCODE)" }
-    $now = Join-Path $env:TEMP ("hl_auditpol_" + [guid]::NewGuid() + ".csv")
-    auditpol /backup /file:"$now" | Out-Null
-    # Compare by subcategory GUID and setting value (the machine name column may differ in case)
-    $key = { param($r) "$($r.'Subcategory GUID')|$($r.Subcategory)|$($r.'Setting Value')" }
-    $a = @(Import-Csv -LiteralPath $f | ForEach-Object { & $key $_ } | Sort-Object)
-    $b = @(Import-Csv -LiteralPath $now | ForEach-Object { & $key $_ } | Sort-Object)
-    Remove-Item -LiteralPath $now -Force
-    $d = @(Compare-Object $a $b | ForEach-Object { "$($_.SideIndicator) $($_.InputObject)" })
-    @{ restored = $true; diff = $d } | ConvertTo-Json -Compress
+  ansible.windows.win_shell:
+    cmd: |
+      $f = '{{ hl_win_state_dir }}\auditpol.before.csv'
+      if (-not (Test-Path -LiteralPath $f)) { @{ restored = $false; diff = @() } | ConvertTo-Json -Compress; exit 0 }
+      auditpol /restore /file:"$f" | Out-Null
+      if ($LASTEXITCODE -ne 0) { throw "auditpol /restore failed ($LASTEXITCODE)" }
+      $now = Join-Path $env:TEMP ("hl_auditpol_" + [guid]::NewGuid() + ".csv")
+      auditpol /backup /file:"$now" | Out-Null
+      # Compare by subcategory GUID and setting value (the machine name column may differ in case).
+      # After a /restore, /backup adds empty "FileGlobalSacl,,,," and "RegistryGlobalSacl,,,," rows
+      # that the original (no global SACL) didn't have, while /resourceSACL /view still says there is
+      # none (task 5 check 10): an empty global-SACL row means "none", the same as no row. A row with
+      # a SACL in it still has to match.
+      $key = { param($r) "$($r.'Subcategory GUID')|$($r.Subcategory)|$($r.'Setting Value')" }
+      $real = { param($r) -not ($r.Subcategory -match 'GlobalSacl$' -and [string]::IsNullOrEmpty($r.'Setting Value')) }
+      $a = @(Import-Csv -LiteralPath $f | Where-Object { & $real $_ } | ForEach-Object { & $key $_ } | Sort-Object)
+      $b = @(Import-Csv -LiteralPath $now | Where-Object { & $real $_ } | ForEach-Object { & $key $_ } | Sort-Object)
+      Remove-Item -LiteralPath $now -Force
+      $d = @(Compare-Object $a $b | ForEach-Object { "$($_.SideIndicator) $($_.InputObject)" })
+      @{ restored = $true; diff = $d } | ConvertTo-Json -Compress
   register: hl_ap_restore
   changed_when: (hl_ap_restore.stdout | from_json).restored
 
