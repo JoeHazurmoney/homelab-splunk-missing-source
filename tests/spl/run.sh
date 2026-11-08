@@ -12,9 +12,10 @@
 # The runner copies the tables into the app's lookups/ as dhtest_<case>_<table>.csv, runs the
 # search through REST, diffs the results and exits non-zero on any mismatch.
 # The dhtest_ files are removed afterwards. Nothing is written to KV or to an index.
-# A full run (no glob) first runs three checks: lookup-names (dh_evaluate vs dh_lookup_*),
+# A full run (no glob) first runs these checks: lookup-names (dh_evaluate vs dh_lookup_*),
 # lookup-names-static (every literal lookup name in the conf files is defined, and merge macros
-# get the collection their search writes) and savedsearch-settings (savedsearches.expect.csv).
+# get the collection their search writes), retention-windows (nothing looks back past the indexes'
+# retention) and savedsearch-settings (savedsearches.expect.csv).
 #
 # shellcheck disable=SC2016  # backticks here are Splunk macro calls, not shell expansions
 # Usage: tests/spl/run.sh [case-glob]     e.g. tests/spl/run.sh '1*'
@@ -198,6 +199,30 @@ static_names_check() {
   return 1
 }
 
+# No saved search, macro or view looks back further than the indexes keep data (spec §4.4): every
+# relative time -<N>d in them has N <= the shortest frozenTimePeriodInSecs of hl_server_base's own
+# indexes (Splunk's _internal and _audit, kept longer, are left out), in days.
+retention_check() {
+  local app="$here/../../splunk/apps/$DH_APP/default" base="$here/../../splunk/apps/hl_server_base/default" secs
+  secs=$(awk -F= '{ sub(/\r$/, "") } /^\[/ { st = $0 } st !~ /^\[_/ && $1 ~ /^frozenTimePeriodInSecs/ { gsub(/ /, "", $2); print $2 }' \
+    "$base/indexes.conf" | sort -n | head -1)
+  if [ -z "$secs" ]; then echo "  no frozenTimePeriodInSecs in hl_server_base's indexes.conf"; echo "FAIL retention-windows"; return 1; fi
+  if { conf_lines "$app/savedsearches.conf" | grep -E '\|(search|dispatch\.earliest_time) = '
+    conf_lines "$app/macros.conf" | grep '|definition = '
+    cat "$app"/data/ui/views/*.xml; } | awk -v days=$((secs / 86400)) '
+      { s = $0
+        while (match(s, /(^|[^A-Za-z0-9_.])-[0-9]+d/)) {
+          m = substr(s, RSTART, RLENGTH); sub(/^[^-]*-/, "", m)
+          if (m + 0 > days) { print "  -" m " is past the " days "-day retention: " substr($0, 1, 100); bad = 1 }
+          s = substr(s, RSTART + RLENGTH) } }
+      END { exit bad }'; then
+    echo "PASS retention-windows"
+    return 0
+  fi
+  echo "FAIL retention-windows"
+  return 1
+}
+
 # The deployed saved searches have the schedules and alert settings in savedsearches.expect.csv
 # (REST names: the conf keys counttype, relation and quantity read as alert_type,
 # alert_comparator and alert_threshold).
@@ -283,6 +308,7 @@ run_cases() {
   if [ "$pattern" = "*" ]; then
     if names_check; then pass=$((pass + 1)); else fail=$((fail + 1)); fi
     if static_names_check; then pass=$((pass + 1)); else fail=$((fail + 1)); fi
+    if retention_check; then pass=$((pass + 1)); else fail=$((fail + 1)); fi
     if conf_check; then pass=$((pass + 1)); else fail=$((fail + 1)); fi
     if dash_static; then pass=$((pass + 1)); else fail=$((fail + 1)); fi
     if docs_check; then pass=$((pass + 1)); else fail=$((fail + 1)); fi
