@@ -8,6 +8,9 @@
 # vault_hl_cribl_admin_password in the vault.
 
 # --- Preconditions ---
+- name: Check the previous S2S token
+  ansible.builtin.import_tasks: s2s_token_check.yml
+
 - name: Check the Cribl image is on HOMEPC
   ansible.windows.win_command:
     argv: [docker, image, inspect, --format, "{{ '{{.Id}}' }}", "{{ hl_cribl_image }}"]
@@ -41,6 +44,29 @@
     that: vault_hl_cribl_admin_password | default('') | length >= 12
     fail_msg: "vault_hl_cribl_admin_password is missing or shorter than 12 characters (ansible-vault edit inventory/group_vars/all/vault.yml)"
     quiet: true
+
+# Each device becomes a Cribl source id, a compose port, a JavaScript string in Cribl's metadata and
+# a quoted value in the self-test search; its name is also the host part of a cribl_block key.
+- name: Check syslog_devices
+  ansible.builtin.assert:
+    that:
+      - hl_cribl_dev_names | reject('match', '^[a-z0-9][a-z0-9_-]*$') | list | length == 0
+      - hl_cribl_dev_names | unique | length == hl_cribl_dev_names | length
+      - hl_cribl_dev_ports | unique | length == hl_cribl_dev_ports | length
+      - hl_cribl_dev_ports | select('le', 0) | list | length == 0
+      - hl_cribl_dev_ports | select('gt', 65535) | list | length == 0
+      - hl_cribl_dev_ports | intersect([hl_cribl_s2s_port | int, hl_cribl_api_port | int]) | length == 0
+      - syslog_devices | map(attribute='index') | reject('match', '^[a-z0-9][a-z0-9_-]*$') | list | length == 0
+      - (syslog_devices | map(attribute='sourcetype') | list + syslog_devices | map(attribute='source') | list)
+        | select('search', '["\x27\\\\]') | list | length == 0
+    fail_msg: >-
+      syslog_devices: each name and index must match ^[a-z0-9][a-z0-9_-]*$ and be unique (names);
+      each port unique, 1-65535 and not {{ hl_cribl_s2s_port }} or {{ hl_cribl_api_port }};
+      no quotes or backslashes in sourcetype or source
+    quiet: true
+  vars:
+    hl_cribl_dev_names: "{{ syslog_devices | map(attribute='name') | list }}"
+    hl_cribl_dev_ports: "{{ syslog_devices | map(attribute='port') | map('int') | list }}"
 
 - name: Marker before the Cribl changes
   ansible.builtin.include_tasks: marker.yml
@@ -88,7 +114,10 @@
     $user | Add-Member -NotePropertyName password -NotePropertyValue $env:HL_CRIBL_PW -Force
     $r = Invoke-HlCribl -Method PATCH -Path '/system/users/admin' -Json $user
     if ($r.Code -ne 200) { throw "password change: HTTP $($r.Code) $($r.Content)" }
-    if (-not (Connect-HlCribl)) { throw 'the new admin password does not log in' }
+    # Cribl refuses the new password for about a second after the change (seen live, task 3b)
+    $ok = $false
+    foreach ($i in 1..30) { if (Connect-HlCribl) { $ok = $true; break }; Start-Sleep -Milliseconds 500 }
+    if (-not $ok) { throw 'the new admin password does not log in' }
     'HL_PW=set'
   environment:
     HL_CRIBL_PW: "{{ vault_hl_cribl_admin_password }}"
@@ -131,7 +160,7 @@
       vars:
         hl_cribl_extra:
           inputs.yml:
-            inputs: "{{ hl_cribl_device_inputs }}"
+            inputs: "{{ hl_cribl_device_inputs | combine(hl_cribl_s2s_token_inputs) }}"
 
     - name: Create the staging directory on HOMEPC
       ansible.windows.win_tempfile:
@@ -169,6 +198,11 @@
       register: hl_cribl_swap
       changed_when: "'HL_RESULT=changed' in hl_cribl_swap.stdout"
 
+    - name: Keep the helper for the commit after the load check
+      ansible.windows.win_command:
+        argv: [docker, exec, -u, "0", "{{ hl_cribl_container }}", cp, /tmp/hl_cribl_stage/hl_cribl_config.sh, /tmp/hl_cribl_config.sh]
+      changed_when: false
+
   always:
     - name: Remove the container staging directory
       ansible.windows.win_command:
@@ -195,50 +229,95 @@
     hl_cribl_config_changed: "{{ hl_cribl_swap is changed }}"
     hl_cribl_any_change: "{{ hl_cribl_swap is changed or hl_cribl_up is changed }}"
 
-- name: Restart Cribl to load the changed config
-  ansible.windows.win_command:
-    argv: [docker, restart, "{{ hl_cribl_container }}"]
-  when: hl_cribl_config_changed | bool
-  changed_when: true
+# The helper wrote local/.hl_pushed.manifest.pending; only a restart that loads the config commits
+# it. If the restart or the load check fails, the next run sees the pending record as a change,
+# restarts again and checks again (spec 5.3).
+- name: Restart Cribl, check what it loaded, and commit the pushed config record
+  block:
+    # A restart, not `cribl reload`: the reload left the running workers on the old authTokens list and
+    # the API on the old file (measured, spec 14.13). With both tokens accepted a restart lost nothing.
+    - name: Restart Cribl to load the changed config
+      ansible.windows.win_command:
+        argv: [docker, restart, "{{ hl_cribl_container }}"]
+      when: hl_cribl_config_changed | bool
+      changed_when: true
 
-- name: Wait for Cribl to report healthy after the restart
-  ansible.windows.win_shell: |
-    {{ hl_cribl_ps_prelude }}
-    Get-HlCriblHealth | ConvertTo-Json -Compress
-  register: hl_cribl_health2
-  until: hl_cribl_health2.rc == 0 and (hl_cribl_health2.stdout | from_json).Code == 200
-  retries: "{{ (hl_cribl_health_timeout / 5) | int }}"
-  delay: 5
-  when: hl_cribl_config_changed | bool
-  changed_when: false
+    - name: Wait for Cribl to report healthy after the restart
+      ansible.windows.win_shell: |
+        {{ hl_cribl_ps_prelude }}
+        Get-HlCriblHealth | ConvertTo-Json -Compress
+      register: hl_cribl_health2
+      until: hl_cribl_health2.rc == 0 and (hl_cribl_health2.stdout | from_json).Code == 200
+      retries: "{{ (hl_cribl_health_timeout / 5) | int }}"
+      delay: 5
+      when: hl_cribl_config_changed | bool
+      changed_when: false
 
-- name: Check Cribl loaded the role's inputs, outputs, routes and pipelines
-  ansible.windows.win_shell: |
-    {{ hl_cribl_ps_prelude }}
-    if (-not (Connect-HlCribl)) { throw 'Cribl login failed' }
-    $want = [ordered]@{
-      '/system/inputs/in_splunk_tcp' = 'splunk'; '/system/inputs/in_cribl_audit' = 'file'
-      '/system/outputs/out_splunk' = 'splunk'; '/pipelines/pl_test_block' = $null; '/pipelines/pl_syslog_pre' = $null
-    }
-    foreach ($d in @({{ hl_cribl_device_inputs.keys() | map('to_json') | join(', ') }})) { $want["/system/inputs/$d"] = 'syslog' }
-    $out = [ordered]@{}
-    foreach ($p in @($want.Keys)) {
-      $r = Invoke-HlCribl -Path $p
-      $ok = $r.Code -eq 200
-      if ($ok -and $want[$p]) { $ok = (($r.Content | ConvertFrom-Json).items[0].type -eq $want[$p]) }
-      $out[$p] = $ok
-    }
-    $routes = (Invoke-HlCribl -Path '/routes/default').Content | ConvertFrom-Json
-    $out['routes'] = (@($routes.items[0].routes | ForEach-Object { $_.id }) -join ',')
-    $out | ConvertTo-Json -Compress
-  environment:
-    HL_CRIBL_PW: "{{ vault_hl_cribl_admin_password }}"
-  register: hl_cribl_loaded
-  changed_when: false
-  failed_when: >-
-    hl_cribl_loaded.rc != 0
-    or (hl_cribl_loaded.stdout | from_json | dict2items | selectattr('value', 'equalto', false) | list | length > 0)
-    or (hl_cribl_loaded.stdout | from_json).routes != 'r_cribl_self,r_syslog_devices,r_uf,r_default'
+    - name: Check Cribl loaded the role's inputs, outputs, routes, pipelines and breakers
+      ansible.windows.win_shell: |
+        {{ hl_cribl_ps_prelude }}
+        if (-not (Connect-HlCribl)) { throw 'Cribl login failed' }
+        $want = [ordered]@{
+          '/system/inputs/in_splunk_tcp' = 'splunk'; '/system/inputs/in_cribl_audit' = 'file'
+          # An unknown type is ignored silently and Cribl keeps its disabled default (task 3b: cribl_metrics)
+          '/system/inputs/CriblLogs' = 'cribl'; '/system/inputs/CriblMetrics' = 'criblmetrics'
+          '/system/outputs/out_splunk' = 'splunk'; '/pipelines/pl_test_block' = $null; '/pipelines/pl_syslog_pre' = $null
+        }
+        foreach ($d in @({{ hl_cribl_device_inputs.keys() | map('to_json') | join(', ') }})) { $want["/system/inputs/$d"] = 'syslog' }
+        $out = [ordered]@{}
+        foreach ($p in @($want.Keys)) {
+          $r = Invoke-HlCribl -Path $p
+          $ok = $r.Code -eq 200
+          if ($ok -and $want[$p]) {
+            $it = ($r.Content | ConvertFrom-Json).items[0]
+            $ok = ($it.type -eq $want[$p]) -and -not $it.disabled
+          }
+          $out[$p] = $ok
+        }
+        $routes = (Invoke-HlCribl -Path '/routes/default').Content | ConvertFrom-Json
+        $out['routes'] = (@($routes.items[0].routes | ForEach-Object { $_.id }) -join ',')
+        # A count only: what the API has loaded, which a reload can leave behind the file (spec 14.13)
+        $s2s = (Invoke-HlCribl -Path '/system/inputs/in_splunk_tcp').Content | ConvertFrom-Json
+        $out['s2s_tokens'] = @($s2s.items[0].authTokens).Count
+        # Cribl ignores config it doesn't understand without an error (spec 13): the UF breakers must
+        # be loaded, with the repo's rules, and attached to the UF source, or UF events are chopped
+        $b = Invoke-HlCribl -Path '/lib/breakers/hl_uf_breakers'
+        $out['/lib/breakers/hl_uf_breakers'] = $b.Code -eq 200
+        $out['breaker_rules'] = ''
+        if ($b.Code -eq 200) {
+          $out['breaker_rules'] = (@(($b.Content | ConvertFrom-Json).items[0].rules | ForEach-Object { $_.name }) -join '|')
+        }
+        $out['breaker_attached'] = @($s2s.items[0].breakerRulesets) -contains 'hl_uf_breakers'
+        $out | ConvertTo-Json -Compress
+      environment:
+        HL_CRIBL_PW: "{{ vault_hl_cribl_admin_password }}"
+      vars:
+        hl_cribl_breaker_rule_names: >-
+          {{ (lookup('ansible.builtin.file', hl_cribl_src ~ '/local/cribl/breakers.yml') | from_yaml).hl_uf_breakers.rules
+             | map(attribute='name') | join('|') }}
+      register: hl_cribl_loaded
+      changed_when: false
+      failed_when: >-
+        hl_cribl_loaded.rc != 0
+        or (hl_cribl_loaded.stdout | from_json | dict2items | selectattr('value', 'equalto', false) | list | length > 0)
+        or (hl_cribl_loaded.stdout | from_json).routes != 'r_cribl_self,r_syslog_devices,r_uf,r_default'
+        or (hl_cribl_loaded.stdout | from_json).s2s_tokens != (2 if vault_hl_s2s_token_previous | default('') | length > 0 else 1)
+        or (hl_cribl_loaded.stdout | from_json).breaker_rules != hl_cribl_breaker_rule_names
+
+    - name: Commit the pushed config record
+      ansible.windows.win_command:
+        argv: [docker, exec, -u, "0", "{{ hl_cribl_container }}", sh, /tmp/hl_cribl_config.sh, commit]
+      register: hl_cribl_commit
+      # Part of the change the swap already reported
+      changed_when: false
+      failed_when: hl_cribl_commit.rc != 0 or hl_cribl_commit.stdout is not search('HL_RESULT=(committed|nothing)')
+
+  always:
+    - name: Remove the helper from the Cribl container
+      ansible.windows.win_command:
+        argv: [docker, exec, -u, "0", "{{ hl_cribl_container }}", rm, -f, /tmp/hl_cribl_config.sh]
+      changed_when: false
+      failed_when: false
 
 # --- The test-block lookup: seeded once, then owned by cribl_block (spec 7.7) ---
 - name: Seed the test-block lookup through the API when Cribl has none
@@ -246,8 +325,9 @@
     {{ hl_cribl_ps_prelude }}
     if (-not (Connect-HlCribl)) { throw 'Cribl login failed' }
     $id = 'hl_ingest_block.csv'
-    if ((Invoke-HlCribl -Path "/system/lookups/$id").Code -eq 200) { 'HL_LOOKUP=present'; exit 0 }
-    $csv = {{ lookup('ansible.builtin.file', hl_cribl_src ~ '/data/lookups/hl_ingest_block.csv') | to_json }}
+    if (Test-HlCriblLookup $id) { 'HL_LOOKUP=present'; exit 0 }
+    # base64: a JSON string in PowerShell keeps \n literally and expands $ (task 3b)
+    $csv = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('{{ hl_cribl_seed_b64 }}'))
     $up = Invoke-HlCribl -Method PUT -Path "/system/lookups?filename=$id" -Raw $csv -ContentType 'text/csv'
     if ($up.Code -ne 200) { throw "lookup upload: HTTP $($up.Code) $($up.Content)" }
     $tmp = ($up.Content | ConvertFrom-Json).filename
@@ -256,8 +336,31 @@
     'HL_LOOKUP=created'
   environment:
     HL_CRIBL_PW: "{{ vault_hl_cribl_admin_password }}"
+  vars:
+    # rstrip=false keeps the file's final newline
+    hl_cribl_seed_b64: "{{ lookup('ansible.builtin.file', hl_cribl_src ~ '/data/lookups/hl_ingest_block.csv', rstrip=false) | b64encode }}"
   register: hl_cribl_lookup
   changed_when: "'HL_LOOKUP=created' in hl_cribl_lookup.stdout"
+
+- name: Read the test-block table's header in Cribl
+  ansible.windows.win_command:
+    argv: [docker, exec, "{{ hl_cribl_container }}", sh, -c, 'head -n 1 "$CRIBL_VOLUME_DIR/data/lookups/hl_ingest_block.csv"']
+  register: hl_cribl_lookup_head
+  changed_when: false
+
+# A broken header (e.g. a literal \n) makes every block row unreadable to pl_test_block
+- name: Check the test-block table's header
+  ansible.builtin.assert:
+    that: (hl_cribl_lookup_head.stdout | replace('\r', '') | trim) == 'k,until,reason,set_by'
+    fail_msg: "Cribl's hl_ingest_block.csv starts with {{ hl_cribl_lookup_head.stdout | to_json }}, not k,until,reason,set_by"
+    quiet: true
+
+# A new Cribl table has no blocks, so Splunk's mirror must show none either
+- name: Reset Splunk's mirror of the test-block table to the seed
+  ansible.builtin.include_tasks: cribl_mirror.yml
+  vars:
+    hl_mirror_csv: "{{ lookup('ansible.builtin.file', hl_cribl_src ~ '/data/lookups/hl_ingest_block.csv', rstrip=false) }}"
+  when: "'HL_LOOKUP=created' in hl_cribl_lookup.stdout"
 
 # --- Cribl's data reaches Splunk (the cribl heartbeat, spec 7.4) ---
 - name: Wait for Cribl's own logs and metrics in Splunk

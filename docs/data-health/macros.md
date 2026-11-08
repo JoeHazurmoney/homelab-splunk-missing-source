@@ -191,7 +191,7 @@ Writes the arrival tracker's run record: this run's time, the previous run, the 
 **300 seconds.** A clock change the operating system reports at least this large is a tamper finding ("big clock step"). Raise it to ignore bigger time corrections; lower it to catch smaller ones (normal NTP corrections may then show). Used by: `dh_tamper_win`, `dh_tamper_linux`.
 
 ### `dh_tamper_lookback_secs`
-**604800 seconds (7 days).** How far back DH Tamper re-checks each finding against Ansible markers on every run. Raise it to re-check older findings (slower); lower it to stop sooner. Keep it equal to `dh_tamper_finding_earliest`. Used by: `dh_tamper_finish`.
+**604800 seconds (7 days).** How far back DH Tamper re-checks each finding against Ansible markers on every run. Only findings this recent are written to the index, so an older finding is never alerted again. Raise it to re-check older findings (slower), but not past the indexes' 14-day retention, inside which DH Tamper reads what it already wrote; lower it to stop sooner. Keep it equal to `dh_tamper_finding_earliest`. Used by: `dh_tamper_finish`.
 
 ### `dh_tamper_finding_earliest`
 **`-7d`.** The event-time window DH Tamper reads findings from. Widen it to catch findings that arrive later (slower runs); narrow it to read less. It must match `dh_tamper_lookback_secs` (a test checks this). Used by: *DH Tamper*.
@@ -218,7 +218,7 @@ Writes the arrival tracker's run record: this run's time, the previous run, the 
 **2592000 seconds (30 days).** Forwarder rows not updated for this long, of hosts no longer expected, are pruned daily. Raise it to keep facts about retired hosts longer; lower it to forget them sooner. Used by: `dh_prune_mark_fwd`.
 
 ### `dh_tamper_retention_secs`
-**2592000 seconds (30 days).** Tamper findings older than this are pruned from the collection (the `data_health` index keeps them). Raise it to keep them on Host detail longer; lower it to keep the collection smaller. Used by: `dh_prune_mark_tamper`.
+**2592000 seconds (30 days).** Tamper findings older than this are pruned from the collection (the `data_health` index keeps them for 14 days, its retention). Raise it to keep them on Host detail longer; lower it to keep the collection smaller. Used by: `dh_prune_mark_tamper`.
 
 ### `dh_volume_retention_secs`
 **172800 seconds (2 days).** Volume rows not updated for this long are pruned. Raise it to keep stale hourly rows longer (nothing reads them); lower it to clean up sooner. Used by: `dh_prune_mark_volume`.
@@ -227,7 +227,7 @@ Writes the arrival tracker's run record: this run's time, the previous run, the 
 **2592000 seconds (30 days).** Baseline rows not recomputed for this long (the entity stopped sending) are pruned. Raise it to keep what was learned about a stream that comes back after a long break; lower it to forget it sooner. Used by: `dh_prune_mark_baseline`.
 
 ### `dh_admin_retention_secs`
-**7776000 seconds (90 days).** Admin-log rows older than this, already copied to the index, are pruned from the collection. Raise it to see more history on Manage; lower it to keep the table small (the index keeps a copy either way). Used by: `dh_prune_mark_admin_log`.
+**7776000 seconds (90 days).** Admin-log rows older than this, already copied to the index, are pruned from the collection. Raise it to see more history on Manage; lower it to keep the table small (the index keeps a copy for 14 days, its retention). Used by: `dh_prune_mark_admin_log`.
 
 ### `dh_fwd_expected_version`
 **`10.6.1.1`.** The Splunk agent version the role installs. Agents on another version are listed in the daily report and flagged on Host detail. Change it when the role pins a new version. Used by: `dh_soh_fwd`, `dh_ui_fwd`.
@@ -263,7 +263,7 @@ Writes the daily report rows (`source=dh:soh`). Used by: *DH Daily SoH report*.
 For each entity and completed day: how many events, how many active minutes, the longest and 95th-percentile silence, how late data arrived, and the hourly counts. Only minutes when Splunk (and, for agent hosts, the agent) were up count, so PC sleep never looks like silence; a silence still open at midnight carries into the next day. Arguments: `fwd`, `expected`. Used by: *DH Baseline daily*.
 
 ### `dh_daily_todo(now)`
-The completed days of the last 14 that have no daily record yet, so a missed night is caught up on the next run. Used by: *DH Baseline daily*, `dh_daily_window`.
+The completed days of the last 13 that have no daily record yet, so a missed night is caught up on the next run. Not 14: the indexes keep 14 days, so the raw data of the day that began 14 days ago may already be partly gone, and filling it in would record a silence that never happened. Used by: *DH Baseline daily*, `dh_daily_window`.
 
 ### `dh_daily_window(now)`
 The time window that covers those days (empty when nothing is due). Used by: *DH Baseline daily*.
@@ -285,7 +285,7 @@ Finds Windows tamper indicators: security or event log cleared (1102, 104), even
 Finds Linux tamper indicators: auditd stopped or aborted, audit rules changed, the Splunk agent, auditd or rsyslog stopped, events of the `hl-*` and `wd2l-*` audit keys, and big clock steps. Used by: *DH Tamper*.
 
 ### `dh_tamper_finish(tamper, now)`
-Groups indicators into findings (one per host, kind and 5-minute bucket), re-checks each finding of the last 7 days against every Ansible marker (a finding within `dh_tamper_window_secs` of a marker is the role's own work and is suppressed), and marks which ones still need writing to the index. Used by: *DH Tamper*.
+Groups indicators into findings (one per host, kind and 5-minute bucket), re-checks each finding of the last 7 days against every Ansible marker (a finding within `dh_tamper_window_secs` of a marker is the role's own work and is suppressed), and marks which ones of the last 7 days still need writing to the index (an older one never does: the index keeps 14 days, the collection 30). Used by: *DH Tamper*.
 
 ### `dh_tamper_collect_rows`
 Shapes findings for writing to the index. Used by: *DH Tamper*.
@@ -393,6 +393,42 @@ These macros hold the SPL behind the dashboard panels, so the tests run exactly 
 ### `dh_ui_time_fmt`
 **`%Y-%m-%d %H:%M`.** How dates are shown in dashboard tables. Used by: most `dh_ui_*` macros.
 
+### `dh_ui_time_fmt_tz`
+**`%Y-%m-%d %H:%M %Z`.** The same with the time zone, for every time shown on Manage (and the Unregistered list, which Daily state of health shares). Times follow the viewer's Splunk time zone, so the zone is spelled out. Used by: the Manage macros below, `dh_ui_unregistered`.
+
+### `dh_ui_item_words(id)`
+An Item ID (`level|index|host|sourcetype|source`) in words: `pi5: whole host`, `pi5 › syslog (enclave1)`, `pi5 › linux_secure › /var/log/secure (linux)`. Anything else comes back unchanged. Arguments: `id`, the field or expression holding the ID. Only what is shown changes; the stored IDs stay as they are. Used by: the Manage lists, previews, results and tables, `dh_ui_thresholds`.
+
+### `dh_ui_block_words(k)`
+A test-block key (`host|*|*`, `host|sourcetype|*`, `host|sourcetype|raw source`) in words: `pi5: whole host`, `pi5 › syslog`, `pi5 › linux_secure › /var/log/secure.1 (exact source)`. Arguments: `k`, the key. Used by: Manage, Test blocks tab and Admin log.
+
+### `dh_ui_action_words(action)`
+An admin-log action code in words: `override_mute` Mute, `override_unmute` Unmute, `override_threshold` Set limit, `override_clear` Clear limit, `expected_add` Add expected row, `expected_adopt` Adopt, `block_add` Add test block, `block_remove` Remove test block. The codes stay in the admin log. Used by: the Manage plan macros, `dh_ui_log_words`.
+
+### `dh_ui_secs_words(secs)`
+A number of seconds in words: whole days, hours or minutes (`7 days`, `1 hour`, `20 minutes`), else seconds (`90 s`). Used by: the Manage previews and Confirm choices, `dh_ui_overrides`.
+
+### `dh_ui_origin_words(origin)`
+Where an item's limit comes from (`dh_threshold`'s origin code) in words: Override (set on Manage), Fixed limit on its expected row, Learned from its history, Profile default, Profile default (the row's profile is unknown), None (INFO: never alerts). Used by: `dh_ui_thresholds`, `dh_ui_host_children`.
+
+### `dh_ui_log_words`
+Admin-log rows for display: the action and item in words, the time with its zone, and the detail's `->` shown as `→` (with `managed by` and `limit` for `managed_by` and `threshold`). The stored row is not changed. Used by: `dh_ui_log`, `dh_ui_admin_log`.
+
+### `dh_ui_admin_log(admin_log)`
+The admin log, newest first, for display, with the words its search box looks in. Used by: Manage, Admin log tab.
+
+### `dh_ui_hay_filter`
+The search box of a table: keeps the rows that contain every word of the box (words separated by `*`, not case-sensitive, compared literally as in `dh_ui_filter`). `*` keeps everything. Used by: Manage, Admin log tab.
+
+### `dh_ui_overrides(overrides)`
+The mutes and limit overrides in force, for display: the item in words, when the mute ends and the limit override in words, with their zone. Used by: Manage, Current mutes and limit overrides.
+
+### `dh_ui_blocks(blocks, now)`
+The current test blocks for display: the key in words, until when (with its zone) and whether each is still active; the placeholder row is left out. Used by: Manage, Current test blocks.
+
+### `dh_ui_indexes`
+The index choices of Manage's Add-row form, read from `dh_indexes` at run time, so the list of watched indexes lives in one place (the add-row check uses `dh_indexes` too). Used by: Manage, Expected list tab, Index.
+
 ### `dh_ui_headers`
 The plain column headers of every dashboard table ("Silent for / limit" instead of `age_vs_threshold`, "Host" instead of `host`). It is the last step of each table's search; the macros and tests keep the field names. Used by: every table panel.
 
@@ -430,7 +466,7 @@ Adds the filter attributes (site, owner, criticality, status, roll-up, descripti
 Outages that ended with a return to OK in the last 24 hours (a mute or an INFO profile is not a recovery). Used by: Overview, Recently recovered.
 
 ### `dh_ui_host_children(volume)`
-One host's expected rows: status, age against its limit, profile, where the limit comes from, any mute or test block, and last hour's volume. Used by: Host detail, Expected data from this host.
+One host's expected rows: status, age against its limit, profile, where the limit comes from (in words, `dh_ui_origin_words`), any mute or test block (with its time zone), and last hour's volume. Used by: Host detail, Expected data from this host.
 
 ### `dh_ui_fwd(now)`
 One host's forwarder facts as readable lines: version (flagged if not the expected one), OS, last heartbeat, last connection, last Ansible marker, last VM event, last probe. Used by: Host detail, Forwarder.
@@ -439,10 +475,10 @@ One host's forwarder facts as readable lines: version (flagged if not the expect
 Hyper-V Worker-Admin events with the VM name and what each event ID means. Used by: Host detail, Hyper-V VM events.
 
 ### `dh_ui_thresholds(baseline, expected)`
-For each entity: the configured limit, the profile default, the learned value before and after its clamp, the covered days, and the limit actually applied with its origin. Used by: Manage, Thresholds.
+For each entity: the limit actually applied and where it comes from (in words), the learned value after and before its clamp, the profile default, the configured limit and the covered days, with the item in words first. Used by: Manage, Thresholds.
 
 ### `dh_ui_unregistered(expected, state_fast, state_slow, baseline, now)`
-Sourcetypes and hosts that sent data in the last 7 days but are not on the expected list, with a suggested profile. Used by: Manage (Unregistered, and the Adopt list), Daily state of health.
+Sourcetypes and hosts that sent data in the last 7 days but are not on the expected list, with a suggested profile; times carry their zone. Used by: Manage (Unregistered, and the Adopt list), Daily state of health.
 
 ### `dh_ui_actor`
 Who is signed in (from the server, never from the page) and all their roles, including roles they inherit. Used by: the Manage previews and writes.
@@ -459,29 +495,29 @@ Turns a host name picked on a dashboard into a safe search filter for that host 
 ### `dh_ui_clean(fields)`
 Trims form values; empty or `-` means "none". Arguments: `fields`, the field names. Used by: the Manage plan macros.
 
-### `dh_ui_override_plan(overrides, now)`
-Checks a mute, unmute, threshold or clear request (reason required, mutes end within 30 days) and shows the override before and after. It also makes the confirmation code that the Apply choice carries. Used by: Manage, form 1.
+### `dh_ui_override_plan(overrides, admin_log, now)`
+Checks a mute, unmute, set-limit or clear-limit request (reason required, mutes end within 30 days). It returns what is logged (`before`, `after`, `action`), what the preview shows in words (`ui_change`, `ui_item`, `ui_now`, `ui_after`, `check`), the Confirm choice's text (`dh_label`, for example "Apply: mute pi5 › syslog (enclave1) for 1 hour") and the confirmation code that the choice carries. The code also covers the item's admin-log times (`admin_log`), so a confirmation fits only once: after DH Prune removes an expired mute, the old state is back but the log is not. Used by: Manage, Mute & thresholds tab.
 
 ### `dh_ui_override_write(overrides, admin_log, now)`
-Writes the override when the confirmation matches the current state, and logs it. A repeat or stale confirmation writes nothing. Used by: Manage, form 1.
+Writes the override when the confirmation matches the current state, and logs it. A repeat or stale confirmation writes nothing. Used by: Manage, Mute & thresholds tab.
 
-### `dh_ui_expected_plan(expected, now)`
-Checks a new or changed expected row (dh_admin only; Ansible-managed rows are refused) and shows it before and after, with its confirmation code. Used by: Manage, forms 2 and 3.
+### `dh_ui_expected_plan(expected, admin_log, now)`
+Checks a new or changed expected row (dh_admin only; the index must be one of `dh_indexes`; Ansible-managed rows are refused) and shows it before and after, in words for the preview and as logged, with its Confirm text and confirmation code. The code also covers the item's admin-log times, so a confirmation fits only once even when the change left the row as it was (a reload or a revisited tab re-runs the write). Arguments: `admin_log`, the admin log. Used by: Manage, Expected list tab (add and adopt).
 
 ### `dh_ui_expected_write(expected, admin_log, now)`
-Writes the expected row when the confirmation matches, and logs it. Used by: Manage, forms 2 and 3.
+Writes the expected row when the confirmation matches, and logs it. Used by: Manage, Expected list tab (add and adopt).
 
 ### `dh_ui_adopt_row(baseline, fwd)`
-Turns an unregistered entity into an expected-row request: agent hosts become `uf`, others `syslog`. An agent host's own row gets the `heartbeat` profile; any other row takes the baseline's suggestion, else continuous. Used by: Manage, form 3.
+Turns an unregistered entity into an expected-row request: agent hosts become `uf`, others `syslog`. An agent host's own row gets the `heartbeat` profile; any other row takes the baseline's suggestion, else continuous. Used by: Manage, Expected list tab (adopt).
 
-### `dh_ui_block_plan(blocks, now)`
-Checks a test-block request (dh_admin only; 60 s to 24 h; a source block needs an exact raw source) and shows the block before and after, with the normalized source for reference and its confirmation code. Used by: Manage, form 4.
+### `dh_ui_block_plan(blocks, admin_log, now)`
+Checks a test-block request (dh_admin only; 1 minute to 24 hours; a source block needs an exact raw source) and shows the block before and after, in words for the preview and as logged, with the normalized source for reference, its Confirm text and its confirmation code. The code covers the whole current table and the key's admin-log times (`admin_log`), so a confirmation fits only once, even after DH Prune has removed the expired block. Used by: Manage, Test blocks tab.
 
 ### `dh_ui_block_rows(blocks, now)`
 The whole new test-block table for a confirmed request; when that would leave the table empty, one placeholder row that matches nothing (DH Prune removes it within a minute). Used by: `dh_ui_block_write`.
 
 ### `dh_ui_block_write(blocks, admin_log, now)`
-Rewrites the test-block table (key column first, as the ingest rule needs) and logs the change. Used by: Manage, form 4.
+Rewrites the test-block table (key column first, as the ingest rule needs) and logs the change. Used by: Manage, Test blocks tab.
 
 ### `dh_ui_log(admin_log, now)`
-Adds one admin-log row per applied change and returns the result line ("applied: …" or "nothing applied: …"). Used by: the three write macros.
+Adds one admin-log row per applied change and returns the result in words ("Done: Mute pi5: whole host", or "Nothing written: …" when the confirmation no longer fits). What is stored is unchanged. Used by: the three write macros.

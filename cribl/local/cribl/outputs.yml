@@ -16,7 +16,7 @@ outputs:
     connectionTimeout: 10000
     writeTimeout: 60000
     # The spike lost ≈ 30 s on a splunkd restart with enableACK true and maxS2Sversion v3
-    # (§14.7 g). v4 is the first option to test; see docs/handoff/task-3b-cribl.md.
+    # (§14.7 g). v4 is the first option to test, in task 4 (docs/handoff/task-3b-cribl.md check 6).
     enableACK: true
     maxS2Sversion: v4
     # Cribl adds the indexed field cribl_pipe by default (spike §14.7 b); [] adds nothing.

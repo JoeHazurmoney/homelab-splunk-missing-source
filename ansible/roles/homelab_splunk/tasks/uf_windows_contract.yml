@@ -1,0 +1,43 @@
+# The Windows uninstall contract (spec 5.6), included by uf_windows_uninstall.yml after the
+# removal. Fails on any leftover, and fails closed: a group it can't enumerate, a member SID it
+# can't read or a secedit export that fails stops the script (rc != 0), and that fails the task.
+# Members are read through ADSI, which survives an orphaned SID (task 5 review I1).
+#   vars: hl_unw_sids (the service SIDs), hl_unw_product (the product code, may be ''),
+#         hl_uf_win_groups
+- name: Gather what is left
+  ansible.windows.win_shell:
+    cmd: |
+      $ErrorActionPreference = 'Stop'
+      {{ hl_win_acct_ps }}
+      $sids = @({{ hl_unw_sids | map('to_json') | join(', ') }})
+      $keys = @('HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*',
+                'HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*')
+      $pc = '{{ hl_unw_product | replace("'", "''") }}'
+      $prod = @(Get-ItemProperty $keys -ErrorAction SilentlyContinue |
+        Where-Object { $_.DisplayName -like 'UniversalForwarder*' -or ($pc -and $_.PSChildName -eq $pc) })
+      $members = @()
+      foreach ($g in @({{ hl_uf_win_groups | map(attribute='sid') | map('to_json') | join(', ') }})) {
+        $members += @(@(Get-HlGroupMemberSids $g) | Where-Object { $sids -contains $_ } | ForEach-Object { "$g/$_" })
+      }
+      @{
+        product = $prod.Count
+        folder = (Test-Path -LiteralPath '{{ hl_uf_win_home | replace("'", "''") }}')
+        service_key = (Test-Path -LiteralPath 'HKLM:\SYSTEM\CurrentControlSet\Services\{{ hl_uf_win_service }}')
+        stage = (Test-Path -LiteralPath '{{ hl_win_state_dir | replace("'", "''") }}\stage')
+        members = $members
+        rights = @(Get-HlUserRights $sids)
+      } | ConvertTo-Json -Compress
+  register: hl_unw_left
+  changed_when: false
+
+- name: Check the uninstall contract
+  ansible.builtin.assert:
+    that:
+      - (hl_unw_left.stdout | from_json).product == 0
+      - not (hl_unw_left.stdout | from_json).folder
+      - not (hl_unw_left.stdout | from_json).service_key
+      - not (hl_unw_left.stdout | from_json).stage
+      - (hl_unw_left.stdout | from_json).members | length == 0
+      - (hl_unw_left.stdout | from_json).rights | length == 0
+    fail_msg: "uninstall left something behind: {{ hl_unw_left.stdout }}"
+    success_msg: "uninstall contract passed: no product, folder, service key, staging folder, group membership or user right ({{ hl_unw_left.stdout }})"

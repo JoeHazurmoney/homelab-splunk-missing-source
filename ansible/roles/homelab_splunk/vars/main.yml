@@ -67,12 +67,14 @@ hl_ps_prelude: |
     return Invoke-HlWeb -Method GET -Uri ($HlHec + '/services/collector/health')
   }
 
-# PowerShell prepended to the Cribl win_shell tasks (cribl, cribl_block, cribl_remove). The Cribl
-# admin password arrives in the environment variable HL_CRIBL_PW (the task's `environment`, with
-# no_log), never in the script text.
+# PowerShell prepended to the Cribl win_shell tasks (cribl, cribl_block). The Cribl admin password
+# arrives in the environment variable HL_CRIBL_PW (the task's `environment`), never in the script
+# text, so it is not in the result's `cmd`; Ansible doesn't return the environment in a result (task
+# 3b checked its -v logs for the value: none). The password-change task also has no_log.
 #   Connect-HlCribl [-Password <pw>]  -> logs in, keeps the bearer token for Invoke-HlCribl ($true/$false)
 #   Invoke-HlCribl -Method GET|POST|PATCH|PUT|DELETE -Path /system/... [-Json <object>] [-Raw <string> -ContentType <type>]
 #                                     -> {Code, Content}
+#   Test-HlCriblLookup <id>           -> $true when Cribl has that lookup
 #   Get-HlCriblHealth                 -> {Code, Content} of /api/v1/health (no login)
 hl_cribl_ps_prelude: |
   $ErrorActionPreference = 'Stop'
@@ -106,16 +108,39 @@ hl_cribl_ps_prelude: |
     if (-not $script:HlCriblToken) { throw 'Invoke-HlCribl: not logged in (Connect-HlCribl)' }
     $h = @{ Authorization = 'Bearer ' + $script:HlCriblToken }
     $body = $null
+    # An omitted [string]$Raw is '' (never $null), and a GET with a body throws: test the binding
     if ($null -ne $Json) { $body = $Json | ConvertTo-Json -Depth 20 -Compress }
-    elseif ($null -ne $Raw) { $body = [Text.Encoding]::UTF8.GetBytes($Raw) }
+    elseif ($PSBoundParameters.ContainsKey('Raw')) { $body = [Text.Encoding]::UTF8.GetBytes($Raw) }
     return Invoke-HlCriblWeb -Method $Method -Uri ($HlCriblApi + $Path) -Headers $h -Body $body -ContentType $ContentType
+  }
+  # GET /system/lookups/<id> answers 200 with no items for a missing lookup (seen live, task 3b)
+  function Test-HlCriblLookup {
+    param([string]$Id)
+    $r = Invoke-HlCribl -Path "/system/lookups/$Id"
+    return ($r.Code -eq 200 -and @(($r.Content | ConvertFrom-Json).items).Count -gt 0)
   }
   function Get-HlCriblHealth {
     return Invoke-HlCriblWeb -Method GET -Uri ($HlCriblApi + '/health')
   }
 
+# During a token rotation (spec 13) in_splunk_tcp accepts both tokens. Merged over the repo's
+# inputs.yml (a list replaces the file's list), so the file stays plain YAML for yamllint and an empty
+# vault_hl_s2s_token_previous adds nothing: the rendered file is byte for byte a normal run's.
+hl_cribl_s2s_token_inputs: "{{ {} if vault_hl_s2s_token_previous | default('') | length == 0 else
+  {'in_splunk_tcp': {'authTokens': [{'token': vault_hl_s2s_token, 'description': 'homelab UFs (vault_hl_s2s_token)'},
+    {'token': vault_hl_s2s_token_previous, 'description': 'the old token, during a rotation (vault_hl_s2s_token_previous)'}]}} }}"
+# A valid S2S token: a UUID, what bootstrap-pi.sh generates (uuid4)
+hl_s2s_token_re: '^[0-9a-fA-F]{8}(-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}$'
+
 # One Cribl syslog source per syslog_devices entry, merged into cribl/local/cribl/inputs.yml
 hl_cribl_device_inputs: "{{ lookup('ansible.builtin.template', 'cribl/device_inputs.yml.j2') | from_yaml }}"
+
+# Splunk's splunktcp listener inside the container (the image's etc/system/local, spec 5.5), which
+# Cribl's out_splunk sends to over hl-net
+hl_splunk_tcp_port: 9997
+
+# Splunk's copy of the test-block table (cribl_block mirrors Cribl's table here, spec 7.2)
+hl_cribl_mirror_path: "{{ hl_splunk_home }}/etc/apps/hl_server_base/lookups/hl_ingest_block.csv"
 
 # The Linux UF's tamper audit rules (spec 5.4): b32 and b64 forms of each, keyed hl-*
 hl_uf_tamper_rules:
@@ -125,10 +150,64 @@ hl_uf_tamper_rules:
   - {kind: dir, path: /etc/rsyslog.d, key: hl-syslog-config}
   - {kind: dir, path: /etc/audit, key: hl-audit-config}
 hl_uf_tamper_file: /etc/audit/rules.d/zz-hl-uf-tamper.rules
+# ERE for these rules and for wd2l's in `auditctl -l`, which prints a syscall rule's key as
+# `-F key=<key>` (task 4, audit 4.0.3) and a watch rule's (`-w`) as `-k <key>`
+hl_uf_tamper_key_re: "(-F key=|-k )({{ hl_uf_tamper_rules | map(attribute='key') | unique | join('|') }})$"
+hl_wd2l_audit_key_re: "(-F key=|-k )wd2l-"
+# ERE for the UF's splunkd.log lines that end a connection to Cribl. The UF logs a wrong token as a
+# plain "Connection closed by server" (task 4 check 7), the same as a benign close.
+hl_uf_close_re: "Invalid S2S token|Connection closed by server|unauthorized"
 # The files of hl_uf_outputs (templates/uf/hl_uf_outputs/default/<name>.j2)
 hl_uf_outputs_files: [app.conf, outputs.conf, limits.conf, web.conf]
-# The UF's CLI, run as its own user (running it as root warns about SPLUNK_HOME ownership, spike 14 d)
+# The UF's CLI. The role runs it only as root, for boot-start (enable/disable), which needs root;
+# status, FIPS and the connection are read from systemd, /proc, the rpm and splunkd.log instead.
 hl_uf_cli: "{{ hl_uf_home }}/bin/splunk"
+
+# PowerShell for the Windows UF's group memberships and user rights (install, uninstall and its
+# contract). Every read error throws, so a check that can't read fails instead of passing
+# (task 5 review I1). Get-LocalGroupMember throws on a group that holds an orphaned SID
+# (PowerShell #2996), which is the case the uninstall contract exists for, so members are read
+# through ADSI (WinNT) and compared by SID.
+#   Get-HlGroupMemberSids <group SID>         -> the members' SIDs (strings; wrap the call in @())
+#   Remove-HlGroupMember <group SID> <SID>    -> removes it (the cmdlet, else ADSI by SID), then checks
+#   Get-HlUserRights <SID[]>                  -> the user rights (Se…) that name any of them (secedit; wrap in @())
+hl_win_acct_ps: |
+  function Get-HlGroupName {
+    param([string]$GroupSid)
+    return (New-Object Security.Principal.SecurityIdentifier($GroupSid)).Translate([Security.Principal.NTAccount]).Value.Split('\')[-1]
+  }
+  function Get-HlGroupMemberSids {
+    param([string]$GroupSid)
+    $grp = [ADSI]("WinNT://$env:COMPUTERNAME/$(Get-HlGroupName $GroupSid),group")
+    $out = @()
+    foreach ($m in @($grp.Invoke('Members'))) {
+      $b = $m.GetType().InvokeMember('objectSid', 'GetProperty', $null, $m, $null)
+      $out += (New-Object Security.Principal.SecurityIdentifier([byte[]]$b, 0)).Value
+    }
+    return $out
+  }
+  function Remove-HlGroupMember {
+    param([string]$GroupSid, [string]$MemberSid)
+    try { Remove-LocalGroupMember -SID $GroupSid -Member $MemberSid -ErrorAction Stop }
+    catch { ([ADSI]("WinNT://$env:COMPUTERNAME/$(Get-HlGroupName $GroupSid),group")).Remove("WinNT://$MemberSid") }
+    if (@(Get-HlGroupMemberSids $GroupSid) -contains $MemberSid) { throw "$MemberSid is still in $GroupSid after the removal" }
+  }
+  function Get-HlUserRights {
+    param([string[]]$Sids)
+    $tmp = Join-Path $env:TEMP ("hl_secedit_" + [guid]::NewGuid() + ".inf")
+    try {
+      $o = secedit /export /areas USER_RIGHTS /cfg $tmp | Out-String
+      if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $tmp)) { throw "secedit /export failed (exit $LASTEXITCODE): $($o.Trim())" }
+      $rights = @()
+      foreach ($line in (Get-Content -LiteralPath $tmp)) {
+        if ($line -match '^(Se\w+)\s*=\s*(.*)$') {
+          $name = $Matches[1]; $val = $Matches[2]
+          foreach ($s in $Sids) { if ($val -match ('(^|,)\*' + [regex]::Escape($s) + '(,|$)')) { $rights += $name } }
+        }
+      }
+      return @($rights | Sort-Object -Unique)
+    } finally { Remove-Item -LiteralPath $tmp -Force -ErrorAction SilentlyContinue }
+  }
 
 # This host's inputs after hl_input_overrides, hl_disabled_inputs and the rows' `hosts` (spec 5.2,
 # 5.3 "turn off receipt"). The forwarder apps render only the enabled rows; `expected` (task 10)

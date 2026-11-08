@@ -1,0 +1,3 @@
+c,dh_action,level,host,target,dh_secs,reason,actor,actor_roles
+b1,add,source,h5,linux_audit|/var/log/audit/audit.log.1,900,r,taylor,admin
+b2,remove,host,h1,-,,done,taylor,admin

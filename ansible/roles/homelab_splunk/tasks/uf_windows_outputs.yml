@@ -13,6 +13,7 @@
     dest: "{{ hl_uf_win_home }}\\etc\\apps\\hl_uf_outputs\\default\\{{ item }}"
   loop: "{{ hl_uf_outputs_files }}"
   register: hl_uf_outputs_render
+  diff: false
   no_log: true    # outputs.conf holds the token
 
 - name: Note whether hl_uf_outputs changed
@@ -22,13 +23,17 @@
       | select('equalto', 'outputs.conf') | list | length > 0 }}"
 
 - name: Drop the UF's stale encrypted token copy (outputs.conf changed)
-  ansible.windows.win_shell: |
-    $f = '{{ hl_uf_win_home }}\etc\apps\hl_uf_outputs\local\outputs.conf'
-    if (Test-Path -LiteralPath $f) {
-      $keep = @(Get-Content -LiteralPath $f | Where-Object { $_ -notmatch '^\s*token\s*=' })
-      Set-Content -LiteralPath $f -Value $keep
-      'HL_DROPPED'
-    }
+  ansible.windows.win_shell:
+    cmd: |
+      $f = '{{ hl_uf_win_home | replace("'", "''") }}\etc\apps\hl_uf_outputs\local\outputs.conf'
+      $n = 0
+      if (Test-Path -LiteralPath $f) {
+        $all = @(Get-Content -LiteralPath $f)
+        $keep = @($all | Where-Object { $_ -notmatch '^\s*token\s*=' })
+        $n = $all.Count - $keep.Count
+        if ($n -gt 0) { Set-Content -LiteralPath $f -Value $keep -Encoding ASCII }
+      }
+      "HL_DROPPED=$n"
   register: hl_ufw_token_drop
-  changed_when: "'HL_DROPPED' in hl_ufw_token_drop.stdout"
+  changed_when: hl_ufw_token_drop.rc == 0 and hl_ufw_token_drop.stdout is not search('HL_DROPPED=0')
   when: hl_uf_outputs_token_changed | bool
