@@ -1,0 +1,12 @@
+level,index,host,sourcetype,source,collection,via,profile,interval_secs,max_gap_secs,criticality,enabled,expected_since
+host,,cribl,,,syslog,,heartbeat,,120,1,,
+sourcetype,cribl,cribl,cribl,,syslog,,heartbeat,,120,1,,
+host,,h35a,,,uf,cribl,heartbeat,,,2,,
+sourcetype,linux,h35a,syslog,,uf,cribl,continuous,,600,2,,
+sourcetype,linux,h35a,cpu,,uf,cribl,continuous,,600,2,,
+host,,h35b,,,uf,cribl,heartbeat,,,2,,
+sourcetype,linux,h35b,syslog,,uf,cribl,continuous,,600,2,,
+sourcetype,linux,h35b,cpu,,uf,cribl,continuous,,600,2,,
+host,,h35c,,,uf,other,heartbeat,,,2,,
+sourcetype,linux,h35c,syslog,,uf,other,continuous,,600,2,,
+sourcetype,linux,h35c,cpu,,uf,other,continuous,,600,2,,

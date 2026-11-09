@@ -7,3 +7,14 @@ plan:b5,1,OK: run the command below on pi5,h3|cpu|cpu,cpu,blocked until 2033-05-
 plan:b6,0,A test block lasts 1 minute to 24 hours,h1|*|*,,blocked until 2033-05-18 03:43 (old block),test block until 2033-05-19 04:33 (r),NOW+90000,r,taylor
 plan:b7,0,Needs the dh_admin role,h1|*|*,,blocked until 2033-05-18 03:43 (old block),test block until 2033-05-18 04:33 (r),NOW+3600,r,ana
 plan:b8,0,Choose the raw source,h5|linux_audit|*,*,not blocked,test block until 2033-05-18 03:34 (r),NOW+60,r,taylor
+plan:r1,0,This raw source has a character the command can't carry safely: block its sourcetype instead,-,,not blocked,test block until 2033-05-18 03:34 (r),NOW+60,r,taylor
+plan:r2,0,This raw source has a character the command can't carry safely: block its sourcetype instead,-,,not blocked,test block until 2033-05-18 03:34 (r),NOW+60,r,taylor
+plan:r3,0,This raw source has a character the command can't carry safely: block its sourcetype instead,-,,not blocked,test block until 2033-05-18 03:34 (r),NOW+60,r,taylor
+plan:r4,0,This raw source has a character the command can't carry safely: block its sourcetype instead,-,,not blocked,test block until 2033-05-18 03:34 (r),NOW+60,r,taylor
+plan:r5,0,This raw source has a character the command can't carry safely: block its sourcetype instead,-,,not blocked,test block until 2033-05-18 03:34 (r),NOW+60,r,taylor
+plan:r6,0,This raw source has a character the command can't carry safely: block its sourcetype instead,-,,not blocked,test block until 2033-05-18 03:34 (r),NOW+60,r,taylor
+plan:r7,0,This raw source has a character the command can't carry safely: block its sourcetype instead,-,,not blocked,test block until 2033-05-18 03:34 (r),NOW+60,r,taylor
+plan:r8,0,This raw source has a character the command can't carry safely: block its sourcetype instead,-,,not blocked,test block until 2033-05-18 03:34 (r),NOW+60,r,taylor
+plan:r9,0,This raw source has a character the command can't carry safely: block its sourcetype instead,-,,not blocked,test block until 2033-05-18 03:34 (r),NOW+60,r,taylor
+plan:r10,0,This raw source has a character the command can't carry safely: block its sourcetype instead,-,,not blocked,test block until 2033-05-18 03:34 (r),NOW+60,r,taylor
+plan:r11,0,This sourcetype has a character the command can't carry safely: block the whole host instead,-,,not blocked,test block until 2033-05-18 03:34 (r),NOW+60,r,taylor

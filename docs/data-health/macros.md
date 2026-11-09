@@ -126,7 +126,7 @@ Rolls a host's rows up to DOWN (its liveness is missing, or, for agentless hosts
 ## Likely cause and action
 
 ### `dh_eval_cause`
-Picks the most likely cause of an entity that is not OK, in a fixed order: the hold, a mute, "just added" (newly expected and not yet seen), a test block, an Ansible stop, the VM being off, a tamper finding, a relay down, the device probe, the heartbeat, and finally "this stream stopped". Used by: `dh_eval`.
+Picks the most likely cause of an entity that is not OK, in a fixed order: the hold, a mute, "just added" (newly expected and not yet seen), a test block, an Ansible stop, the VM being off, a tamper finding, a relay down, the device probe, a silent *hl:devprobe* row while its host's heartbeat is OK, the heartbeat, and finally "this stream stopped". Used by: `dh_eval`.
 
 ### `dh_eval_cause_text`
 Turns each cause code into the plain sentence shown in the Cause column and the next step shown in the Action column (for example "Start it again with the role: ansible-playbook site.yml --tags start --limit wd2l-recv"). The texts use the names the panels use ("Splunk agent", not UF or splunkd) and say what any command does. The full list is in [dashboards.md](dashboards.md#causes-what-the-cause-column-can-say). Used by: `dh_eval`.
@@ -137,7 +137,7 @@ Turns each cause code into the plain sentence shown in the Cause column and the 
 Loads the enabled expected rows and joins each with the latest arrival at its level (source, sourcetype or whole host), taking the later of the fast and slow trackers. Arguments: the expected list and the two arrival tables. Used by: `dh_eval`.
 
 ### `dh_eval_facts(fwd, overrides, baseline, tamper, prev)`
-Adds the facts each row needs: forwarder heartbeat, last Ansible marker, last Hyper-V event and device probe (by host); the entity's and its host's override; the learned baseline; tamper findings on the host (marking those suppressed by a marker); and the previous status. Used by: `dh_eval`.
+Adds the facts each row needs: forwarder heartbeat, last Ansible marker, last Hyper-V event and device probe (by host); the entity's and its host's override; the learned baseline; tamper findings on the host, and on host *cribl* too for a row that arrives through Cribl (marking those suppressed by a marker); and the previous status. Used by: `dh_eval`.
 
 ### `dh_eval_blocks(blocks)`
 Marks rows covered by an active test block (whole host, a sourcetype, or one exact raw source) so the cause says "test block until hh:mm". Only the linux, windows and network indexes can be blocked. Arguments: `blocks`, the test-block table. Used by: `dh_eval`.
@@ -514,10 +514,10 @@ Writes the expected row when the confirmation matches, and logs it. Used by: Man
 Turns an unregistered entity into an expected-row request: agent hosts become `uf`, others `syslog`. An agent host's own row gets the `heartbeat` profile; any other row takes the baseline's suggestion, else continuous. Used by: Manage, Expected list tab (adopt).
 
 ### `dh_ui_block_command`
-The test block lives in Cribl, so Manage shows the command to run instead of writing it: the role's *cribl_block* line for a checked request (setting with minutes and reason, or clearing), with the reason reduced to plain characters. Used by: Manage, Test blocks tab.
+The test block lives in Cribl, so Manage shows the command to run instead of writing it: the role's *cribl_block* line for a checked request (setting with minutes and reason, or clearing), with the key in plain single quotes and the reason reduced to plain characters. Used by: Manage, Test blocks tab.
 
 ### `dh_ui_block_plan(blocks, now)`
-Checks a test-block request (dh_admin only; 1 minute to 24 hours; a source block needs an exact raw source) against Splunk's copy of the block table and shows the block before and after, in words for the preview and as logged, with the normalized source for reference. Nothing is written from here: when the check says OK, `dh_ui_block_command` gives the role's command. Used by: Manage, Test blocks tab.
+Checks a test-block request (dh_admin only; 1 minute to 24 hours; a source block needs an exact raw source; a sourcetype or source with a character the command can't carry, such as a quote, `$`, a comma, a space or `{`, is refused) against Splunk's copy of the block table and shows the block before and after, in words for the preview and as logged, with the normalized source for reference. Nothing is written from here: when the check says OK, `dh_ui_block_command` gives the role's command. Used by: Manage, Test blocks tab.
 
 ### `dh_ui_log(admin_log, now)`
 Adds one admin-log row per applied change and returns the result in words ("Done: Mute pi5: whole host", or "Nothing written: …" when the confirmation no longer fits). What is stored is unchanged. Used by: the three write macros.

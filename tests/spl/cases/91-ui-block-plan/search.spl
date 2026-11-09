@@ -1,2 +1,4 @@
-| inputlookup @req@ | `dh_ui_block_plan(@blk@, @NOW@)` | eval g="plan"
+| inputlookup @req@ | eval target=replace(replace(replace(replace(target, ";", ","), "~", urldecode("%0A")), "#Q#", urldecode("%22")), "#B#", urldecode("%5C"))
+| `dh_ui_block_plan(@blk@, @NOW@)` | eval g="plan"
 | eval g=g.":".coalesce(c, "file")
+| eval k=if(dh_ok==0 AND match(c, "^r[0-9]+$"), "-", k), source_norm=if(dh_ok==0 AND match(c, "^r[0-9]+$"), "", source_norm)
