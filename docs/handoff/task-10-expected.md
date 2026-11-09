@@ -43,7 +43,7 @@ ansible-playbook site.yml --tags expected --limit homepc        # expect changed
 
 | # | Check | How | Pass | If it fails |
 |---|---|---|---|---|
-| 1 | Fixture `97-sync-plan` and the full suite | `tests/spl/run.sh` | all PASS, including savedsearch-settings and docs-coverage | a diff in 93: compare the `dh_change` column first. KV number fields can come back as `2.0`, which `dh_sync_sig` rounds; check `interval_secs` |
+| 1 | Fixture `97-sync-plan` and the full suite | `tests/spl/run.sh` | all PASS, including savedsearch-settings and docs-coverage | a diff in `97-sync-plan`: compare the `dh_change` column first. KV number fields can come back as `2.0`, which `dh_sync_sig` rounds; check `interval_secs` |
 | 2 | **Each enabled input has a row** (done-when) | `\| inputlookup dh_expected where managed_by="ansible" enabled=1 \| stats count by host level` | a row per enabled input, per the rendered file (§14.17) | compare with `\| inputlookup dh_expected_ansible.csv` |
 | 3 | Idempotence | second `--tags expected`; also wait 5 min | `written=0`; the scheduled run writes nothing | a row rewritten every time: its signature differs between the file and KV (KV type coercion); add `round(tonumber())` to that field in `dh_sync_sig` |
 | 4 | **Removing one retires it** (done-when) | `-e '{"hl_disabled_inputs":["monitor:///var/log/cron"]}' --tags expected --limit homepc` (the input itself stays, so the UFs aren't touched; `-e` applies to all hosts) | the cron source rows get `enabled=0`; DH Evaluate drops their status within a minute; the Overview stops showing them. Rerun without `-e`: they come back, with a fresh grace period | — |

@@ -367,6 +367,10 @@ argument_specs:
         elements: dict
         default: []
         description: Extra rows for dh_expected_ansible.csv (columns as in the file), for what Ansible can't derive.
+      hl_expected:
+        type: bool
+        default: true
+        description: Per host. False renders no expected rows for the host, so the next expected run retires them (after an uninstall).
       hl_verify_status_wait:
         type: int
         default: 150
