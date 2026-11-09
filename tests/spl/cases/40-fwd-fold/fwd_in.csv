@@ -16,3 +16,5 @@ ufint,NOW-510,pi5,,,,,,,,,,,,10-31-2026 22:31:00.001 +0000 INFO  loader [1 MainT
 ufint,NOW-500,pi5,,,,,,,,,,,,10-31-2026 22:31:10.002 +0000 INFO  loader [1 MainThread] - System info: Linux; pi5; 6.12.96-20260724.v8.1.el10; #1 SMP PREEMPT Thu Jul 24 2026; aarch64.,,
 ufint,NOW-25,pi5,,,,,,,,,,,,10-31-2026 22:39:50.003 +0000 INFO  AutoLoadBalancedConnectionStrategy [99 TcpOutEloop] - Connected to idx=192.168.1.27:9997:0; pset=0; reuse=0. using ACK.,,
 ufint,NOW-15,wd2l-splunk,wd2l-splunk,,,,,,,,,,,10-31-2026 22:40:00.000 +0000 INFO  loader - System info: Linux; wd2l-splunk; 6.6.87.2; #1 SMP; x86_64.,,
+ufint,NOW-41,HOMEPC.mshome.net,,,,,,,,,,,,11-08-2026 17:34:19.377 -0700 INFO  loader [8148 MainThread] - Splunkd starting (build b2ae2962645c).,,
+ufint,NOW-40,HOMEPC.mshome.net,,,,,,,,,,,,11-08-2026 17:34:19.377 -0700 INFO  loader [8148 MainThread] - System info: Windows; HOMEPC; 0; 10; x64.,,

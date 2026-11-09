@@ -1,14 +1,9 @@
-g,dh_ok,has_token,check,k,source_norm,before,after,dh_plan,dh_out,until,reason,set_by
-plan:b1,1,1,OK: choose Apply under Confirm to write this change,h1|*|*,,blocked until 2033-05-18 03:43 (old block),test block until 2033-05-18 04:33 (retest),,,NOW+3600,retest,taylor
-plan:b2,1,1,OK: choose Apply under Confirm to write this change,h4|linux_secure|*,,not blocked,test block until 2033-05-18 03:48 (r),,,NOW+900,r,taylor
-plan:b3,1,1,OK: choose Apply under Confirm to write this change,h5|linux_audit|/var/log/audit/audit.log.1,/var/log/audit/audit.log.*,not blocked,test block until 2033-05-18 03:34 (r),,,NOW+60,r,taylor
-plan:b4,0,0,This has no active test block: nothing to remove,h2|syslog|*,,not blocked,not blocked,,,,r,taylor
-plan:b5,1,1,OK: choose Apply under Confirm to write this change,h3|cpu|cpu,cpu,blocked until 2033-05-18 03:38 (keep),not blocked,,,,r,taylor
-plan:b6,0,0,A test block lasts 1 minute to 24 hours,h1|*|*,,blocked until 2033-05-18 03:43 (old block),test block until 2033-05-19 04:33 (r),,,NOW+90000,r,taylor
-plan:b7,0,0,Needs the dh_admin role,h1|*|*,,blocked until 2033-05-18 03:43 (old block),test block until 2033-05-18 04:33 (r),,,NOW+3600,r,ana
-plan:b8,0,0,Choose the raw source,h5|linux_audit|*,*,not blocked,test block until 2033-05-18 03:34 (r),,,NOW+60,r,taylor
-add:r1,1,,OK: choose Apply under Confirm to write this change,h1|*|*,,blocked until 2033-05-18 03:43 (old block),test block until 2033-05-18 04:33 (retest),1,1,NOW+3600,retest,taylor
-add:file,,,,h3|cpu|cpu,,,,,1,NOW+300,keep,admin
-remove:r2,1,,OK: choose Apply under Confirm to write this change,,cpu,blocked until 2033-05-18 03:38 (keep),not blocked,1,0,,,
-remove:file,,,,h1|*|*,,,,,1,NOW+600,old block,admin
-last:r2,1,,OK: choose Apply under Confirm to write this change,-,cpu,blocked until 2033-05-18 03:38 (keep),not blocked,1,1,0,placeholder: no test blocks,taylor
+g,dh_ok,check,k,source_norm,before,after,until,reason,set_by
+plan:b1,1,OK: run the command below on pi5,h1|*|*,,blocked until 2033-05-18 03:43 (old block),test block until 2033-05-18 04:33 (retest),NOW+3600,retest,taylor
+plan:b2,1,OK: run the command below on pi5,h4|linux_secure|*,,not blocked,test block until 2033-05-18 03:48 (r),NOW+900,r,taylor
+plan:b3,1,OK: run the command below on pi5,h5|linux_audit|/var/log/audit/audit.log.1,/var/log/audit/audit.log.*,not blocked,test block until 2033-05-18 03:34 (r),NOW+60,r,taylor
+plan:b4,0,This has no active test block: nothing to remove,h2|syslog|*,,not blocked,not blocked,,r,taylor
+plan:b5,1,OK: run the command below on pi5,h3|cpu|cpu,cpu,blocked until 2033-05-18 03:38 (keep),not blocked,,r,taylor
+plan:b6,0,A test block lasts 1 minute to 24 hours,h1|*|*,,blocked until 2033-05-18 03:43 (old block),test block until 2033-05-19 04:33 (r),NOW+90000,r,taylor
+plan:b7,0,Needs the dh_admin role,h1|*|*,,blocked until 2033-05-18 03:43 (old block),test block until 2033-05-18 04:33 (r),NOW+3600,r,ana
+plan:b8,0,Choose the raw source,h5|linux_audit|*,*,not blocked,test block until 2033-05-18 03:34 (r),NOW+60,r,taylor

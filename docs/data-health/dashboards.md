@@ -198,7 +198,7 @@ Everything about one host. Pick the host at the top, or arrive here by clicking 
 - **How to read it:** steady bars are normal. A gap shows when a stream stopped; a sudden drop or spike is worth comparing with the status changes below.
 
 ### Forwarder (the Splunk agent on the host)
-- **What it shows:** one fact per row: Agent version (with "(expected 10.6.1.1)" when it differs), Operating system, Agent type, Agent ID (guid), Last heartbeat, Last connection to Cribl, Last Ansible marker (action, when, by whom, run id), Last Hyper-V event and Last device probe. A host without one shows a single row: "No forwarder facts: this host has no Splunk agent or no Splunk agent has connected yet" (a network device, a syslog-only host, or an agent that has never connected).
+- **What it shows:** one fact per row: Agent version (with "(expected 10.6.1.1)" when it differs), Operating system, Agent type, Last heartbeat, Last connection to Cribl, Last Ansible marker (action, when, by whom, run id), Last Hyper-V event and Last device probe. A host without one shows a single row: "No forwarder facts: this host has no Splunk agent or no Splunk agent has connected yet" (a network device, a syslog-only host, or an agent that has never connected).
 - **Where it comes from:** what the arrival tracker last recorded for this host.
 - **How to read it:** a heartbeat a few seconds ago is good. A heartbeat minutes old with the host DOWN means the agent or host stopped; the last Ansible marker or Hyper-V event often explains why. A version flag means the agent needs the role's install.
 
@@ -235,7 +235,7 @@ Where you change what the app expects and how it alerts: mute data during planne
 
 - **Who may do what.** Anyone who can open the app may mute, unmute and set or clear a limit. Adding or adopting expected rows and test blocks need the **dh_admin** role; without it the preview says "Needs the dh_admin role" and nothing can be applied.
 - **Nothing is written until you choose Apply.** A form shows a preview of the change as you fill it in. The change is written only when you open that form's **Confirm (writes the change)** list and choose the line that starts with **Apply**. There is no other button: choosing that line writes the change at once and records it on the Admin log tab.
-- **Each form stands alone.** Every form has its own Reason, Ticket and Confirm, and a choice under one form's Confirm writes only that form's change.
+- **Each form stands alone.** Every form that writes has its own Reason, Ticket and Confirm, and a choice under one form's Confirm writes only that form's change. (The test-block form has no Confirm: it writes nothing.)
 - **Boxes apply as you go.** There is no Submit button on Manage. A list applies as soon as you pick from it; a text box applies when you press Enter or click outside it. Lists that depend on a host (the items of a host, a host's sourcetypes and raw sources) fill as soon as you pick the host.
 - **Until a form is filled in**, its preview area shows what to fill in instead of a table. A required box (Reason, Host name) must not be empty. Optional boxes hold `-`, which means "none"; leave it there unless you have a value.
 - **The Confirm list** appears once the form is filled in. It offers the Apply line only when the preview's **Check** column says "OK: …"; otherwise it says "No results", and the Check column says what to fix.
@@ -465,7 +465,7 @@ The form also has its own **Reason (required)** and **Ticket (optional, - for no
 - **How to read it:** a source-level block must use one of these exact raw names.
 
 #### Current test blocks
-- **What it shows:** every block in the test-block table. Columns: **Item** (the block key in words), **Until**, **Reason**, **Set by**, **State** ("test block until hh:mm", or "expired (removed within about 2 min)"), **Block key**.
+- **What it shows:** every block in the test-block table. Columns: **Item** (the block key in words), **Until**, **Reason**, **Set by**, **State** ("test block until hh:mm", or "expired: no longer applied (it leaves this list at the next cribl_block run)"), **Block key**.
 - **Where it comes from:** the copy of Cribl's block table that the role's *cribl_block* tag writes into Splunk.
 - **How to read it:** blocked data is **thrown away** in Cribl before it reaches Splunk, so a block is a real outage, on purpose. Remove blocks as soon as a test ends.
 
@@ -486,7 +486,7 @@ Every change made on Manage, newest first.
 | Search the log (words separated by *) | Words that must all appear in a row (who, change, item, detail, reason or ticket), separated by `*`; not case-sensitive. `*` shows all. |
 
 #### Admin log (every change made on Manage)
-- **What it shows:** the last 1000 changes that match the search. Columns: **Time**, **Who**, **Change** (Mute, Unmute, Set limit, Clear limit, Add expected row, Adopt, Add test block or Remove test block), **Item**, **Detail** (before → after, as recorded at the time; times in it are in the time zone of whoever made the change), **Reason**, **Ticket**, **Item ID** (for a test block, its key).
+- **What it shows:** the last 1000 changes that match the search. Columns: **Time**, **Who**, **Change** (Mute, Unmute, Set limit, Clear limit, Add expected row, Adopt; Add test block or Remove test block only on older rows, since a test block is now set by the role), **Item**, **Detail** (before → after, as recorded at the time; times in it are in the time zone of whoever made the change), **Reason**, **Ticket**, **Item ID** (for a test block, its key).
 - **Where it comes from:** the admin log, written by every applied change. It is also copied to the `data_health` index every 5 minutes (which keeps 14 days) and kept 90 days in the table.
 - **How to read it:** use it to answer "who muted this, and why?".
 

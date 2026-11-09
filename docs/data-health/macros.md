@@ -36,7 +36,7 @@ The expected list, `dh_expected`: every entity that should send data. Used by: t
 `dh_meta`: run times of the trackers and the admin-log copy. The banner and the evaluator's gate read it. Used by: *DH Tracker fast*, *DH Tracker slow*, *DH Admin log copy*.
 
 ### `dh_lookup_blocks`
-`hl_ingest_block`: the test-block table (owned by the `hl_server_base` app). Until that app is installed the table doesn't exist and is read as empty. Used by: *DH Prune*.
+`hl_ingest_block`: Splunk's copy of Cribl's test-block table (the `hl_server_base` lookup that the role's *cribl_block* tag writes; nothing here writes it). Until that app is installed the table doesn't exist and is read as empty. Used by: `dh_evaluate`, the Manage Test blocks tab.
 
 ### `dh_lookup_tamper`
 `dh_tamper`: tamper findings with their suppression. Used by: *DH Tamper*.
@@ -313,9 +313,6 @@ The admin-log rows written since the last copy (and at least 60 s old), for copy
 
 Each "mark" macro marks the rows to delete; the prune searches rewrite a table only when something is marked.
 
-### `dh_prune_mark_blocks(now)`
-Test blocks that have expired, or that have no key or no valid expiry. Used by: *DH Prune* (every minute).
-
 ### `dh_prune_mark_overrides(now)`
 Expired mutes are cleared; an override row with nothing left is deleted. Used by: *DH Prune* (every minute).
 
@@ -517,16 +514,10 @@ Writes the expected row when the confirmation matches, and logs it. Used by: Man
 Turns an unregistered entity into an expected-row request: agent hosts become `uf`, others `syslog`. An agent host's own row gets the `heartbeat` profile; any other row takes the baseline's suggestion, else continuous. Used by: Manage, Expected list tab (adopt).
 
 ### `dh_ui_block_command`
-The test block lives in Cribl, so Manage shows the command to run instead of writing it: the role's *cribl_block* line for a checked request (setting with minutes and reason, or clearing), with the reason reduced to plain characters. Used by: Manage, form 4 (once the redesigned Manage is merged, task 12e).
+The test block lives in Cribl, so Manage shows the command to run instead of writing it: the role's *cribl_block* line for a checked request (setting with minutes and reason, or clearing), with the reason reduced to plain characters. Used by: Manage, Test blocks tab.
 
-### `dh_ui_block_plan(blocks, admin_log, now)`
-Checks a test-block request (dh_admin only; 1 minute to 24 hours; a source block needs an exact raw source) and shows the block before and after, in words for the preview and as logged, with the normalized source for reference, its Confirm text and its confirmation code. The code covers the whole current table and the key's admin-log times (`admin_log`), so a confirmation fits only once, even after DH Prune has removed the expired block. Used by: Manage, Test blocks tab.
-
-### `dh_ui_block_rows(blocks, now)`
-The whole new test-block table for a confirmed request; when that would leave the table empty, one placeholder row that matches nothing (DH Prune removes it within a minute). Used by: `dh_ui_block_write`.
-
-### `dh_ui_block_write(blocks, admin_log, now)`
-Rewrites the test-block table (key column first, as the ingest rule needs) and logs the change. Used by: Manage, Test blocks tab.
+### `dh_ui_block_plan(blocks, now)`
+Checks a test-block request (dh_admin only; 1 minute to 24 hours; a source block needs an exact raw source) against Splunk's copy of the block table and shows the block before and after, in words for the preview and as logged, with the normalized source for reference. Nothing is written from here: when the check says OK, `dh_ui_block_command` gives the role's command. Used by: Manage, Test blocks tab.
 
 ### `dh_ui_log(admin_log, now)`
 Adds one admin-log row per applied change and returns the result in words ("Done: Mute pi5: whole host", or "Nothing written: …" when the confirmation no longer fits). What is stored is unchanged. Used by: the three write macros.

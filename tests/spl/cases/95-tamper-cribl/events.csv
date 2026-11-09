@@ -1,6 +1,7 @@
 time,host,raw
 NOW-900,cribl,{'time':'2026-11-01T10:00:00.000Z';'action':'update';'type':'pipelines';'id':'pl_test_block';'user':'admin'}
 NOW-800,cribl,{'time':'2026-11-01T10:01:00.000Z';'action':'create';'type':'routes';'id':'r_drop';'user':'admin'}
-NOW-700,cribl,{'time':'2026-11-01T10:02:00.000Z';'action':'upload';'type':'lookups';'id':'hl_ingest_block.csv';'user':'admin'}
+NOW-700,cribl,{'time':'2026-11-09T00:45:11.803Z';'action':'upload';'type':'lookups';'user':'admin';'principal':'admin';'filename':'hl_ingest_block.csv.i64dfxT.tmp';'rows':0;'size':22;'requestId':'338cd686'}
+NOW-699,cribl,{'time':'2026-11-09T00:45:11.818Z';'action':'update';'type':'lookups';'user':'admin';'principal':'admin';'id':'hl_ingest_block.csv';'version':'20a2nSNG';'requestId':'85482f11'}
 NOW-600,cribl,{'time':'2026-11-01T10:03:00.000Z';'action':'update';'type':'users';'id':'admin';'user':'admin'}
 NOW-500,cribl,{'time':'2026-11-01T10:04:00.000Z';'action':'login';'type':'auth';'user':'admin'}

@@ -1,8 +1,8 @@
 c,item,block,change,dur,from,ui_change,ui_item,ui_now,ui_after,dh_label,detail,reason,entity_id,limit_override,k
-b1,,,,,,Add test block,h5 › linux_audit › /var/log/audit/audit.log.1 (exact source),Not blocked,Blocked until 2033-05-18 03:48 GMT (r); Cribl applies it about 20 s after the command runs,Apply: block h5 › linux_audit › /var/log/audit/audit.log.1 (exact source) for 15 minutes,,,,,
-b2,,,,,,Remove test block,h1: whole host,Blocked until 2033-05-18 03:43 GMT (old block),Not blocked,Apply: remove the test block on h1: whole host,,,,,
+b1,,,,,,Add test block,h5 › linux_audit › /var/log/audit/audit.log.1 (exact source),Not blocked,Blocked until 2033-05-18 03:48 GMT (r); Cribl applies it about 20 s after the command runs,,,,,,
+b2,,,,,,Remove test block,h1: whole host,Blocked until 2033-05-18 03:43 GMT (old block),Not blocked,,,,,,
 blk,,,,,,,h1: whole host,2033-05-18 03:43 GMT,test block until 03:43 GMT,,,,,,h1|*|*
-blk,,,,,,,h3 › cpu › cpu (exact source),2033-05-18 03:33 GMT,expired (removed within about 2 min),,,,,,h3|cpu|cpu
+blk,,,,,,,h3 › cpu › cpu (exact source),2033-05-18 03:33 GMT,expired: no longer applied (it leaves this list at the next cribl_block run),,,,,,h3|cpu|cpu
 log,,,,,,Add expected row,newh › syslog (linux),2033-05-18 03:32 GMT,,,not expected → managed by ui / enabled 1 / profile continuous / criticality 2 / collection uf,add syslog,sourcetype|linux|newh|syslog|*,,
 log,,,,,,Add test block,pi5 › syslog,2033-05-18 03:32 GMT,,,not blocked → test block until 2033-05-18 03:48 (r),r,pi5|syslog|*,,
 log,,,,,,Mute,pi5: whole host,2033-05-18 03:31 GMT,,,no override → mute until 2033-05-18 04:33 / limit none / reason patching,patching,host|*|pi5|*|*,,
