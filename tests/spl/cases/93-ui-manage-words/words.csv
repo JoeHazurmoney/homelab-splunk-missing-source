@@ -1,0 +1,6 @@
+c,id,k,action,secs,origin
+w1,host|*|pi5|*|*,pi5|*|*,override_mute,3600,override
+w2,sourcetype|enclave1|pi5|syslog|*,pi5|syslog|*,block_remove,1200,max_gap_secs
+w3,source|linux|h8|app|/var/log/app-*.log,h8|linux_secure|/var/log/secure.1,expected_adopt,90,learned
+w4,bogus,-,something_else,604800,invalid_profile
+w5,,,override_threshold,,none

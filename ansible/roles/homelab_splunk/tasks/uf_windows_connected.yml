@@ -1,35 +1,101 @@
-# Is the Windows UF sending through Cribl (127.0.0.1:9997)? Same rules as uf_linux_connected.yml:
-# in the UF's splunkd.log after hl_uf_log_from, the latest "Connected to idx=" is newer than the
-# latest token refusal; then Splunk has this host's _internal, under 120 s old.
+# Is the Windows UF sending through Cribl (127.0.0.1:9997)? (install, start, restart, verify; spec
+# 5.3, 13). The rules of uf_linux_connected.yml (task 4's final ones), in PowerShell:
+#   vars: hl_uf_log_from (line number of splunkd.log to read from; 0 = the whole file)
+#         hl_uf_since (> 0 when this run (re)started the UF; 0 = no restart, read the last 120 s)
+# 1. The UF's own splunkd.log after hl_uf_log_from: the latest "Connected to idx=<collector>:<port>"
+#    is newer than the latest close (hl_uf_close_re). No fast fail: the UF logs a token refusal as a
+#    plain "Connection closed by server", the same line as a benign close, so a close only keeps the
+#    wait going and the timeout fails it, quoting the last close. A refused attempt also logs
+#    "Connected to idx=…" about 1 ms before its close, so this is a first answer only.
+# 2. The proof: Splunk has this host's _internal stamped at or after the running splunkd's start
+#    (the service process's start time; without a restart in this run, also within the last 120 s).
+#    Not "since the restart was asked for": the old splunkd sends its shutdown lines with the old
+#    token while it stops (task 4 fix round 1).
 - name: Wait for the UF to connect to Cribl
-  ansible.windows.win_shell: |
-    $log = '{{ hl_uf_win_home }}\var\log\splunk\splunkd.log'
-    if (-not (Test-Path -LiteralPath $log)) { 'HL_CONNECTED=0'; 'HL_REFUSED=0'; exit 0 }
-    $lines = @(Get-Content -LiteralPath $log | Select-Object -Skip {{ hl_uf_log_from | default(0) | int }})
-    $lc = 0; $lr = 0
-    for ($i = 0; $i -lt $lines.Count; $i++) {
-      if ($lines[$i] -like '*Connected to idx={{ hl_collector }}:{{ hl_s2s_port }}*') { $lc = $i + 1 }
-      if ($lines[$i] -match 'Invalid S2S token|Connection closed by server|unauthorized') { $lr = $i + 1 }
-    }
-    "HL_CONNECTED=$([int]($lc -gt $lr))"
-    "HL_REFUSED=$([int]($lr -gt $lc))"
-  register: hl_ufw_conn
-  until: hl_ufw_conn.stdout is search('HL_CONNECTED=1') or hl_ufw_conn.stdout is search('HL_REFUSED=1')
-  retries: "{{ (hl_uf_connect_timeout / 10) | int }}"
-  delay: 10
+  ansible.windows.win_shell:
+    cmd: |
+      $ErrorActionPreference = 'Stop'
+      "HL_NOW=$([DateTimeOffset]::UtcNow.ToUnixTimeSeconds())"
+      # The running splunkd's start as epoch seconds; anything else is reported as unknown and fails
+      # below, never as 0 (that would count every event)
+      $st = 'unknown'
+      $svc = Get-CimInstance Win32_Service -Filter "Name='{{ hl_uf_win_service }}'"
+      if ($svc -and $svc.State -eq 'Running' -and $svc.ProcessId -gt 0) {
+        try { $st = [DateTimeOffset]::new((Get-Process -Id $svc.ProcessId).StartTime).ToUnixTimeSeconds() } catch { $st = 'unknown' }
+      }
+      "HL_STARTED=$st"
+      $log = '{{ hl_uf_win_home | replace("'", "''") }}\var\log\splunk\splunkd.log'
+      $from = {{ hl_uf_log_from | default(0) | int }}
+      $conn = 'Connected to idx={{ hl_collector }}:{{ hl_s2s_port }}'
+      $closeRe = '{{ hl_uf_close_re }}'
+      # Line numbers of the latest connect and the latest close after $from (case-sensitive, as grep);
+      # the file is opened shared, because splunkd keeps writing it
+      function Get-HlLast {
+        $lc = 0; $ln = 0; $lr = ''
+        if (Test-Path -LiteralPath $log) {
+          $fs = [IO.File]::Open($log, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]'ReadWrite, Delete')
+          try {
+            $sr = New-Object IO.StreamReader($fs)
+            $i = 0
+            while ($null -ne ($l = $sr.ReadLine())) {
+              $i++
+              if ($i -le $from) { continue }
+              if ($l.Contains($conn)) { $lc = $i }
+              if ($l -cmatch $closeRe) { $ln = $i; $lr = $l }
+            }
+          } finally { $fs.Dispose() }
+        }
+        return @($lc, $ln, $lr)
+      }
+      # The wait loops here, not with until/retries: Ansible fails a task whose retries run out, and
+      # the next task should say why (the last close). The latest of "connected" and "closed" decides.
+      $end = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds() + {{ hl_uf_connect_timeout | int }}
+      while ($true) {
+        $lc, $ln, $lr = Get-HlLast
+        if ($lc -gt $ln) { break }
+        if ([DateTimeOffset]::UtcNow.ToUnixTimeSeconds() -ge $end) { break }
+        Start-Sleep -Seconds 10
+      }
+      "HL_CONNECTED=$(if ($lc -gt $ln) { 1 } else { 0 })"
+      if ($lr) { "HL_LAST_CLOSE=$($lr.Substring(0, [Math]::Min(300, $lr.Length)))" }
+  register: hl_uf_conn
   changed_when: false
-  failed_when: hl_ufw_conn.rc != 0 or hl_ufw_conn.stdout is not search('HL_CONNECTED=1')
+  failed_when: false
 
-- name: Wait for this host's _internal in Splunk (through Cribl)
-  ansible.windows.win_shell: |
-    {{ hl_ps_prelude }}
-    $h = '{{ inventory_hostname | lower | regex_replace('[.].*$', '') }}'
-    $rows = Invoke-HlSearch ("| tstats max(_indextime) as t where index=_internal (host=$h OR host=$h.*) earliest=-15m | eval age=now()-t")
-    $a = ($rows | Select-Object -First 1).age
-    @{ age = $(if ("$a" -match '^\d+(\.\d+)?$') { [int][double]$a } else { -1 }) } | ConvertTo-Json -Compress
+- name: Fail when the UF never connected
+  ansible.builtin.fail:
+    msg: >-
+      The UF didn't connect to Cribl at {{ hl_collector }}:{{ hl_s2s_port }} within {{ hl_uf_connect_timeout }} s.
+      Last close in splunkd.log: {{ hl_uf_conn.stdout_lines | select('match', '^HL_LAST_CLOSE=')
+      | map('regex_replace', '^HL_LAST_CLOSE=', '') | first | default('none') }}.
+      A wrong token shows on Cribl's side as "Invalid S2S token … sent by host={{ inventory_hostname }}".
+  when: hl_uf_conn.rc != 0 or hl_uf_conn.stdout is not search('HL_CONNECTED=1')
+
+- name: Fail when the running splunkd's start time is unknown
+  ansible.builtin.fail:
+    msg: >-
+      The {{ hl_uf_win_service }} service's process start time couldn't be read
+      ({{ hl_uf_conn.stdout_lines | select('match', '^HL_STARTED=') | first | default('no HL_STARTED line') }}),
+      so the Splunk-side check can't tell this splunkd's data from an earlier one's.
+  when: hl_uf_conn.stdout is not search('HL_STARTED=[0-9]+')
+
+- name: Wait for this host's _internal in Splunk (through Cribl, from the running splunkd)
+  ansible.windows.win_shell:
+    cmd: |
+      {{ hl_ps_prelude }}
+      $h = '{{ inventory_hostname | lower | regex_replace('[.].*$', '') }}'
+      $rows = Invoke-HlSearch ("| tstats count max(_time) as t where index=_internal (host=$h OR host=$h.*) earliest={{ hl_uf_seen_since }}")
+      $r = $rows | Select-Object -First 1
+      @{ count = [int]("0" + $r.count); since = {{ hl_uf_seen_since }}; latest = "$($r.t)" } | ConvertTo-Json -Compress
+  vars:
+    hl_uf_started_at: "{{ hl_uf_conn.stdout | regex_search('HL_STARTED=([0-9]+)', '\\1') | first | int }}"
+    hl_uf_now: "{{ hl_uf_conn.stdout | regex_search('HL_NOW=([0-9]+)', '\\1') | first | int }}"
+    hl_uf_seen_since: >-
+      {{ [hl_uf_started_at | int, hl_uf_since | int] | max if (hl_uf_since | default(0) | int) > 0
+         else [hl_uf_started_at | int, (hl_uf_now | int) - 120] | max }}
   delegate_to: "{{ hl_server_host }}"
-  register: hl_ufw_seen
-  until: hl_ufw_seen.rc == 0 and (hl_ufw_seen.stdout | from_json).age >= 0 and (hl_ufw_seen.stdout | from_json).age < 120
+  register: hl_uf_seen
+  until: hl_uf_seen.rc == 0 and (hl_uf_seen.stdout | from_json).count > 0
   retries: "{{ (hl_uf_connect_timeout / 10) | int }}"
   delay: 10
   changed_when: false

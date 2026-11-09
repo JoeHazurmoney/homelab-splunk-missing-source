@@ -1,6 +1,7 @@
 # The UF-path tamper audit rules (spec 5.4): /etc/audit/rules.d/zz-hl-uf-tamper.rules, sorting
 # after wd2l.rules, loaded with augenrules. Only paths that exist go in (auditctl rejects a missing
 # dir, and augenrules would stop at this file). wd2l's own rules must still be loaded afterwards.
+# The counts match `-F key=`, the form `auditctl -l` prints (hl_uf_tamper_key_re, vars/main.yml).
 - name: Look for the watched paths
   ansible.builtin.stat:
     path: "{{ item.path }}"
@@ -9,13 +10,19 @@
     label: "{{ item.path }}"
   register: hl_uf_tamper_stat
 
-- name: Count wd2l's loaded rules before
+- name: Note which paths get rules and how many rules that loads
+  ansible.builtin.set_fact:
+    hl_uf_tamper_present: "{{ hl_uf_tamper_stat.results | selectattr('stat.exists') | map(attribute='item.path') | list }}"
+    hl_uf_tamper_expected: "{{ (hl_uf_tamper_stat.results | selectattr('stat.exists') | list | length) * (hl_audit_arches | length) }}"
+
+- name: Count the loaded tamper rules and wd2l's rules before
   ansible.builtin.shell: |
     set -o pipefail
-    auditctl -l | grep -c -- '-k wd2l' || true
+    echo "HL_UF=$(auditctl -l | grep -c -E -- '{{ hl_uf_tamper_key_re }}' || true)"
+    echo "HL_WD2L=$(auditctl -l | grep -c -E -- '{{ hl_wd2l_audit_key_re }}' || true)"
   args:
     executable: /bin/bash
-  register: hl_uf_wd2l_before
+  register: hl_uf_tamper_before
   changed_when: false
 
 - name: Render the tamper rules
@@ -25,25 +32,28 @@
     owner: root
     group: root
     mode: "0600"
-  vars:
-    hl_uf_tamper_present: "{{ hl_uf_tamper_stat.results | selectattr('stat.exists') | map(attribute='item.path') | list }}"
   register: hl_uf_tamper_render
 
+# Also when the file is unchanged but the kernel holds a different set (a run that failed between
+# the render and the load, or a hand-run `auditctl -D`)
 - name: Load the audit rules (augenrules)
   ansible.builtin.command:
     argv: [augenrules, --load]
-  when: hl_uf_tamper_render.changed or hl_uf_tamper_loaded_before | default(false)
+  when: >-
+    hl_uf_tamper_render.changed
+    or ('HL_UF=' ~ hl_uf_tamper_expected) not in hl_uf_tamper_before.stdout_lines
   changed_when: true
 
 - name: Check the tamper rules and wd2l's rules are loaded
   ansible.builtin.shell: |
     set -o pipefail
-    echo "HL_UF=$(auditctl -l | grep -c -- '-k hl-uf-config' || true)"
-    echo "HL_WD2L=$(auditctl -l | grep -c -- '-k wd2l' || true)"
+    echo "HL_UF=$(auditctl -l | grep -c -E -- '{{ hl_uf_tamper_key_re }}' || true)"
+    echo "HL_WD2L=$(auditctl -l | grep -c -E -- '{{ hl_wd2l_audit_key_re }}' || true)"
   args:
     executable: /bin/bash
   register: hl_uf_tamper_loaded
   changed_when: false
   failed_when: >-
-    hl_uf_tamper_loaded.stdout is search('HL_UF=0$', multiline=true)
-    or ('HL_WD2L=' ~ (hl_uf_wd2l_before.stdout | trim)) not in hl_uf_tamper_loaded.stdout
+    ('HL_UF=' ~ hl_uf_tamper_expected) not in hl_uf_tamper_loaded.stdout_lines
+    or (hl_uf_tamper_before.stdout_lines | select('match', '^HL_WD2L=') | first)
+       not in hl_uf_tamper_loaded.stdout_lines

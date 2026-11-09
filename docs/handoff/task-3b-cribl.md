@@ -3,11 +3,12 @@
 Issue #24 · branch `feat/3b-cribl` (from `main` at `344e319`) · drafted in a cloud session on
 2026-11-01 without access to HOMEPC or pi5.
 
-**State:** written, `yamllint --strict` + `ansible-lint --strict` (production) + `shellcheck` clean,
-`--syntax-check` OK. The Cribl config and `compose.yml` were rendered locally with dummy secrets
-and parse. The in-container helper was exercised against a fake volume. **Nothing has run against
-Cribl, Docker Desktop or Splunk.** Every API call and file path below that the spike didn't prove is
-marked *unverified* and has a check.
+**State:** verified live 2026-11-07: checks 1–5 and 7–15 below pass, after five fixes found on the
+live system (the GET body in `Invoke-HlCribl`, the login retry after the password change, the
+metrics source type `criblmetrics`, the lookup-exists test, and the CSV passed to PowerShell in
+base64). Check 6 needs a real UF and moved to task 4. Results, one row per check: spec §14.9.
+The text below is the draft's plan, kept as the record; where it says *unverified*, §14.9 has the
+answer.
 
 ## What the branch adds
 

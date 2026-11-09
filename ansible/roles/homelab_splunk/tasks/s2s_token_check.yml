@@ -1,0 +1,12 @@
+# Refuse a bad vault_hl_s2s_token_previous before server or cribl changes anything (spec 13). The
+# fail_msg names no value and the assertion is the unrendered expression, so nothing leaks.
+- name: Check vault_hl_s2s_token_previous, when set
+  ansible.builtin.assert:
+    that:
+      - vault_hl_s2s_token_previous != vault_hl_s2s_token
+      - vault_hl_s2s_token_previous is match(hl_s2s_token_re)
+    fail_msg: >-
+      vault_hl_s2s_token_previous must be the old token during a rotation: a UUID that is not
+      vault_hl_s2s_token. Remove it from the vault when no rotation is under way.
+    quiet: true
+  when: vault_hl_s2s_token_previous | default('') | length > 0

@@ -1,10 +1,15 @@
 # server (splunk_server, spec 5.3/5.5): build each server app as a tar on the controller, copy it to
 # HOMEPC, `docker cp` it into the container and swap in only default/ (and the app's other shipped
 # directories), metadata/default.meta and the shipped lookups, keeping local/ and UI-written
-# lookups. splunkd restarts only when indexes.conf, inputs.conf or props.conf changed; any other
-# change is reloaded over REST. A splunkd restart loses what Cribl sends during Splunk's shutdown
-# (about 30 s in spike 2b, spec 14.7 g) until task 3b fixes or documents it.
+# lookups. splunkd restarts only when a file in hl_server_restart_confs changed (indexes.conf,
+# inputs.conf, props.conf, web.conf); any other change is reloaded over REST.
+# A splunkd restart loses what Cribl sends during Splunk's shutdown (about 30 s in spike 2b,
+# spec 14.7 g; 3 s with maxS2Sversion v4, task 4), so server_restart.yml holds Cribl paused until
+# splunktcp is back (hl_cribl_hold_on_splunk_restart, on; nothing lost in task 4 check 15).
 #   -e '{"hl_apps_only":["hl_server_base"]}'   limits the run to the listed apps
+- name: Check the previous S2S token
+  ansible.builtin.import_tasks: s2s_token_check.yml
+
 - name: Select the server apps to deploy
   ansible.builtin.set_fact:
     hl_server_apps_run: "{{ hl_server_apps | selectattr('name', 'in', hl_apps_only) | list
@@ -165,7 +170,7 @@
       restart: {{ hl_server_restart_needed }}"
   when: hl_server_changed_apps | length > 0
 
-- name: Restart splunkd (indexes, inputs or props changed)
+- name: Restart splunkd (indexes, inputs, props or web changed)
   ansible.builtin.import_tasks: server_restart.yml
   when: hl_server_restart_needed | bool
 

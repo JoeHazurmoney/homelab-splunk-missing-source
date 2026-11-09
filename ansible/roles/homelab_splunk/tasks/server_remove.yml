@@ -90,7 +90,7 @@
       ansible.builtin.set_fact:
         hl_server_restart_needed: "{{ hl_rm_confs | select('in', hl_server_restart_confs) | list | length > 0 }}"
 
-    - name: Restart splunkd (removed indexes, inputs or props)
+    - name: Restart splunkd (removed indexes, inputs, props or web)
       ansible.builtin.import_tasks: server_restart.yml
       when: hl_server_restart_needed | bool
 

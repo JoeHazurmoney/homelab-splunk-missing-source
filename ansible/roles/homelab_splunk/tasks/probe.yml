@@ -1,8 +1,86 @@
 # probe (pi5, spec 5.3/4.4): the probe script, hl-devprobe.service + .timer, the log folder and
 # logrotate. pi5's UF reads probe.log (hl_uf_linux_inputs, row `hosts: [pi5]`, task 6). Every file
-# is recorded in the state file; probe_remove undoes exactly that.
+# is recorded in the state file before it is written, so a run that dies can still be removed;
+# probe_remove undoes exactly that. A rerun with nothing to do is changed=0 and posts no marker.
 - name: Read the state file
   ansible.builtin.import_tasks: linux_state_read.yml
+
+# pi5 isn't in splunk_server: an empty list would install a probe that pings nothing, silently.
+# The names go into a shell script, so check them here as well as in the `cribl` tag.
+- name: Check the device list
+  ansible.builtin.assert:
+    that:
+      - hl_probe_devices | length > 0
+      - hl_probe_devices | rejectattr('name', 'match', '^[a-z0-9][a-z0-9_-]*$') | list | length == 0
+      - hl_probe_devices | rejectattr('ip', 'match', '^[0-9]{1,3}([.][0-9]{1,3}){3}$') | list | length == 0
+    fail_msg: "hl_probe_devices (syslog_devices on the Splunk server) must be non-empty, with a plain name and an IPv4 ip each"
+    quiet: true
+
+- name: Look at whether the probe's files would change
+  ansible.builtin.template:
+    src: "probe/{{ item.src }}"
+    dest: "{{ item.dest }}"
+    owner: root
+    group: root
+    mode: "{{ item.mode }}"
+  loop: "{{ hl_probe_files }}"
+  loop_control:
+    label: "{{ item.dest }}"
+  check_mode: true
+  register: hl_probe_would
+
+# A run that died between writing a unit and acting on it left the files right and systemd behind:
+# that counts as a change too (task 6's rule). The timer file only matters to the timer; a running
+# timer never rereads it, and `state: started` doesn't restart it. Unknown start: restart.
+# A stopped or disabled timer is a change too (HL_UP): it gets a marker before the role starts it.
+- name: Read what systemd has loaded
+  ansible.builtin.shell:
+    cmd: |
+      set -o pipefail
+      reload=0
+      for u in hl-devprobe.timer hl-devprobe.service; do
+        if [ "$(systemctl show -p NeedDaemonReload --value "$u" 2>/dev/null)" = yes ]; then reload=1; fi
+      done
+      restart=0
+      f=/etc/systemd/system/hl-devprobe.timer
+      st=$(systemctl show --timestamp=unix -p ActiveEnterTimestamp --value hl-devprobe.timer 2>/dev/null)
+      st=${st#@}
+      case "$st" in
+        ''|*[!0-9]*) restart=1 ;;
+        *) if [ "$(stat -c %Y "$f" 2>/dev/null || echo 0)" -gt "$st" ]; then restart=1; fi ;;
+      esac
+      up=0
+      if systemctl is-active -q hl-devprobe.timer && systemctl is-enabled -q hl-devprobe.timer; then up=1; fi
+      echo "HL_RELOAD=$reload HL_RESTART=$restart HL_UP=$up HL_DIR=$([ -d {{ hl_probe_dir | quote }} ] && echo present || echo missing)"
+    executable: /bin/bash
+  register: hl_probe_state
+  changed_when: false
+
+- name: Note what this run has to do
+  ansible.builtin.set_fact:
+    hl_probe_timer_changed: >-
+      {{ hl_probe_would.results | selectattr('changed') | selectattr('item.dest', 'eq', '/etc/systemd/system/hl-devprobe.timer') | list | length > 0
+         or hl_probe_state.stdout is search('HL_RESTART=1') }}
+    hl_probe_reload: >-
+      {{ hl_probe_would.results | selectattr('changed') | selectattr('item.dest', 'match', '^/etc/systemd/system/') | list | length > 0
+         or hl_probe_state.stdout is search('HL_RELOAD=1') }}
+    hl_probe_real_change: >-
+      {{ hl_probe_would is changed or hl_probe_state.stdout is search('HL_(RELOAD|RESTART)=1')
+         or hl_probe_state.stdout is search('HL_UP=0') or hl_probe_state.stdout is search('HL_DIR=missing') }}
+
+- name: Marker before the probe changes
+  ansible.builtin.include_tasks: marker_best_effort.yml
+  vars:
+    hl_marker_action: probe
+  when: hl_probe_real_change | bool
+
+# Before the files: a failed run must still be removable (spec 5.3 install's rule)
+- name: Record what the probe adds
+  ansible.builtin.set_fact:
+    hl_state: "{{ hl_state | combine({'probe': {'files': hl_probe_files | map(attribute='dest') | list, 'dir': hl_probe_dir}}) }}"
+
+- name: Write the state file
+  ansible.builtin.import_tasks: linux_state_write.yml
 
 - name: Create the probe's log folder
   ansible.builtin.file:
@@ -12,55 +90,40 @@
     group: root
     mode: "0755"
 
-- name: Install the probe script
-  ansible.builtin.template:
-    src: probe/hl-devprobe.sh.j2
-    dest: /usr/local/libexec/hl-devprobe
-    owner: root
-    group: root
-    mode: "0755"
-  register: hl_probe_script
-
-- name: Install the units and the logrotate rule
+- name: Install the script, the units and the logrotate rule
   ansible.builtin.template:
     src: "probe/{{ item.src }}"
     dest: "{{ item.dest }}"
     owner: root
     group: root
-    mode: "0644"
-  loop:
-    - {src: hl-devprobe.service.j2, dest: /etc/systemd/system/hl-devprobe.service}
-    - {src: hl-devprobe.timer.j2, dest: /etc/systemd/system/hl-devprobe.timer}
-    - {src: hl-devprobe.logrotate.j2, dest: /etc/logrotate.d/hl-devprobe}
+    mode: "{{ item.mode }}"
+  loop: "{{ hl_probe_files }}"
   loop_control:
     label: "{{ item.dest }}"
-  register: hl_probe_units
 
+# restarted only when the timer unit changed: a changed service or script applies on the next run
 - name: Start the timer
   ansible.builtin.systemd_service:
     name: hl-devprobe.timer
-    state: started
+    state: "{{ 'restarted' if hl_probe_timer_changed | bool else 'started' }}"
     enabled: true
-    daemon_reload: "{{ hl_probe_units is changed }}"
+    daemon_reload: "{{ hl_probe_reload | bool }}"
 
-- name: Record what the probe added
-  ansible.builtin.set_fact:
-    hl_state: "{{ hl_state | combine({'probe': {'files': ['/usr/local/libexec/hl-devprobe', '/etc/systemd/system/hl-devprobe.service',
-      '/etc/systemd/system/hl-devprobe.timer', '/etc/logrotate.d/hl-devprobe'], 'dir': hl_probe_dir}}) }}"
-
-- name: Write the state file
-  ansible.builtin.import_tasks: linux_state_write.yml
-
-- name: Wait for a probe line for every device
-  ansible.builtin.shell: |
-    set -o pipefail
-    {% for d in hl_probe_devices %}
-    tail -n 50 {{ hl_probe_dir }}/probe.log 2>/dev/null | grep -c 'device={{ d.name }} ' || true
-    {% endfor %}
-  args:
+# A line from this interval, not just any line: a leftover file must not pass for a working probe.
+# The check is for a line, whatever it says: a device that is down must still report reachable=0.
+- name: Wait for a fresh probe line for every device
+  ansible.builtin.shell:
+    cmd: |
+      set -o pipefail
+      f={{ (hl_probe_dir ~ '/probe.log') | quote }}
+      cutoff=$(date -u -d '-{{ (hl_probe_interval | int) * 3 }} seconds' +%Y-%m-%dT%H:%M:%S)
+      for d in {{ hl_probe_devices | map(attribute='name') | map('quote') | join(' ') }}; do
+        n=$( (tail -n 1000 "$f" 2>/dev/null || true) | awk -v d="device=$d" -v c="time=$cutoff" '$2 == d && $1 >= c' | wc -l)
+        echo "$d=$n"
+      done
     executable: /bin/bash
   register: hl_probe_lines
-  until: hl_probe_lines.stdout_lines | map('int') | select('equalto', 0) | list | length == 0
-  retries: "{{ ((hl_probe_interval * 3) / 10) | int }}"
+  until: hl_probe_lines.stdout_lines | select('search', '=0$') | list | length == 0
+  retries: "{{ (((hl_probe_interval | int) * 3) / 10) | int }}"
   delay: 10
   changed_when: false
