@@ -226,3 +226,15 @@ hl_inputs_effective: >-
   {%- endfor -%}
   {{ out }}
 hl_inputs_enabled: "{{ hl_inputs_effective | selectattr('enabled') | list }}"
+
+# The syslog devices the probe pings, from the Splunk server's group_vars (pi5 isn't in that group)
+hl_probe_devices: "{{ hostvars[groups['splunk_server'][0]]['syslog_devices'] | default([]) }}"
+# Everything the probe installs on pi5 (probe.log's folder is hl_probe_dir), one list for install,
+# the state record and removal.
+hl_probe_files:
+  - {src: hl-devprobe.sh.j2, dest: /usr/local/libexec/hl-devprobe, mode: "0755"}
+  - {src: hl-devprobe.service.j2, dest: /etc/systemd/system/hl-devprobe.service, mode: "0644"}
+  - {src: hl-devprobe.timer.j2, dest: /etc/systemd/system/hl-devprobe.timer, mode: "0644"}
+  - {src: hl-devprobe.logrotate.j2, dest: /etc/logrotate.d/hl-devprobe, mode: "0644"}
+# The probe's unit names: uninstall leaves them out of its new-units compare (the probe tag owns them)
+hl_probe_units: "{{ hl_probe_files | map(attribute='dest') | select('match', '^/etc/systemd/system/') | map('basename') | list }}"

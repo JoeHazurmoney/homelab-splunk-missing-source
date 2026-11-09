@@ -1,0 +1,75 @@
+# probe_remove (pi5, spec 5.3): stop and disable the timer, delete what probe added (as the state
+# file recorded it) and the log folder, daemon-reload, check nothing is left. Only a unit that is
+# already gone is tolerated, so a rerun after a removal passes and a refused stop stops the play.
+- name: Read the state file
+  ansible.builtin.import_tasks: linux_state_read.yml
+
+- name: Note what the probe owns
+  ansible.builtin.set_fact:
+    hl_probe_rm_files: "{{ (hl_state.probe | default({})).files | default(hl_probe_files | map(attribute='dest') | list) }}"
+    hl_probe_rm_dir: "{{ (hl_state.probe | default({})).dir | default(hl_probe_dir) }}"
+
+- name: List what is on the host
+  ansible.builtin.shell: &hl_probe_left_shell
+    cmd: |
+      for p in {{ (hl_probe_rm_files + [hl_probe_rm_dir, '/etc/systemd/system/timers.target.wants/hl-devprobe.timer']) | map('quote') | join(' ') }}; do
+        if [ -e "$p" ] || [ -L "$p" ]; then echo "$p"; fi
+      done
+    executable: /bin/bash
+  register: hl_probe_there
+  changed_when: false
+
+- name: Marker before the removal
+  ansible.builtin.include_tasks: marker_best_effort.yml
+  vars:
+    hl_marker_action: probe_remove
+  when: hl_probe_there.stdout_lines | length > 0
+
+- name: Stop and disable the timer
+  ansible.builtin.systemd_service:
+    name: hl-devprobe.timer
+    state: stopped
+    enabled: false
+  register: hl_probe_stop_timer
+  failed_when:
+    - hl_probe_stop_timer.failed | default(false)
+    - "'Could not find the requested service' not in (hl_probe_stop_timer.msg | default(''))"
+
+# The service has no [Install] section, so there is nothing to disable.
+- name: Stop the service
+  ansible.builtin.systemd_service:
+    name: hl-devprobe.service
+    state: stopped
+  register: hl_probe_stop_svc
+  failed_when:
+    - hl_probe_stop_svc.failed | default(false)
+    - "'Could not find the requested service' not in (hl_probe_stop_svc.msg | default(''))"
+
+- name: Delete the probe's files
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop: "{{ hl_probe_rm_files }}"
+
+- name: Delete the probe's log folder
+  ansible.builtin.file:
+    path: "{{ hl_probe_rm_dir }}"
+    state: absent
+
+- name: Reload systemd
+  ansible.builtin.systemd_service:
+    daemon_reload: true
+  changed_when: false
+
+- name: Check nothing is left
+  ansible.builtin.shell: *hl_probe_left_shell
+  register: hl_probe_left
+  changed_when: false
+  failed_when: hl_probe_left.stdout_lines | length > 0
+
+- name: Drop the probe record
+  ansible.builtin.set_fact:
+    hl_state: "{{ hl_state | dict2items | rejectattr('key', 'eq', 'probe') | items2dict }}"
+
+- name: Write the state file
+  ansible.builtin.import_tasks: linux_state_write.yml

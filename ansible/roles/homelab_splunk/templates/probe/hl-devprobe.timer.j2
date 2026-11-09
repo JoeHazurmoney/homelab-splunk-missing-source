@@ -1,0 +1,13 @@
+# Managed by the homelab_splunk role (probe tag); local edits are overwritten.
+# Every {{ hl_probe_interval }} s (spec 4.4: periodic, threshold 2 x 60 + 60 = 180 s).
+[Unit]
+Description=Homelab device probe every {{ hl_probe_interval }} s
+
+[Timer]
+OnBootSec=60
+OnUnitActiveSec={{ hl_probe_interval }}
+AccuracySec=5
+Unit=hl-devprobe.service
+
+[Install]
+WantedBy=timers.target

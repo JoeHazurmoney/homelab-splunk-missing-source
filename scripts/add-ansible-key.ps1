@@ -92,5 +92,5 @@ if (-not $SkipWindows) {
 }
 
 Write-Step 'Done. Check from the Pi (ssh pi5), in ~/homelab-splunk-missing-source/ansible:'
-Write-Step '  ansible uf_linux:syslog_relay -m ansible.builtin.ping'
+Write-Step '  ansible uf_linux -m ansible.builtin.ping'
 Write-Step '  ansible uf_windows -m ansible.windows.win_ping'

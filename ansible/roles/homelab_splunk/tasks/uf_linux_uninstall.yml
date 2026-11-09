@@ -141,10 +141,12 @@
       # that something else added meanwhile also shows here: the play lists it and fails, unless
       # -e hl_uninstall_accept_new_units=true says those are known to be unrelated.
       # Transient units (an SSH login's session-N.scope) come and go and are left out (task 4 fix round 2).
+      # The probe's units belong to the probe tag (a separate tag) and may be installed here: not leftovers
       if [ -f "$d/units.before" ]; then
         systemctl list-unit-files --no-legend | awk '$2 != "transient" {print $1}' | LC_ALL=C sort > "$d/units.after"
-        echo "units_new=$(comm -13 "$d/units.before" "$d/units.after" | wc -l)"
-        comm -13 "$d/units.before" "$d/units.after" | head -20 | sed 's/^/units_path=/'
+        own=(grep -v -x -F{% for u in hl_probe_units %} -e {{ u | quote }}{% endfor %})
+        echo "units_new=$(comm -13 "$d/units.before" <("${own[@]}" "$d/units.after") | wc -l)"
+        comm -13 "$d/units.before" <("${own[@]}" "$d/units.after") | head -20 | sed 's/^/units_path=/'
       else echo "units_new=nobaseline"; fi
       {% for p in hl_state.packages_added | default([]) %}
       echo "pkg_{{ p }}=$(rpm -q {{ p }} >/dev/null 2>&1 && echo present || echo absent)"

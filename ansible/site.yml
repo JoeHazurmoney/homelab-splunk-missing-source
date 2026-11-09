@@ -3,6 +3,6 @@
 #   ansible-playbook site.yml --tags stop --limit wd2l-recv
 #   ansible-playbook site.yml --list-tags
 - name: Homelab Splunk
-  hosts: uf_linux:uf_windows:splunk_server:syslog_relay
+  hosts: uf_linux:uf_windows:splunk_server
   roles:
     - role: homelab_splunk

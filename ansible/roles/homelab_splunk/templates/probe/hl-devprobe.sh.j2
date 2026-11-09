@@ -1,0 +1,21 @@
+#!/bin/sh
+# Managed by the homelab_splunk role (probe tag); local edits are overwritten.
+# hl-devprobe (spec 4.4, 5.3): one ping per syslog device, one line per ping appended to
+# {{ hl_probe_dir }}/probe.log, which this host's UF forwards (index=network sourcetype=hl:devprobe):
+#   time=<iso8601> device=<name> ip=<ip> reachable=1|0 rtt_ms=<ms>
+# Prints nothing: the probe must never reach rsyslog or the journal (and so never wd2l).
+set -u
+log={{ hl_probe_dir }}/probe.log
+probe() {
+  name=$1; ip=$2
+  if out=$(ping -n -c 1 -W 2 "$ip" 2>/dev/null); then
+    rtt=$(printf '%s\n' "$out" | sed -n 's/.*time=\([0-9.]*\) ms.*/\1/p' | head -n 1)
+    printf 'time=%s device=%s ip=%s reachable=1 rtt_ms=%s\n' "$(date -u +%Y-%m-%dT%H:%M:%S.%3NZ)" "$name" "$ip" "${rtt:-0}" >>"$log"
+  else
+    printf 'time=%s device=%s ip=%s reachable=0 rtt_ms=\n' "$(date -u +%Y-%m-%dT%H:%M:%S.%3NZ)" "$name" "$ip" >>"$log"
+  fi
+}
+{% for d in hl_probe_devices %}
+probe {{ d.name | quote }} {{ d.ip | quote }}
+{% endfor %}
+exit 0
