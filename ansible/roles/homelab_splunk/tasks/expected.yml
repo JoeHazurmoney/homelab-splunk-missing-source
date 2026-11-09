@@ -82,9 +82,10 @@
 - name: Run DH Sync expected now
   ansible.windows.win_shell: |
     {{ hl_ps_prelude }}
-    $rows = Invoke-HlSearch '| savedsearch "DH Sync expected"'
+    $rows = Invoke-HlSearch -App hl_data_health -Spl '| savedsearch "DH Sync expected"'
     $r = $rows | Select-Object -First 1
-    @{ written = [int]$r.written; changes = @($r.changes) } | ConvertTo-Json -Compress
+    if ($null -eq $r) { throw 'DH Sync expected returned no result' }
+    @{ written = [int]$r.written; changes = @(@($r.changes) | Where-Object { $_ }) } | ConvertTo-Json -Compress
   register: hl_exp_sync
   changed_when: (hl_exp_sync.stdout | from_json).written > 0
 

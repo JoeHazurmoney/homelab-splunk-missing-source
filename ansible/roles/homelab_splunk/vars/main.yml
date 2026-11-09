@@ -4,7 +4,9 @@
 # HOMEPC from hl_splunk_admin_password_file at the moment of the call and never leaves the PC
 # (spec 5.2): it is not a task argument and it is never printed.
 #   Invoke-HlRest -Method GET|POST|DELETE -Path /services/... [-Body @{...}]  -> {Code, Content}
-#   Invoke-HlSearch '<SPL>'      -> the result rows (oneshot export, JSON)
+#   Invoke-HlSearch '<SPL>' [-App <app>] -> the result rows (oneshot export, JSON). -App runs it in
+#                                that app's namespace (objects not exported, e.g. hl_data_health's)
+#                                and throws when the search reports an error, rather than returning no rows
 #   Get-HlHecHealth              -> {Code, Content} of wd2l HEC /services/collector/health
 hl_ps_prelude: |
   $ErrorActionPreference = 'Stop'
@@ -52,13 +54,17 @@ hl_ps_prelude: |
     return Invoke-HlWeb -Method $Method -Uri ($HlMgmt + $Path) -Headers @{ Authorization = $auth } -Body $Body
   }
   function Invoke-HlSearch {
-    param([string]$Spl)
-    $r = Invoke-HlRest -Method POST -Path '/services/search/jobs/export' -Body @{ search = $Spl; output_mode = 'json'; exec_mode = 'oneshot' }
+    param([string]$Spl, [string]$App = '')
+    $path = if ($App) { "/servicesNS/nobody/$App/search/jobs/export" } else { '/services/search/jobs/export' }
+    $r = Invoke-HlRest -Method POST -Path $path -Body @{ search = $Spl; output_mode = 'json'; exec_mode = 'oneshot' }
     if ($r.Code -ne 200) { throw "search failed (HTTP $($r.Code)): $($r.Content)" }
     $rows = @()
     foreach ($line in ($r.Content -split "`n")) {
       if ($line.Trim() -eq '') { continue }
       $o = $line | ConvertFrom-Json
+      if ($App -and ($o.PSObject.Properties.Name -contains 'messages')) {
+        foreach ($m in $o.messages) { if ($m.type -in 'ERROR', 'FATAL') { throw "search failed: $($m.text)" } }
+      }
       if ($o.PSObject.Properties.Name -contains 'result') { $rows += $o.result }
     }
     return ,$rows

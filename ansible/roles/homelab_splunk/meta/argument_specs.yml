@@ -367,6 +367,10 @@ argument_specs:
         elements: dict
         default: []
         description: Extra rows for dh_expected_ansible.csv (columns as in the file), for what Ansible can't derive.
+      hl_verify_status_wait:
+        type: int
+        default: 150
+        description: Seconds verify waits for dh_status to hold a non-PENDING answer before reporting "not evaluated".
       hl_hypervisor:
         type: str
         description: The host's hypervisor (hyperv for the wd2l VMs); carried in its expected rows.

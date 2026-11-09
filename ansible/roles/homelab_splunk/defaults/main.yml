@@ -337,3 +337,5 @@ hl_probe_dir: /var/log/hl-devprobe
 #   - {level: sourcetype, index: enclave1, host: wd2l-recv, sourcetype: syslog, collection: hec,
 #      via: wd2l-recv, profile: continuous, criticality: 3}
 dh_extra_expected: []
+# verify: how long to wait for dh_status to hold a non-PENDING answer before reporting "not evaluated" (spec 5.3)
+hl_verify_status_wait: 150

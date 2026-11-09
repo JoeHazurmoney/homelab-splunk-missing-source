@@ -5,3 +5,5 @@ sourcetype|linux|h3|syslog|*,sourcetype|linux|h3|syslog|*,sourcetype,linux,h3,sy
 sourcetype|linux|h4|syslog|*,sourcetype|linux|h4|syslog|*,sourcetype,linux,h4,syslog,,uf,cribl,,continuous,,,2,taylorb,home,,,ansible,0,NOW-9000
 sourcetype|linux|h5|syslog|*,sourcetype|linux|h5|syslog|*,sourcetype,linux,h5,syslog,,uf,,,sporadic,,,3,ops,lab,,,ui,1,NOW-5000
 sourcetype|linux|h6|cron|*,sourcetype|linux|h6|cron|*,sourcetype,linux,h6,cron,,uf,,,sporadic,,,3,ops,lab,,,ui,1,NOW-5000
+sourcetype|linux|h10|syslog|*,sourcetype|linux|h10|syslog|*,sourcetype,linux,h10,syslog,,uf,,,sporadic,,,3,ops,lab,,,ui,0,NOW-5000
+sourcetype|linux|h11|syslog|*,sourcetype|linux|h11|syslog|*,sourcetype,linux,h11,syslog,,uf,cribl,,continuous,,,2,taylorb,home,,,ansible,1,NOW-9000

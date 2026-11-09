@@ -13,9 +13,12 @@
 #   writes         the Manage writes end to end on throwaway KV collections and a throwaway CSV:
 #                  preview -> confirm -> apply, the stored rows, the admin log, the k-first test-block
 #                  file with the raw source, and that a repeated or stale confirmation applies nothing.
+#   sync           DH Sync expected, the search as written in savedsearches.conf, on a throwaway KV
+#                  copy of dh_expected: it upserts by _key, so the rows it doesn't change stay as
+#                  they were (DH Evaluate drops the status of any entity missing from dh_expected).
 #
 # Throwaway collections, lookup definitions and files are named dhtest_* and removed on exit.
-# Usage: tests/spl/dash.sh panels | load [hosts] | writes
+# Usage: tests/spl/dash.sh panels | load [hosts] | writes | sync
 # shellcheck disable=SC2016  # backticks here are Splunk macro calls, not shell expansions
 set -euo pipefail
 here=$(cd "$(dirname "$0")" && pwd)
@@ -296,9 +299,55 @@ writes() {
   [ "$WFAIL" -eq 0 ]
 }
 
+########## sync: DH Sync expected on a throwaway KV copy of dh_expected (spec 7.2, task 10)
+sync() {
+  WFAIL=0
+  local src=$work/sync_src spl res
+  mkdir -p "$src"
+  : >"$src/search.spl"
+  cat >"$src/ansible.csv" <<'EOF'
+entity_id,level,index,host,sourcetype,source,collection,via,hypervisor,profile,interval_secs,max_gap_secs,criticality,owner,site,runbook,description,enabled
+,sourcetype,linux,dhtest-s1,syslog,,uf,cribl,,continuous,,,2,taylorb,home,,,1
+,sourcetype,linux,dhtest-s2,syslog,,uf,cribl,,continuous,,,1,taylorb,home,,,1
+,sourcetype,linux,dhtest-new,syslog,,uf,cribl,,continuous,,,2,taylorb,home,,,1
+EOF
+  cat >"$src/seed.csv" <<'EOF'
+entity_id,level,index,host,sourcetype,source,collection,via,hypervisor,profile,interval_secs,max_gap_secs,criticality,owner,site,runbook,description,managed_by,enabled,expected_since
+sourcetype|linux|dhtest-s1|syslog|*,sourcetype,linux,dhtest-s1,syslog,,uf,cribl,,continuous,,,2,taylorb,home,,,ansible,1,NOW-9000
+sourcetype|linux|dhtest-s2|syslog|*,sourcetype,linux,dhtest-s2,syslog,,uf,cribl,,continuous,,,3,taylorb,home,,,ansible,1,NOW-9000
+sourcetype|linux|dhtest-s3|syslog|*,sourcetype,linux,dhtest-s3,syslog,,uf,cribl,,continuous,,,2,taylorb,home,,,ansible,1,NOW-9000
+sourcetype|linux|dhtest-s4|syslog|*,sourcetype,linux,dhtest-s4,syslog,,uf,,,sporadic,,,3,ops,lab,,,ui,1,NOW-5000
+EOF
+  upload sync "$src"
+  kv_make dhtest_kv_expected dh_expected
+  dh_search '| inputlookup dhtest_sync_seed.csv | eval _key=entity_id | fields - dh_* | outputlookup append=true key_field=_key dhtest_kv_expected' csv >/dev/null
+  spl=$(conf_lines "$here/../../splunk/apps/$DH_APP/default/savedsearches.conf" | grep -F '|[DH Sync expected]|search = ' | sed 's/.*|search = //')
+  if [ -z "$spl" ]; then echo "sync: FAIL DH Sync expected not found"; return 1; fi
+  spl=$(printf '%s' "$spl" | sed 's/\<dh_expected_ansible\>/dhtest_sync_ansible.csv/g; s/\<dh_expected\>/dhtest_kv_expected/g')
+  res=$(dh_search "$spl" csv | tr -d '\r' | col written)
+  expect "first sync writes only the three changes" "$res" '^3$'
+  res=$(kv_get dhtest_kv_expected 'stats count')
+  expect "no row left dh_expected" "$(printf '%s' "$res" | sed -n 2p)" '^5$'
+  res=$(kv_get dhtest_kv_expected 'search host=dhtest-s1 | table managed_by enabled criticality expected_since')
+  expect "an unchanged row keeps its expected_since" "$(printf '%s' "$res" | sed -n 2p)" '^ansible,1,2,1999991000(\.0)?$'
+  res=$(kv_get dhtest_kv_expected 'search host=dhtest-s2 | table enabled criticality expected_since')
+  expect "an updated row keeps its expected_since" "$(printf '%s' "$res" | sed -n 2p)" '^1,1,1999991000(\.0)?$'
+  res=$(kv_get dhtest_kv_expected 'search host=dhtest-s3 | table enabled expected_since')
+  expect "a row that left the file is retired" "$(printf '%s' "$res" | sed -n 2p)" '^0,1999991000(\.0)?$'
+  res=$(kv_get dhtest_kv_expected 'search host=dhtest-s4 | table managed_by enabled expected_since')
+  expect "a UI row stays" "$(printf '%s' "$res" | sed -n 2p)" '^ui,1,1999995000(\.0)?$'
+  res=$(kv_get dhtest_kv_expected 'search host=dhtest-new | eval es=if(abs(expected_since-now())<120, "now", expected_since) | table managed_by enabled es')
+  expect "a new row starts its grace now" "$(printf '%s' "$res" | sed -n 2p)" '^ansible,1,now$'
+  res=$(dh_search "$spl" csv | tr -d '\r' | col written)
+  expect "a second sync writes nothing (KV types read back as written)" "$res" '^0$'
+  [ "$WFAIL" -eq 0 ] && echo "sync: PASS"
+  [ "$WFAIL" -eq 0 ]
+}
+
 case ${1:-} in
   panels) panels ;;
   load) load "${2:-300}" ;;
   writes) writes ;;
-  *) echo "usage: $0 panels | load [hosts] | writes" >&2; exit 2 ;;
+  sync) sync ;;
+  *) echo "usage: $0 panels | load [hosts] | writes | sync" >&2; exit 2 ;;
 esac

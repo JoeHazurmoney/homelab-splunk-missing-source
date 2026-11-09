@@ -1,6 +1,6 @@
 # verify (all, read-only; spec 5.3): UF hosts — running, connected to Cribl (the UF's own log: Splunk
 # sees only Cribl's connection), no token refusal, and this host's _internal seen in Splunk;
-# splunk_server — Cribl healthy. Task 10 adds "every expected sourcetype seen in the last N min".
+# splunk_server — Cribl healthy, and every expected row seen (dh_status, each with its own profile's threshold).
 - name: Verify the Linux UF
   when: "'uf_linux' in group_names"
   block:
@@ -121,3 +121,61 @@
       register: hl_verify_cribl
       changed_when: false
       failed_when: hl_verify_cribl.rc != 0 or (hl_verify_cribl.stdout | from_json).Code != 200
+
+- name: Verify every expected row is seen
+  when: "'splunk_server' in group_names"
+  block:
+    # DH Evaluate holds every row PENDING while its gate is shut (tracker late, nothing received, a
+    # resume); that says nothing either way, so the task waits a little for a real answer.
+    - name: Read the expected rows' status (dh_status, read-only)
+      ansible.windows.win_shell: |
+        {{ hl_ps_prelude }}
+        $name = {
+          param($r)
+          if ($r.level -eq 'host') { return "$($r.host) (host row: $($r.status))" }
+          $s = if ($r.level -eq 'source') { " $($r.source)" }
+          "$($r.host) $($r.sourcetype)$s ($($r.status))"
+        }
+        $deadline = (Get-Date).AddSeconds({{ hl_verify_status_wait | int }})
+        do {
+          $rows = Invoke-HlSearch -App hl_data_health -Spl '| inputlookup dh_status | fields level host sourcetype source status profile'
+          $pending = @($rows | Where-Object { $_.status -eq 'PENDING' }).Count
+          if ($rows.Count -gt 0 -and $pending -lt $rows.Count) { break }
+          if ((Get-Date) -ge $deadline) { break }
+          Start-Sleep -Seconds 15
+        } while ($true)
+        @{
+          total = $rows.Count
+          pending = $pending
+          hard = @($rows | Where-Object { $_.status -in 'MISSING', 'NEVER_SEEN' -and $_.profile -ne 'sporadic' } | ForEach-Object { & $name $_ })
+          late = @($rows | Where-Object { $_.status -eq 'LATE' } | ForEach-Object { & $name $_ })
+          sporadic = @($rows | Where-Object { $_.status -in 'MISSING', 'NEVER_SEEN' -and $_.profile -eq 'sporadic' } | ForEach-Object { & $name $_ })
+        } | ConvertTo-Json -Compress
+      register: hl_verify_status
+      changed_when: false
+
+    - name: Fail when dh_status has not evaluated anything
+      ansible.builtin.assert:
+        that:
+          - (hl_verify_status.stdout | from_json).total | int > 0
+          - (hl_verify_status.stdout | from_json).pending | int < (hl_verify_status.stdout | from_json).total | int
+        fail_msg: >-
+          Not evaluated: every row in dh_status is PENDING (or the list is empty) after
+          {{ hl_verify_status_wait }} s, so this play can't say what arrives. Wait for DH Evaluate
+          (a resume holds it for 5 min) and run verify again.
+        quiet: true
+
+    - name: Report rows that are late or sporadic and quiet (no failure)
+      ansible.builtin.debug:
+        msg:
+          late: "{{ (hl_verify_status.stdout | from_json).late }}"
+          sporadic_missing_or_never_seen: "{{ (hl_verify_status.stdout | from_json).sporadic }}"
+          total: "{{ (hl_verify_status.stdout | from_json).total }}"
+
+    - name: Fail on an expected row that isn't arriving
+      ansible.builtin.assert:
+        that: (hl_verify_status.stdout | from_json).hard | length == 0
+        fail_msg: >-
+          Expected data not seen (MISSING or NEVER_SEEN, profile not sporadic):
+          {{ (hl_verify_status.stdout | from_json).hard | join('; ') }}
+        quiet: true
