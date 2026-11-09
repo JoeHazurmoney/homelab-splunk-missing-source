@@ -1,6 +1,8 @@
 # apps (uf_linux, spec 5.3/5.5): Splunk_TA_nix unmodified (its local/inputs.conf is the role's),
 # the role-owned input apps (hl_uf_linux_inputs, hl_uf_wd2l_inputs; stanzas in local/) and
-# hl_uf_outputs; restart the UF only when something changed, then prove the path and post a marker.
+# hl_uf_outputs; restart the UF only on a real change, then prove the path. The connection check runs
+# on every run (task 4's rule), with task 4's anchors: the proof counts only data from the running
+# splunkd, and an unknown start fails. Markers are best effort.
 #   -e '{"hl_disabled_inputs":["monitor:///var/log/secure"]}' --tags apps   turns one input off
 - name: Check the TA package is pinned and on the controller
   ansible.builtin.stat:
@@ -47,6 +49,8 @@
         find "$dst" -mindepth 1 -maxdepth 1 ! -name local -exec rm -rf {} +
         (cd /var/tmp/hl_ta/Splunk_TA_nix && find . -mindepth 1 -maxdepth 1 ! -name local -exec cp -a {} "$dst"/ \;)
         chown -R {{ hl_uf_user }}:{{ hl_uf_user }} "$dst"
+        # cp -a keeps the staging folder's SELinux type; give the files the UF tree's
+        restorecon -R "$dst"
       args:
         executable: /bin/bash
       changed_when: true
@@ -64,7 +68,7 @@
     owner: "{{ hl_uf_user }}"
     group: "{{ hl_uf_user }}"
     mode: "0755"
-  loop: "{{ (hl_uf_input_apps_linux + ['Splunk_TA_nix']) | product(['default', 'local']) | list }}"
+  loop: "{{ hl_uf_input_apps_linux | product(['default', 'local']) | list + [['Splunk_TA_nix', 'local']] }}"
 
 - name: Render the role-owned apps' app.conf
   ansible.builtin.template:
@@ -93,25 +97,48 @@
 - name: Deploy hl_uf_outputs
   ansible.builtin.import_tasks: uf_linux_outputs.yml
 
+# The files can be right while the running splunkd isn't using them (a run that died before its
+# restart): the next run must still restart, so a file newer than the running splunkd counts as a
+# change. Only role-written files and the TA's folder (its swap touches it); never local/outputs.conf,
+# which splunkd itself rewrites. Unknown start: restart, and the connection check below fails loudly.
+- name: Check the running splunkd is newer than the role's files
+  ansible.builtin.shell:
+    cmd: |
+      set -o pipefail
+      a={{ hl_uf_home }}/etc/apps
+      st=$(systemctl show --timestamp=unix -p ActiveEnterTimestamp --value SplunkForwarder 2>/dev/null)
+      st=${st#@}
+      case "$st" in ''|*[!0-9]*) echo HL_STALE=unknown; exit 0;; esac
+      files=("$a/Splunk_TA_nix" "$a/Splunk_TA_nix/local/inputs.conf" "$a"/hl_uf_outputs/default/*)
+      for app in {{ hl_uf_input_apps_linux | join(' ') }}; do
+        files+=("$a/$app/default/app.conf" "$a/$app/local/inputs.conf")
+      done
+      newest=$(stat -c %Y "${files[@]}" | sort -n | tail -1)
+      if [ "$newest" -gt "$st" ]; then echo HL_STALE=1; else echo HL_STALE=0; fi
+    executable: /bin/bash
+  register: hl_apps_stale
+  changed_when: false
+
 - name: Note whether the UF must restart
   ansible.builtin.set_fact:
     hl_apps_restart: >-
       {{ (hl_ta_nix_ver.stdout | trim != hl_tas.Splunk_TA_nix.version) or hl_apps_appconf is changed
-         or hl_apps_inputs is changed or hl_uf_outputs_changed | bool }}
+         or hl_apps_inputs is changed or hl_uf_outputs_changed | bool
+         or hl_apps_stale.stdout is not search('HL_STALE=0') }}
 
+# "<lines> <epoch>": where splunkd.log ends and the host's clock, just before the restart
 - name: Note where splunkd.log ends
-  ansible.builtin.shell: |
-    set -o pipefail
-    f={{ hl_uf_home }}/var/log/splunk/splunkd.log
-    if [ -f "$f" ]; then wc -l < "$f"; else echo 0; fi
-  args:
+  ansible.builtin.shell:
+    cmd: |
+      set -o pipefail
+      f={{ hl_uf_home }}/var/log/splunk/splunkd.log
+      if [ -f "$f" ]; then echo "$(wc -l < "$f") $(date +%s)"; else echo "0 $(date +%s)"; fi
     executable: /bin/bash
   register: hl_apps_log_lines
   changed_when: false
-  when: hl_apps_restart | bool
 
 - name: Marker before the restart
-  ansible.builtin.include_tasks: marker.yml
+  ansible.builtin.include_tasks: marker_best_effort.yml
   vars:
     hl_marker_action: apps
   when: hl_apps_restart | bool
@@ -122,8 +149,9 @@
     state: restarted
   when: hl_apps_restart | bool
 
+# Every run, as install: without a restart, the whole log (the latest state counts) and the last 120 s
 - name: Check the UF is connected through Cribl
   ansible.builtin.include_tasks: uf_linux_connected.yml
   vars:
-    hl_uf_log_from: "{{ hl_apps_log_lines.stdout | default('0') | trim | int }}"
-  when: hl_apps_restart | bool
+    hl_uf_log_from: "{{ (hl_apps_log_lines.stdout.split()[0] | int) if hl_apps_restart | bool else 0 }}"
+    hl_uf_since: "{{ (hl_apps_log_lines.stdout.split()[1] | int) if hl_apps_restart | bool else 0 }}"

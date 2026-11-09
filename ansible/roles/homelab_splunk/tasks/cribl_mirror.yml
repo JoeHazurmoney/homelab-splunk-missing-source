@@ -1,0 +1,84 @@
+# Write Splunk's copy of the test-block table (hl_server_base/lookups/hl_ingest_block.csv, the
+# hl_ingest_block definition), so the dashboards can label blocked rows (spec 7.2; task 11b reads
+# it). Writes, and reports a change, only when Splunk's file differs. hl_server_base ships the
+# file once as a seed and the server tag never overwrites it.
+#   vars: hl_mirror_csv (required), the whole table, header first, ending in a newline
+# Included by cribl_block (after every change), cribl (when it seeds Cribl's table) and
+# cribl_remove (back to the header).
+# With no Splunk container, or no hl_server_base (after a full server_remove), there is no mirror
+# to write: skip, so cribl_remove still reaches its contract check.
+- name: Look for the Splunk container
+  ansible.windows.win_command:
+    argv: [docker, inspect, --format, "{{ '{{.State.Running}}' }}", "{{ hl_splunk_container }}"]
+  register: hl_mirror_ctr
+  changed_when: false
+  failed_when: false
+
+- name: Look for hl_server_base's lookups folder in it
+  ansible.windows.win_command:
+    argv: [docker, exec, -u, splunk, "{{ hl_splunk_container }}", test, -d, "{{ hl_cribl_mirror_path | dirname }}"]
+  register: hl_mirror_dir
+  changed_when: false
+  failed_when: false
+  when: hl_mirror_ctr.rc == 0 and hl_mirror_ctr.stdout | trim == 'true'
+
+- name: Note whether there is a mirror to write
+  ansible.builtin.set_fact:
+    hl_mirror_target: "{{ hl_mirror_dir is not skipped and hl_mirror_dir.rc | default(1) == 0 }}"
+
+- name: Say why the mirror is skipped
+  ansible.builtin.debug:
+    msg: >-
+      no mirror to write: container {{ hl_splunk_container }}
+      {{ 'has no ' ~ (hl_cribl_mirror_path | dirname) if hl_mirror_dir is not skipped else 'is absent or not running' }}
+  when: not hl_mirror_target | bool
+
+- name: Read Splunk's copy of the test-block table
+  ansible.windows.win_command:
+    argv: [docker, exec, -u, splunk, "{{ hl_splunk_container }}", cat, "{{ hl_cribl_mirror_path }}"]
+  register: hl_mirror_cur
+  changed_when: false
+  failed_when: false
+  when: hl_mirror_target | bool
+
+- name: Write Splunk's copy when it differs
+  when:
+    - hl_mirror_target | bool
+    - (hl_mirror_cur.stdout | default('') | replace('\r', '') | trim) != (hl_mirror_csv | trim)
+  block:
+    - name: Create a staging directory on HOMEPC for the mirror
+      ansible.windows.win_tempfile:
+        state: directory
+        prefix: hl_cribl_mirror.
+      register: hl_mirror_stage
+      changed_when: false
+
+    - name: Write the mirror on HOMEPC
+      ansible.windows.win_copy:
+        content: "{{ hl_mirror_csv }}"
+        dest: "{{ hl_mirror_stage.path }}\\hl_ingest_block.csv"
+      changed_when: false
+
+    - name: Copy the mirror into the Splunk container
+      ansible.windows.win_command:
+        argv: [docker, cp, "{{ hl_mirror_stage.path }}\\hl_ingest_block.csv", "{{ hl_splunk_container }}:{{ hl_cribl_mirror_path }}"]
+      changed_when: true
+
+    - name: Give the mirror back to splunk
+      ansible.windows.win_command:
+        argv: [docker, exec, -u, root, "{{ hl_splunk_container }}", chown, "splunk:splunk", "{{ hl_cribl_mirror_path }}"]
+      changed_when: false
+
+    # docker cp from Windows leaves it rwxr-xr-x; match the server tag's lookups (u=rw,go=r)
+    - name: Set the mirror's mode
+      ansible.windows.win_command:
+        argv: [docker, exec, -u, root, "{{ hl_splunk_container }}", chmod, "0644", "{{ hl_cribl_mirror_path }}"]
+      changed_when: false
+
+  always:
+    - name: Remove the mirror's staging directory on HOMEPC
+      ansible.windows.win_file:
+        path: "{{ hl_mirror_stage.path }}"
+        state: absent
+      when: hl_mirror_stage.path is defined
+      changed_when: false

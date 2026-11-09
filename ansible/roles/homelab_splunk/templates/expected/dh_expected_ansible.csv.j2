@@ -5,7 +5,10 @@
     Per UF host: its host row (UF heartbeat) and one row per enabled input after that host's
     hl_input_overrides, hl_disabled_inputs and the row's `hosts`: a sourcetype row (inputs sharing a
     sourcetype merge, the most critical wins) and, with track_source, a source row.
-    Plus each syslog device (host + sourcetype), Cribl (host + its own logs) and dh_extra_expected. -#}
+    Plus each syslog device (host + sourcetype), Cribl (host + its own logs) and dh_extra_expected.
+    A host with hl_expected: false renders no rows from its UF (host row and input rows), because the
+    inventory can't tell a VM that is off from one whose UF was uninstalled. dh_extra_expected rows naming
+    it stay: they are declared explicitly and describe data that doesn't depend on the UF. -#}
 {%- set cols = ['entity_id', 'level', 'index', 'host', 'sourcetype', 'source', 'collection', 'via', 'hypervisor', 'profile',
                 'interval_secs', 'max_gap_secs', 'criticality', 'owner', 'site', 'runbook', 'description', 'enabled'] -%}
 {%- set rows = {} -%}
@@ -14,6 +17,7 @@
 {%- for h in (groups['uf_linux'] | default([])) + (groups['uf_windows'] | default([])) -%}
 {%-   set hv = hostvars[h] -%}
 {%-   set hs = h | lower | regex_replace('[.].*$', '') -%}
+{%-   if hv.hl_expected | default(hl_expected) | bool -%}
 {%-   set base = {'host': hs, 'collection': 'uf', 'via': 'cribl', 'hypervisor': hv.hl_hypervisor | default(''),
                   'owner': hv.hl_owner | default(hl_owner), 'site': hv.hl_site | default(hl_site), 'enabled': 1} -%}
 {%-   set _ = rows.update({key({'level': 'host', 'host': hs}): base | combine({'level': 'host', 'profile': 'heartbeat',
@@ -40,6 +44,7 @@
 {%-       endif -%}
 {%-     endif -%}
 {%-   endfor -%}
+{%-   endif -%}
 {%- endfor -%}
 {%- for d in syslog_devices -%}
 {%-   set base = {'host': d.name, 'collection': 'syslog', 'via': 'cribl', 'owner': hl_owner, 'site': hl_site, 'criticality': d.criticality, 'enabled': 1} -%}

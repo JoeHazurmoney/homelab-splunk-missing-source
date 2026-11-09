@@ -5,29 +5,47 @@
     hl_rmw_apps: "{{ hl_apps_only if hl_apps_only | length > 0 else (hl_uf_input_apps_windows + ['Splunk_TA_windows']) }}"
 
 - name: Remove the role-owned apps (only those marked [hl] managed = true)
-  ansible.windows.win_shell: |
-    $removed = @()
-    foreach ($a in @({{ hl_rmw_apps | reject('equalto', 'Splunk_TA_windows') | map('to_json') | join(', ') }})) {
-      $d = Join-Path '{{ hl_uf_win_home }}\etc\apps' $a
-      $f = Join-Path $d 'default\app.conf'
-      if ((Test-Path -LiteralPath $f) -and ((Get-Content -LiteralPath $f -Raw) -match '(?ms)^\[hl\][^\[]*managed\s*=\s*(true|1)')) {
-        Remove-Item -LiteralPath $d -Recurse -Force; $removed += $a
+  ansible.windows.win_shell:
+    cmd: |
+      $ErrorActionPreference = 'Stop'
+      $apps = '{{ hl_uf_win_home | replace("'", "''") }}\etc\apps'
+      $removed = @()
+      foreach ($a in @({{ hl_rmw_apps | reject('equalto', 'Splunk_TA_windows') | map('to_json') | join(', ') }})) {
+        $d = Join-Path $apps $a
+        $f = Join-Path $d 'default\app.conf'
+        if ((Test-Path -LiteralPath $f) -and ((Get-Content -LiteralPath $f -Raw) -match '(?ms)^\[hl\][^\[]*managed\s*=\s*(true|1)')) {
+          Remove-Item -LiteralPath $d -Recurse -Force; $removed += $a
+        }
       }
-    }
-    if ({{ ('Splunk_TA_windows' in hl_rmw_apps) | ternary('$true', '$false') }}) {
-      $ti = '{{ hl_uf_win_home }}\etc\apps\Splunk_TA_windows\local\inputs.conf'
-      if (Test-Path -LiteralPath $ti) { Remove-Item -LiteralPath $ti -Force; $removed += 'Splunk_TA_windows/local/inputs.conf' }
-    }
-    @{ removed = $removed } | ConvertTo-Json -Compress
+      if ({{ ('Splunk_TA_windows' in hl_rmw_apps) | ternary('$true', '$false') }}) {
+        $ti = Join-Path $apps 'Splunk_TA_windows\local\inputs.conf'
+        if (Test-Path -LiteralPath $ti) { Remove-Item -LiteralPath $ti -Force; $removed += 'Splunk_TA_windows/local/inputs.conf' }
+      }
+      @{ removed = @($removed) } | ConvertTo-Json -Compress
   register: hl_rmw_done
-  changed_when: (hl_rmw_done.stdout | from_json).removed | length > 0
+  changed_when: hl_rmw_done.rc == 0 and (hl_rmw_done.stdout | from_json).removed | length > 0
 
 - name: Note whether the UF must restart
   ansible.builtin.set_fact:
     hl_rmw_restart: "{{ hl_rmw_done is changed }}"
 
+# "<lines> <epoch>": where splunkd.log ends and the host's clock, just before the restart
+- name: Note where splunkd.log ends
+  ansible.windows.win_shell:
+    cmd: |
+      $f = '{{ hl_uf_win_home | replace("'", "''") }}\var\log\splunk\splunkd.log'
+      $n = 0
+      if (Test-Path -LiteralPath $f) {
+        $fs = [IO.File]::Open($f, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]'ReadWrite, Delete')
+        try { $sr = New-Object IO.StreamReader($fs); while ($null -ne $sr.ReadLine()) { $n++ } } finally { $fs.Dispose() }
+      }
+      "$n $([DateTimeOffset]::UtcNow.ToUnixTimeSeconds())"
+  register: hl_rmw_log_lines
+  changed_when: false
+  when: hl_rmw_restart | bool
+
 - name: Marker for the removal
-  ansible.builtin.include_tasks: marker.yml
+  ansible.builtin.include_tasks: marker_best_effort.yml
   vars:
     hl_marker_action: apps_remove
   when: hl_rmw_restart | bool
@@ -37,3 +55,11 @@
     name: "{{ hl_uf_win_service }}"
     state: restarted
   when: hl_rmw_restart | bool
+
+# The heartbeat must survive the removal (spec 5.5); not when hl_uf_outputs itself was removed
+- name: Check the UF is still connected through Cribl
+  ansible.builtin.include_tasks: uf_windows_connected.yml
+  vars:
+    hl_uf_log_from: "{{ hl_rmw_log_lines.stdout.split()[0] | int }}"
+    hl_uf_since: "{{ hl_rmw_log_lines.stdout.split()[1] | int }}"
+  when: hl_rmw_restart | bool and 'hl_uf_outputs' not in hl_rmw_apps

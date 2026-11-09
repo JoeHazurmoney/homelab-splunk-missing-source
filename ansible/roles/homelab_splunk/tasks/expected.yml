@@ -1,7 +1,10 @@
 # expected (splunk_server, spec 5.3/7.2): render dh_expected_ansible.csv from the whole inventory
 # (hostvars: every UF host, even one that is off or outside --limit), push it into hl_data_health's
 # lookups, then run DH Sync expected so dh_expected reflects it within seconds (the schedule runs it
-# every 5 min anyway). Rows retire when the input leaves the inventory or is disabled.
+# every 5 min anyway). Rows retire when the input leaves the inventory or is disabled, and a host's
+# UF rows (host row and input rows) retire once it has hl_expected: false in its host_vars or has left
+# uf_linux/uf_windows and this tag runs: an uninstall alone changes nothing here, because a host that
+# is off must stay expected. dh_extra_expected rows naming the host stay.
 - name: Create the controller build directory
   ansible.builtin.tempfile:
     state: directory
@@ -82,9 +85,10 @@
 - name: Run DH Sync expected now
   ansible.windows.win_shell: |
     {{ hl_ps_prelude }}
-    $rows = Invoke-HlSearch '| savedsearch "DH Sync expected"'
+    $rows = Invoke-HlSearch -App hl_data_health -Spl '| savedsearch "DH Sync expected"'
     $r = $rows | Select-Object -First 1
-    @{ written = [int]$r.written; changes = @($r.changes) } | ConvertTo-Json -Compress
+    if ($null -eq $r) { throw 'DH Sync expected returned no result' }
+    @{ written = [int]$r.written; changes = @(@($r.changes) | Where-Object { $_ }) } | ConvertTo-Json -Compress
   register: hl_exp_sync
   changed_when: (hl_exp_sync.stdout | from_json).written > 0
 

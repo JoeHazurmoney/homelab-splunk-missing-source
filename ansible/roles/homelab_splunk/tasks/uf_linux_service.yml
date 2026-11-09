@@ -8,11 +8,12 @@
     hl_marker_action: stop
   when: hl_service_action == 'stop'
 
+# "<lines> <epoch>": where splunkd.log ends and the host's clock, just before the (re)start
 - name: Note where splunkd.log ends
   ansible.builtin.shell: |
     set -o pipefail
     f={{ hl_uf_home }}/var/log/splunk/splunkd.log
-    if [ -f "$f" ]; then wc -l < "$f"; else echo 0; fi
+    if [ -f "$f" ]; then echo "$(wc -l < "$f") $(date +%s)"; else echo "0 $(date +%s)"; fi
   args:
     executable: /bin/bash
   register: hl_svc_log_lines
@@ -26,10 +27,12 @@
   register: hl_svc_result
   when: hl_service_action in ['start', 'stop', 'restart']
 
+# A start of a running UF changes nothing: then the whole log, where the latest state counts
 - name: Check the UF is connected through Cribl
   ansible.builtin.include_tasks: uf_linux_connected.yml
   vars:
-    hl_uf_log_from: "{{ hl_svc_log_lines.stdout | trim | int }}"
+    hl_uf_log_from: "{{ (hl_svc_log_lines.stdout.split()[0] | int) if hl_svc_result is changed else 0 }}"
+    hl_uf_since: "{{ (hl_svc_log_lines.stdout.split()[1] | int) if hl_svc_result is changed else 0 }}"
   when: hl_service_action in ['start', 'restart']
 
 - name: Marker after the start
@@ -39,17 +42,21 @@
   when: hl_service_action in ['start', 'restart']
 
 - name: Read the UF's status
-  ansible.builtin.shell: |
-    set -o pipefail
-    echo "service=$(systemctl is-active SplunkForwarder 2>/dev/null || true)"
-    echo "rpm=$(rpm -q --qf '%{VERSION}' splunkforwarder 2>/dev/null || echo none)"
-    log={{ hl_uf_home }}/var/log/splunk/splunkd.log
-    echo "build=$(grep -h -o 'Splunkd starting (build [0-9a-f]*)' "$log" 2>/dev/null | tail -1 | grep -o '[0-9a-f]\{12\}' || true)"
-    echo "last_connect=$(grep -h 'Connected to idx=' "$log" 2>/dev/null | tail -1 | cut -c1-23)"
-    echo "last_refusal=$(grep -h -E 'Invalid S2S token|Connection closed by server' "$log" 2>/dev/null | tail -1 | cut -c1-23)"
-    echo "apps=$(ls {{ hl_uf_home }}/etc/apps 2>/dev/null | tr '\n' ' ')"
-    echo "fips=$(grep -c '^SPLUNK_FIPS=1' {{ hl_uf_home }}/etc/splunk-launch.conf 2>/dev/null || echo 0)"
-  args:
+  ansible.builtin.shell:
+    cmd: |
+      set -o pipefail
+      echo "service=$(systemctl is-active SplunkForwarder 2>/dev/null || true)"
+      echo "rpm=$(rpm -q --qf '%{VERSION}' splunkforwarder 2>/dev/null || echo none)"
+      log={{ hl_uf_home }}/var/log/splunk/splunkd.log
+      # The build from etc/splunk.version and FIPS from the running splunkd: splunkd.log's start
+      # lines are gone once the log rotates (task 4 fix round 1)
+      echo "build=$(sed -n 's/^BUILD=//p' {{ hl_uf_home }}/etc/splunk.version 2>/dev/null)"
+      echo "last_connect=$(grep -h 'Connected to idx=' "$log" 2>/dev/null | tail -1 | cut -c1-23)"
+      echo "last_close=$(grep -h -E '{{ hl_uf_close_re }}' "$log" 2>/dev/null | tail -1 | cut -c1-23)"
+      echo "apps=$(ls {{ hl_uf_home }}/etc/apps 2>/dev/null | tr '\n' ' ')"
+      p=$(systemctl show -p MainPID --value SplunkForwarder 2>/dev/null)
+      if [ "${p:-0}" -gt 0 ] && grep -q -F '/ossl-modules/fips140-3/fips.so' /proc/"$p"/maps 2>/dev/null; then f=on; else f=off; fi
+      echo "fips=$f (launch.conf SPLUNK_FIPS=1: $(grep -c '^SPLUNK_FIPS=1' {{ hl_uf_home }}/etc/splunk-launch.conf 2>/dev/null || true))"
     executable: /bin/bash
   register: hl_svc_status
   changed_when: false

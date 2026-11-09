@@ -1,7 +1,7 @@
 # Managed by the homelab_splunk role (probe tag); local edits are overwritten.
 # One probe round (spec 5.3 probe). Started by hl-devprobe.timer. LogLevelMax keeps systemd's own
 # per-run "Starting/Finished" lines out of the journal, so nothing reaches rsyslog and wd2l
-# (task 8 check 3 confirms it).
+# (task 8 check 6 confirms it).
 [Unit]
 Description=Homelab device probe (pings each syslog device into {{ hl_probe_dir }}/probe.log)
 After=network-online.target

@@ -243,6 +243,7 @@ Where you change what the app expects and how it alerts: mute data during planne
 - **A confirmation fits only once.** It fits only the state you previewed, and never again after its change was applied, even if that change has since expired and been cleaned up. After a reload, or when you come back to a tab, the result may say "Nothing written: this confirmation fits only the state you previewed, …". That is expected: the change was applied the first time. Check the tables or the Admin log tab.
 - **The tables don't refresh by themselves.** Manage never refreshes on its own. After applying a change, reload the page to see it in the tables of the tab.
 - **Times** are shown in the time zone of your Splunk account (Settings > your name > Preferences) and always end with the zone, for example `2026-10-31 17:46 MDT`. That may differ from your PC clock.
+- **If "This visualization has a potential security risk" appears after Apply** (the result stays empty with a red icon, and nothing is written until you click the icon and then **Run Query**): Dashboard Studio's risky-command check is still on. Apply writes with `outputlookup`, which is on Studio's risky list, so the server app hl_server_base turns that check off (`enable_risky_command_check_dashboard = false` in its `default/web.conf`). If the prompt appears, that setting is not in effect: check `splunk btool web list settings --debug | grep risky` (it should show `false` from `apps/hl_server_base/default/web.conf`) and that hl_server_base is deployed (the role's `server` tag, which restarts splunkd). If btool already shows `false`, splunkd hasn't restarted since the deploy or the page is stale: restart splunkd, then reload the page.
 
 ### Item IDs
 
@@ -331,7 +332,7 @@ If the item is muted when you set or clear its limit, the mute and its reason st
   | Learned before bounds (s) | The learned value before it was kept within those values. |
   | Default limit (s) | The profile's default. |
   | Configured limit (s) | A fixed limit written on the item's expected row, if any. |
-  | Days covered, Days skipped | Days of history learned from, and days skipped because Splunk was up too little to learn from them. |
+  | Days covered, Days skipped | Days of history learned from (the last 14 at most: the indexes keep 14 days), and days skipped because Splunk was up too little to learn from them. |
   | Suggested profile | The profile the app would choose from what it saw. |
   | Managed by | ansible (from the inventory) or ui (added on Manage). |
   | Item ID | The item's ID. |
@@ -486,7 +487,7 @@ Every change made on Manage, newest first.
 
 #### Admin log (every change made on Manage)
 - **What it shows:** the last 1000 changes that match the search. Columns: **Time**, **Who**, **Change** (Mute, Unmute, Set limit, Clear limit, Add expected row, Adopt, Add test block or Remove test block), **Item**, **Detail** (before → after, as recorded at the time; times in it are in the time zone of whoever made the change), **Reason**, **Ticket**, **Item ID** (for a test block, its key).
-- **Where it comes from:** the admin log, written by every applied change. It is also copied to the `data_health` index every 5 minutes and kept 90 days in the table.
+- **Where it comes from:** the admin log, written by every applied change. It is also copied to the `data_health` index every 5 minutes (which keeps 14 days) and kept 90 days in the table.
 - **How to read it:** use it to answer "who muted this, and why?".
 
 ## Daily state of health
