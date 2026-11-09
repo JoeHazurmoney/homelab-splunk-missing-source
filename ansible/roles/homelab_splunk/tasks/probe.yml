@@ -32,6 +32,7 @@
 # A run that died between writing a unit and acting on it left the files right and systemd behind:
 # that counts as a change too (task 6's rule). The timer file only matters to the timer; a running
 # timer never rereads it, and `state: started` doesn't restart it. Unknown start: restart.
+# A stopped or disabled timer is a change too (HL_UP): it gets a marker before the role starts it.
 - name: Read what systemd has loaded
   ansible.builtin.shell:
     cmd: |
