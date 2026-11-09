@@ -2,8 +2,9 @@
 # (hostvars: every UF host, even one that is off or outside --limit), push it into hl_data_health's
 # lookups, then run DH Sync expected so dh_expected reflects it within seconds (the schedule runs it
 # every 5 min anyway). Rows retire when the input leaves the inventory or is disabled, and a host's
-# rows retire once it has hl_expected: false in its host_vars or has left uf_linux/uf_windows and
-# this tag runs: an uninstall alone changes nothing here, because a host that is off must stay expected.
+# UF rows (host row and input rows) retire once it has hl_expected: false in its host_vars or has left
+# uf_linux/uf_windows and this tag runs: an uninstall alone changes nothing here, because a host that
+# is off must stay expected. dh_extra_expected rows naming the host stay.
 - name: Create the controller build directory
   ansible.builtin.tempfile:
     state: directory

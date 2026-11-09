@@ -6,20 +6,18 @@
     hl_input_overrides, hl_disabled_inputs and the row's `hosts`: a sourcetype row (inputs sharing a
     sourcetype merge, the most critical wins) and, with track_source, a source row.
     Plus each syslog device (host + sourcetype), Cribl (host + its own logs) and dh_extra_expected.
-    A host with hl_expected: false renders no rows at all, dh_extra_expected rows naming it included:
-    the inventory can't tell a VM that is off from one whose UF was uninstalled, so an uninstall says so. -#}
+    A host with hl_expected: false renders no rows from its UF (host row and input rows), because the
+    inventory can't tell a VM that is off from one whose UF was uninstalled. dh_extra_expected rows naming
+    it stay: they are declared explicitly and describe data that doesn't depend on the UF. -#}
 {%- set cols = ['entity_id', 'level', 'index', 'host', 'sourcetype', 'source', 'collection', 'via', 'hypervisor', 'profile',
                 'interval_secs', 'max_gap_secs', 'criticality', 'owner', 'site', 'runbook', 'description', 'enabled'] -%}
 {%- set rows = {} -%}
 {%- macro key(r) -%}{{ r.level }}|{{ r.index | default('') }}|{{ r.host }}|{{ r.sourcetype | default('') }}|{{ r.source | default('') }}{%- endmacro -%}
 {%- set ns = namespace(r=none) -%}
-{%- set not_expected = [] -%}
 {%- for h in (groups['uf_linux'] | default([])) + (groups['uf_windows'] | default([])) -%}
 {%-   set hv = hostvars[h] -%}
 {%-   set hs = h | lower | regex_replace('[.].*$', '') -%}
-{%-   if not (hv.hl_expected | default(hl_expected) | bool) -%}
-{%-     set _ = not_expected.append(hs) -%}
-{%-   else -%}
+{%-   if hv.hl_expected | default(hl_expected) | bool -%}
 {%-   set base = {'host': hs, 'collection': 'uf', 'via': 'cribl', 'hypervisor': hv.hl_hypervisor | default(''),
                   'owner': hv.hl_owner | default(hl_owner), 'site': hv.hl_site | default(hl_site), 'enabled': 1} -%}
 {%-   set _ = rows.update({key({'level': 'host', 'host': hs}): base | combine({'level': 'host', 'profile': 'heartbeat',
@@ -61,7 +59,7 @@
 {%- set _ = rows.update({key({'level': 'host', 'host': 'cribl'}): cb | combine({'level': 'host', 'description': 'Cribl Stream (the relay)'})}) -%}
 {%- set _ = rows.update({key({'level': 'sourcetype', 'index': 'cribl', 'host': 'cribl', 'sourcetype': 'cribl'}):
               cb | combine({'level': 'sourcetype', 'index': 'cribl', 'sourcetype': 'cribl', 'description': 'Cribl worker stats, every 60 s'})}) -%}
-{%- for x in dh_extra_expected if (x.host | lower | regex_replace('[.].*$', '')) not in not_expected -%}
+{%- for x in dh_extra_expected -%}
 {%-   set _ = rows.update({key(x): {'owner': hl_owner, 'site': hl_site, 'enabled': 1} | combine(x)}) -%}
 {%- endfor -%}
 {{ cols | join(',') }}

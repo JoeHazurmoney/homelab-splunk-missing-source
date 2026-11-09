@@ -337,8 +337,9 @@ hl_probe_dir: /var/log/hl-devprobe
 #   - {level: sourcetype, index: enclave1, host: wd2l-recv, sourcetype: syslog, collection: hec,
 #      via: wd2l-recv, profile: continuous, criticality: 3}
 dh_extra_expected: []
-# Set false in a host's host_vars after uninstalling its UF: the host then renders no expected rows
-# and the next `expected` run retires them. True for a host that is merely off (spec 5.3 uninstall).
+# Set false in a host's host_vars after uninstalling its UF: its host row and input rows are no longer
+# rendered and the next `expected` run retires them (dh_extra_expected rows naming it stay). True for a
+# host that is merely off (spec 5.3 uninstall).
 hl_expected: true
 # verify: how long to wait for dh_status to hold a non-PENDING answer before reporting "not evaluated" (spec 5.3)
 hl_verify_status_wait: 150
