@@ -1,0 +1,8 @@
+_key,entity_id,dh_change,managed_by,enabled,expected_since,criticality,source
+host|*|h7|*|*,host|*|h7|*|*,add,ansible,1,NOW,2,
+source|linux|h8|syslog|/var/log/messages,source|linux|h8|syslog|/var/log/messages,add,ansible,1,NOW,2,/var/log/messages
+sourcetype|linux|h2|syslog|*,sourcetype|linux|h2|syslog|*,update,ansible,1,NOW-9000,1,
+sourcetype|linux|h3|syslog|*,sourcetype|linux|h3|syslog|*,retire,ansible,0,NOW-9000,2,
+sourcetype|linux|h10|syslog|*,sourcetype|linux|h10|syslog|*,add,ansible,1,NOW,2,
+sourcetype|linux|h11|syslog|*,sourcetype|linux|h11|syslog|*,retire,ansible,0,NOW-9000,2,
+sourcetype|linux|newh|syslog|*,sourcetype|linux|newh|syslog|*,add,ansible,1,NOW,2,

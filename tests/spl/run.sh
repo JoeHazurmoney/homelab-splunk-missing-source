@@ -194,6 +194,14 @@ static_names_check() {
     case $m$line in "+"*"$l"* | "-"*) ;; *) echo "  '$n' does not contain $l"; bad=1 ;; esac
     case $m$line in "-"*"$l"*) echo "  '$n' must not contain $l (one writer per collection)"; bad=1 ;; esac
   done
+  # dh_expected is never rewritten whole, in any writer: a partial table would drop the dh_status
+  # of the entities it lacks at DH Evaluate's next run (spec 7.2). Upserts by _key only.
+  local upsert='outputlookup( +[a-z_]+=[^ ]+)* +(dh_expected|\$expected\$)( |$)' w
+  while IFS= read -r line; do
+    w=$(printf '%s\n' "$line" | grep -oE "$upsert" | head -1)
+    case $w in *" append=true"*" key_field=_key"* | *" key_field=_key"*" append=true"*) ;;
+      *) echo "  rewrites dh_expected instead of upserting by _key: ${line%%|search*}: $w"; bad=1 ;; esac
+  done < <({ conf_lines "$app/savedsearches.conf" | grep '|search = '; conf_lines "$app/macros.conf" | grep '|definition = '; } | grep -E "$upsert" || true)
   if [ "$bad" -eq 0 ]; then echo "PASS lookup-names-static"; return 0; fi
   echo "FAIL lookup-names-static"
   return 1

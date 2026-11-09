@@ -1,0 +1,9 @@
+_key,entity_id,level,index,host,sourcetype,source,collection,via,hypervisor,profile,interval_secs,max_gap_secs,criticality,owner,site,runbook,description,managed_by,enabled,expected_since
+sourcetype|linux|h1|syslog|*,sourcetype|linux|h1|syslog|*,sourcetype,linux,h1,syslog,,uf,cribl,,continuous,,,2,taylorb,home,,,ansible,1,NOW-9000
+sourcetype|linux|h2|syslog|*,sourcetype|linux|h2|syslog|*,sourcetype,linux,h2,syslog,,uf,cribl,,continuous,,,3,taylorb,home,,,ansible,1,NOW-9000
+sourcetype|linux|h3|syslog|*,sourcetype|linux|h3|syslog|*,sourcetype,linux,h3,syslog,,uf,cribl,,continuous,,,2,taylorb,home,,,ansible,1,NOW-9000
+sourcetype|linux|h4|syslog|*,sourcetype|linux|h4|syslog|*,sourcetype,linux,h4,syslog,,uf,cribl,,continuous,,,2,taylorb,home,,,ansible,0,NOW-9000
+sourcetype|linux|h5|syslog|*,sourcetype|linux|h5|syslog|*,sourcetype,linux,h5,syslog,,uf,,,sporadic,,,3,ops,lab,,,ui,1,NOW-5000
+sourcetype|linux|h6|cron|*,sourcetype|linux|h6|cron|*,sourcetype,linux,h6,cron,,uf,,,sporadic,,,3,ops,lab,,,ui,1,NOW-5000
+sourcetype|linux|h10|syslog|*,sourcetype|linux|h10|syslog|*,sourcetype,linux,h10,syslog,,uf,,,sporadic,,,3,ops,lab,,,ui,0,NOW-5000
+sourcetype|linux|h11|syslog|*,sourcetype|linux|h11|syslog|*,sourcetype,linux,h11,syslog,,uf,cribl,,continuous,,,2,taylorb,home,,,ansible,1,NOW-9000

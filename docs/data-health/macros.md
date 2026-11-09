@@ -53,7 +53,7 @@ The expected list, `dh_expected`: every entity that should send data. Used by: t
 ## Entities and normalization
 
 ### `dh_indexes`
-The indexes the trackers watch: `linux, windows, network, wd2l_uf_audit, enclave1, wd2l`. `data_health` (this app's own output) and `wd2l_audit` are left out on purpose. Used by: *DH Tracker fast*, *DH Tracker slow*, *DH Baseline daily*, *DH Volume hourly*, the Host detail chart.
+The indexes the trackers watch: `linux, windows, network, wd2l_uf_audit, enclave1, wd2l, cribl`. `data_health` (this app's own output), `wd2l_audit` and `cribl_metrics` (a metrics index, whose dimensions carry the data's hosts and sourcetypes) are left out on purpose. Used by: *DH Tracker fast*, *DH Tracker slow*, *DH Baseline daily*, *DH Volume hourly*, the Host detail chart.
 
 ### `dh_host_norm(h)`
 Turns a host name into its short lowercase form (`WD2L-RECV.mshome.net` becomes `wd2l-recv`), so the same machine always gets the same name. The test-block rule at ingest uses the same rule. Arguments: `h`, a field or expression. Used by: nearly every step that reads a host.
@@ -521,3 +521,21 @@ Rewrites the test-block table (key column first, as the ingest rule needs) and l
 
 ### `dh_ui_log(admin_log, now)`
 Adds one admin-log row per applied change and returns the result in words ("Done: Mute pi5: whole host", or "Nothing written: …" when the confirmation no longer fits). What is stored is unchanged. Used by: the three write macros.
+
+## The expected list (task 10)
+
+The role's `expected` tag writes `dh_expected_ansible.csv` from the inventory. *DH Sync expected*
+merges it into `dh_expected` every 5 minutes, and right after each push. An enabled row added on
+the Manage dashboard is never overwritten.
+
+### `dh_sync_rows(ansible)`
+The Ansible rows, cleaned up the way a Manage row is: level and host in lowercase, the host's domain dropped, index and sourcetype only below host level, the raw source kept for a source row, and the entity id built from them. A row the file marks disabled counts as not in the file, and rows with an unknown level or no host are dropped. Arguments: `ansible`, the Ansible file. Used by: `dh_sync_plan`.
+
+### `dh_sync_sig`
+One fingerprint of the fields Ansible owns (level, index, host, sourcetype, source, collection, via, hypervisor, profile, interval, maximum gap, criticality, owner, site, runbook, description), so an unchanged row is never rewritten. Used by: `dh_sync_plan`.
+
+### `dh_sync_plan(ansible, expected, now)`
+The rows *DH Sync expected* writes, each with its reason: **add** (new, or disabled before, a disabled Manage row included), **update** (a field Ansible owns changed; the "expected since" time is kept), **retire** (an Ansible row that left the file or that the file marks disabled: switched off, so its status goes and a later re-add starts a fresh grace period). It returns only the rows that change, written as `_key` upserts, so `dh_expected` is never rewritten whole (DH Evaluate drops the status of any entity missing from it). An enabled Manage row is never overwritten, not even when Ansible lists the same entity, and nothing is written while the Ansible file has no valid rows, so an empty or broken file can't retire the list. Arguments: the Ansible file, the expected list, `now`. Used by: *DH Sync expected*.
+
+### `dh_discover_summary(expected, state_fast, state_slow, baseline, now)`
+One summary row of what arrives without being expected: how many entities, how many hosts, and up to 50 of their ids. The same rows as Manage's "adopt" list and the Daily report's "unregistered" section. Used by: *DH Discover unregistered*.

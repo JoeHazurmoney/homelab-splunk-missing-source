@@ -362,6 +362,22 @@ argument_specs:
         type: str
         default: /var/log/hl-devprobe
         description: The probe's log folder (probe.log, read by the host's UF).
+      dh_extra_expected:
+        type: list
+        elements: dict
+        default: []
+        description: Extra rows for dh_expected_ansible.csv (columns as in the file), for what Ansible can't derive.
+      hl_expected:
+        type: bool
+        default: true
+        description: Per host. False stops rendering the host's UF rows (dh_extra_expected rows stay), so the next expected run retires them.
+      hl_verify_status_wait:
+        type: int
+        default: 150
+        description: Seconds verify waits for dh_status to hold a non-PENDING answer before reporting "not evaluated".
+      hl_hypervisor:
+        type: str
+        description: The host's hypervisor (hyperv for the wd2l VMs); carried in its expected rows.
       hl_server_host:
         type: str
         default: homepc

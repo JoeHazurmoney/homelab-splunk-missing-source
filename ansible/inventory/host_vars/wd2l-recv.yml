@@ -1,3 +1,5 @@
 ansible_host: wd2l-recv.mshome.net
 # wd2l receiver: its audit trail is /var/log/wd2l/audit-*.jsonl with this sourcetype (spec 4)
 hl_wd2l_audit_sourcetype: "wd2l:audit"
+# Hyper-V guest on HOMEPC (the expected rows carry it; Hyper-V VM events name it, spec 7.6)
+hl_hypervisor: hyperv

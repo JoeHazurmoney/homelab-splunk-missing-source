@@ -1,0 +1,71 @@
+{#- dh_expected_ansible.csv (spec 2.1, 7.2): every expectation the inventory implies, rendered by
+    the `expected` tag on the Splunk server from hostvars, so it covers every UF host whether or not
+    that host is in the play (a VM that is off must stay expected). DH Sync expected computes the
+    entity ids (with dh_source_norm) and merges this into dh_expected.
+    Per UF host: its host row (UF heartbeat) and one row per enabled input after that host's
+    hl_input_overrides, hl_disabled_inputs and the row's `hosts`: a sourcetype row (inputs sharing a
+    sourcetype merge, the most critical wins) and, with track_source, a source row.
+    Plus each syslog device (host + sourcetype), Cribl (host + its own logs) and dh_extra_expected.
+    A host with hl_expected: false renders no rows from its UF (host row and input rows), because the
+    inventory can't tell a VM that is off from one whose UF was uninstalled. dh_extra_expected rows naming
+    it stay: they are declared explicitly and describe data that doesn't depend on the UF. -#}
+{%- set cols = ['entity_id', 'level', 'index', 'host', 'sourcetype', 'source', 'collection', 'via', 'hypervisor', 'profile',
+                'interval_secs', 'max_gap_secs', 'criticality', 'owner', 'site', 'runbook', 'description', 'enabled'] -%}
+{%- set rows = {} -%}
+{%- macro key(r) -%}{{ r.level }}|{{ r.index | default('') }}|{{ r.host }}|{{ r.sourcetype | default('') }}|{{ r.source | default('') }}{%- endmacro -%}
+{%- set ns = namespace(r=none) -%}
+{%- for h in (groups['uf_linux'] | default([])) + (groups['uf_windows'] | default([])) -%}
+{%-   set hv = hostvars[h] -%}
+{%-   set hs = h | lower | regex_replace('[.].*$', '') -%}
+{%-   if hv.hl_expected | default(hl_expected) | bool -%}
+{%-   set base = {'host': hs, 'collection': 'uf', 'via': 'cribl', 'hypervisor': hv.hl_hypervisor | default(''),
+                  'owner': hv.hl_owner | default(hl_owner), 'site': hv.hl_site | default(hl_site), 'enabled': 1} -%}
+{%-   set _ = rows.update({key({'level': 'host', 'host': hs}): base | combine({'level': 'host', 'profile': 'heartbeat',
+                  'criticality': hv.hl_host_criticality | default(hl_host_criticality), 'description': 'UF heartbeat'})}) -%}
+{%-   set src = hl_linux_inputs if h in (groups['uf_linux'] | default([])) else hl_windows_inputs -%}
+{%-   set ov = hv.hl_input_overrides | default({}) -%}
+{%-   set dis = hv.hl_disabled_inputs | default(hl_disabled_inputs) -%}
+{%-   for r0 in src -%}
+{%-     set r = r0 | combine(ov.get(r0.stanza, {})) -%}
+{%-     if r.app == 'hl_uf_wd2l_inputs' -%}{%- set r = r | combine({'sourcetype': hv.hl_wd2l_audit_sourcetype | default('wd2l:audit')}) -%}{%- endif -%}
+{%-     if (r.enabled | bool) and r.stanza not in dis and (r.hosts | default([]) | length == 0 or h in r.hosts) -%}
+{%-       set st = base | combine({'level': 'sourcetype', 'index': r.index, 'sourcetype': r.sourcetype, 'profile': r.profile,
+                  'interval_secs': r.interval | default(''), 'max_gap_secs': r.max_gap_secs | default(''), 'criticality': r.criticality}) -%}
+{%-       set k = key(st) -%}
+{%-       if k in rows -%}
+{%-         set old = rows[k] -%}
+{%-         set _ = rows.update({k: old | combine({'criticality': [old.criticality | int, r.criticality | int] | min})}) -%}
+{%-       else -%}
+{%-         set _ = rows.update({k: st}) -%}
+{%-       endif -%}
+{%-       if r.track_source | bool -%}
+{%-         set so = st | combine({'level': 'source', 'source': r.source}) -%}
+{%-         set _ = rows.update({key(so): so}) -%}
+{%-       endif -%}
+{%-     endif -%}
+{%-   endfor -%}
+{%-   endif -%}
+{%- endfor -%}
+{%- for d in syslog_devices -%}
+{%-   set base = {'host': d.name, 'collection': 'syslog', 'via': 'cribl', 'owner': hl_owner, 'site': hl_site, 'criticality': d.criticality, 'enabled': 1} -%}
+{%-   set _ = rows.update({key({'level': 'host', 'host': d.name}): base | combine({'level': 'host', 'profile': d.profile,
+                'description': 'syslog device (liveness from hl-devprobe)'})}) -%}
+{%-   set st = base | combine({'level': 'sourcetype', 'index': d.index, 'sourcetype': d.sourcetype, 'profile': d.profile}) -%}
+{%-   set _ = rows.update({key(st): st}) -%}
+{%- endfor -%}
+{#- Cribl: the relay every collected row depends on (via=cribl); its own logs are its heartbeat (spec 7.4: 120 s) -#}
+{%- set cb = {'host': 'cribl', 'collection': 'syslog', 'owner': hl_owner, 'site': hl_site, 'criticality': 1, 'enabled': 1,
+              'profile': 'heartbeat', 'max_gap_secs': 120} -%}
+{%- set _ = rows.update({key({'level': 'host', 'host': 'cribl'}): cb | combine({'level': 'host', 'description': 'Cribl Stream (the relay)'})}) -%}
+{%- set _ = rows.update({key({'level': 'sourcetype', 'index': 'cribl', 'host': 'cribl', 'sourcetype': 'cribl'}):
+              cb | combine({'level': 'sourcetype', 'index': 'cribl', 'sourcetype': 'cribl', 'description': 'Cribl worker stats, every 60 s'})}) -%}
+{%- for x in dh_extra_expected -%}
+{%-   set _ = rows.update({key(x): {'owner': hl_owner, 'site': hl_site, 'enabled': 1} | combine(x)}) -%}
+{%- endfor -%}
+{{ cols | join(',') }}
+{% for k in rows | sort %}
+{%   set r = rows[k] %}
+{% set vals = [] %}
+{% for c in cols %}{% set _ = vals.append('"' ~ ('' if c == 'entity_id' else (r[c] | default('') | string)) | replace('"', '""') ~ '"') %}{% endfor %}
+{{ vals | join(',') }}
+{% endfor %}

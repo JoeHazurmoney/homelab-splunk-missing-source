@@ -180,7 +180,7 @@ hl_linux_inputs:
   - {stanza: "monitor:///var/log/messages", app: hl_uf_linux_inputs, index: linux, sourcetype: syslog,
      source: /var/log/messages, profile: continuous, criticality: 2, enabled: true, track_source: true}
   - {stanza: "monitor:///var/log/cron", app: hl_uf_linux_inputs, index: linux, sourcetype: syslog,
-     source: /var/log/cron, profile: continuous, criticality: 3, enabled: true, track_source: true}
+     source: /var/log/cron, profile: sporadic, criticality: 3, enabled: true, track_source: true}
   - {stanza: "monitor:///var/log/secure", app: hl_uf_linux_inputs, index: linux, sourcetype: linux_secure,
      source: /var/log/secure, profile: sporadic, criticality: 1, enabled: true, track_source: false}
   - {stanza: "monitor:///var/log/audit/audit.log", app: hl_uf_linux_inputs, index: linux, sourcetype: linux_audit,
@@ -330,3 +330,16 @@ hl_audit_immutable: false
 hl_probe_host: pi5
 hl_probe_interval: 60
 hl_probe_dir: /var/log/hl-devprobe
+
+# --- The expected list (spec 2.1, 7.2; task 10) ---
+# Extra expected rows Ansible can't derive (e.g. the hosts whose syslog reaches Splunk through wd2l),
+# each a dict with the dh_expected_ansible.csv columns, e.g.
+#   - {level: sourcetype, index: enclave1, host: wd2l-recv, sourcetype: syslog, collection: hec,
+#      via: wd2l-recv, profile: continuous, criticality: 3}
+dh_extra_expected: []
+# Set false in a host's host_vars after uninstalling its UF: its host row and input rows are no longer
+# rendered and the next `expected` run retires them (dh_extra_expected rows naming it stay). True for a
+# host that is merely off (spec 5.3 uninstall).
+hl_expected: true
+# verify: how long to wait for dh_status to hold a non-PENDING answer before reporting "not evaluated" (spec 5.3)
+hl_verify_status_wait: 150
