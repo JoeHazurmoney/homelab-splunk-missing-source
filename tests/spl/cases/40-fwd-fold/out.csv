@@ -1,6 +1,7 @@
 _key,host,guid,version,os,fwd_type,last_heartbeat,last_tcpin,last_marker_action,last_marker_time,last_marker_by,last_marker_run_id,last_vm_event,last_vm_event_time,last_probe_time,last_probe_up,last_probe_reachable,updated
 wd2l-recv,wd2l-recv,G-RECV,10.6.1.1,Linux,uf,NOW-20,NOW-3600,stop,NOW-7200,taylorb,r0,,,,,,NOW
-homepc,homepc,G-HOME,10.6.1.1,Windows,uf,,NOW-30,,,,,,,,,,NOW
+homepc,homepc,,10.6.1.1,Windows x64,uf,,NOW-30,,,,,,,,,,NOW
+pi5,pi5,,10.6.1.1,Linux aarch64,uf,,NOW-25,,,,,,,,,,NOW
 wd2l-logsrv,wd2l-logsrv,,,,,,,start,NOW-300,taylorb,r2,18500,NOW-200,,,,NOW
 h-mk,h-mk,,,,,,,stop,NOW-100,ci,r3,,,,,,NOW
 vm-off,vm-off,,,,,,,,,,,18502,NOW-150,,,,NOW

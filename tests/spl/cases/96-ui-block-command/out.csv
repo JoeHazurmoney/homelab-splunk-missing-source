@@ -1,0 +1,7 @@
+c,command
+b1,ansible-playbook site.yml --tags cribl_block --limit homepc -e hl_block_key='wd2l-recv|linux_secure|*' -e hl_block_minutes=30 -e "hl_block_reason='E2E row 4'"
+b2,ansible-playbook site.yml --tags cribl_block --limit homepc -e hl_block_key='udm|*|*' -e hl_block_clear=true
+b3,
+b4,ansible-playbook site.yml --tags cribl_block --limit homepc -e hl_block_key='pi5|*|*' -e hl_block_minutes=2 -e "hl_block_reason='quote and (rm) stripped'"
+b5,ansible-playbook site.yml --tags cribl_block --limit homepc -e hl_block_key='homepc|XmlWinEventLog:Security|*' -e hl_block_minutes=10 -e "hl_block_reason='win'"
+b6,ansible-playbook site.yml --tags cribl_block --limit homepc -e hl_block_key='wd2l-recv|linux_audit|/var/log/audit/audit.log.1' -e hl_block_clear=true

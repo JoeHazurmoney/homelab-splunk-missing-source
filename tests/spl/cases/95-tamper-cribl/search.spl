@@ -1,0 +1,1 @@
+| inputlookup @events@ | eval _time=tonumber(time), _raw=replace(replace(raw, ";", ","), "'", "\"") | fields _time _raw host | spath input=_raw | `dh_tamper_cribl`

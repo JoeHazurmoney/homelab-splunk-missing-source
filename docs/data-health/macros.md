@@ -36,7 +36,7 @@ The expected list, `dh_expected`: every entity that should send data. Used by: t
 `dh_meta`: run times of the trackers and the admin-log copy. The banner and the evaluator's gate read it. Used by: *DH Tracker fast*, *DH Tracker slow*, *DH Admin log copy*.
 
 ### `dh_lookup_blocks`
-`hl_ingest_block`: the test-block table (owned by the `hl_server_base` app). Until that app is installed the table doesn't exist and is read as empty. Used by: *DH Prune*.
+`hl_ingest_block`: Splunk's copy of Cribl's test-block table (the `hl_server_base` lookup that the role's *cribl_block* tag writes; nothing here writes it). Until that app is installed the table doesn't exist and is read as empty. Used by: `dh_evaluate`, the Manage Test blocks tab.
 
 ### `dh_lookup_tamper`
 `dh_tamper`: tamper findings with their suppression. Used by: *DH Tamper*.
@@ -70,6 +70,9 @@ The enabled rows of the expected list, normalized, one per entity. Only `0`, `fa
 ## Tunables
 
 Fixed numbers the pipeline uses. Change them in `local/macros.conf`, never in `default/`.
+
+### `dh_probe_host`
+The host that runs the device probe (*hl-devprobe*): `pi5`, the role's `hl_probe_host`. The probe causes name it ("check hl-devprobe on pi5"). Change both together.
 
 ### `dh_skew_secs`
 **600 seconds.** When data arrives more than this long after (or before) its own timestamp, the entity is flagged for clock skew. Raise it to tolerate slower or more backfilled sources; lower it to catch smaller clock errors (more noise). Used by: `dh_state_merge`, `dh_eval_load`.
@@ -123,7 +126,7 @@ Rolls a host's rows up to DOWN (its liveness is missing, or, for agentless hosts
 ## Likely cause and action
 
 ### `dh_eval_cause`
-Picks the most likely cause of an entity that is not OK, in a fixed order: the hold, a mute, "just added" (newly expected and not yet seen), a test block, an Ansible stop, the VM being off, a tamper finding, a relay down, the device probe, the heartbeat, and finally "this stream stopped". Used by: `dh_eval`.
+Picks the most likely cause of an entity that is not OK, in a fixed order: the hold, a mute, "just added" (newly expected and not yet seen), a test block, an Ansible stop, the VM being off, a tamper finding, a relay down, the device probe, a silent *hl:devprobe* row while its host's heartbeat is OK, the heartbeat, and finally "this stream stopped". Used by: `dh_eval`.
 
 ### `dh_eval_cause_text`
 Turns each cause code into the plain sentence shown in the Cause column and the next step shown in the Action column (for example "Start it again with the role: ansible-playbook site.yml --tags start --limit wd2l-recv"). The texts use the names the panels use ("Splunk agent", not UF or splunkd) and say what any command does. The full list is in [dashboards.md](dashboards.md#causes-what-the-cause-column-can-say). Used by: `dh_eval`.
@@ -134,7 +137,7 @@ Turns each cause code into the plain sentence shown in the Cause column and the 
 Loads the enabled expected rows and joins each with the latest arrival at its level (source, sourcetype or whole host), taking the later of the fast and slow trackers. Arguments: the expected list and the two arrival tables. Used by: `dh_eval`.
 
 ### `dh_eval_facts(fwd, overrides, baseline, tamper, prev)`
-Adds the facts each row needs: forwarder heartbeat, last Ansible marker, last Hyper-V event and device probe (by host); the entity's and its host's override; the learned baseline; tamper findings on the host (marking those suppressed by a marker); and the previous status. Used by: `dh_eval`.
+Adds the facts each row needs: forwarder heartbeat, last Ansible marker, last Hyper-V event and device probe (by host); the entity's and its host's override; the learned baseline; tamper findings on the host, and on host *cribl* too for a row that arrives through Cribl (marking those suppressed by a marker); and the previous status. Used by: `dh_eval`.
 
 ### `dh_eval_blocks(blocks)`
 Marks rows covered by an active test block (whole host, a sourcetype, or one exact raw source) so the cause says "test block until hh:mm". Only the linux, windows and network indexes can be blocked. Arguments: `blocks`, the test-block table. Used by: `dh_eval`.
@@ -167,8 +170,8 @@ Merges a minute's arrival counts with what the table already holds: latest times
 ### `dh_fwd_from_hb`
 Forwarder heartbeats (each Splunk agent reports its own metrics every 30 s), per host; the indexer's own host is left out. Used by: *DH Tracker fast*.
 
-### `dh_fwd_from_tcpin`
-The indexer's record of each forwarder connection: time, guid, version, OS and type. Used by: *DH Tracker fast*.
+### `dh_fwd_from_ufint`
+Each agent's own log lines: its last connection to Cribl ("Connected to idx=", every 30 s), and from the lines it writes at each start, its operating system and processor type and its build, turned into a version by the `dh_uf_builds` table. Splunk now sees only Cribl's connection, so it can't name the agents itself. Splunk's own lines are left out. Used by: *DH Tracker fast*.
 
 ### `dh_fwd_from_markers`
 The latest Ansible marker per host (`stop`, `start`, …, with who ran it and the run id). Used by: *DH Tracker fast*.
@@ -177,7 +180,7 @@ The latest Ansible marker per host (`stop`, `start`, …, with who ran it and th
 The latest Hyper-V lifecycle event per VM (started, turned off, shut down, saved, reset), read from the Windows Worker-Admin log. Used by: *DH Tracker fast*.
 
 ### `dh_fwd_from_probe`
-The latest device-probe result per device (reachable or not), from the probe on the relay. Used by: *DH Tracker fast*.
+The latest device-probe result per device (reachable or not), from hl-devprobe on pi5. Used by: *DH Tracker fast*.
 
 ### `dh_fwd_fold(fwd, now)`
 Merges the five sources above with the existing `dh_fwd` rows, keeping the latest of each fact. Arguments: `fwd`, the forwarder table; `now`. Used by: *DH Tracker fast*.
@@ -284,6 +287,9 @@ Finds Windows tamper indicators: security or event log cleared (1102, 104), even
 ### `dh_tamper_linux`
 Finds Linux tamper indicators: auditd stopped or aborted, audit rules changed, the Splunk agent, auditd or rsyslog stopped, events of the `hl-*` and `wd2l-*` audit keys, and big clock steps. Used by: *DH Tamper*.
 
+### `dh_tamper_cribl`
+Cribl's audit log: any create, update, delete, reorder or upload of routes, pipelines, outputs, inputs or lookups is a finding on the host *cribl*. The log can't tell a Drop function from any other pipeline edit, so every such change counts. The role's own changes fall inside its *cribl* and *cribl_block* marker windows and are suppressed. Used by: *DH Tamper*.
+
 ### `dh_tamper_finish(tamper, now)`
 Groups indicators into findings (one per host, kind and 5-minute bucket), re-checks each finding of the last 7 days against every Ansible marker (a finding within `dh_tamper_window_secs` of a marker is the role's own work and is suppressed), and marks which ones of the last 7 days still need writing to the index (an older one never does: the index keeps 14 days, the collection 30). Used by: *DH Tamper*.
 
@@ -306,9 +312,6 @@ The admin-log rows written since the last copy (and at least 60 s old), for copy
 ## Prune
 
 Each "mark" macro marks the rows to delete; the prune searches rewrite a table only when something is marked.
-
-### `dh_prune_mark_blocks(now)`
-Test blocks that have expired, or that have no key or no valid expiry. Used by: *DH Prune* (every minute).
 
 ### `dh_prune_mark_overrides(now)`
 Expired mutes are cleared; an override row with nothing left is deleted. Used by: *DH Prune* (every minute).
@@ -510,14 +513,11 @@ Writes the expected row when the confirmation matches, and logs it. Used by: Man
 ### `dh_ui_adopt_row(baseline, fwd)`
 Turns an unregistered entity into an expected-row request: agent hosts become `uf`, others `syslog`. An agent host's own row gets the `heartbeat` profile; any other row takes the baseline's suggestion, else continuous. Used by: Manage, Expected list tab (adopt).
 
-### `dh_ui_block_plan(blocks, admin_log, now)`
-Checks a test-block request (dh_admin only; 1 minute to 24 hours; a source block needs an exact raw source) and shows the block before and after, in words for the preview and as logged, with the normalized source for reference, its Confirm text and its confirmation code. The code covers the whole current table and the key's admin-log times (`admin_log`), so a confirmation fits only once, even after DH Prune has removed the expired block. Used by: Manage, Test blocks tab.
+### `dh_ui_block_command`
+The test block lives in Cribl, so Manage shows the command to run instead of writing it: the role's *cribl_block* line for a checked request (setting with minutes and reason, or clearing), with the key in plain single quotes and the reason reduced to plain characters. Used by: Manage, Test blocks tab.
 
-### `dh_ui_block_rows(blocks, now)`
-The whole new test-block table for a confirmed request; when that would leave the table empty, one placeholder row that matches nothing (DH Prune removes it within a minute). Used by: `dh_ui_block_write`.
-
-### `dh_ui_block_write(blocks, admin_log, now)`
-Rewrites the test-block table (key column first, as the ingest rule needs) and logs the change. Used by: Manage, Test blocks tab.
+### `dh_ui_block_plan(blocks, now)`
+Checks a test-block request (dh_admin only; 1 minute to 24 hours; a source block needs an exact raw source; a sourcetype or source with a character the command can't carry, such as a quote, `$`, a comma, a space or `{`, is refused) against Splunk's copy of the block table and shows the block before and after, in words for the preview and as logged, with the normalized source for reference. Nothing is written from here: when the check says OK, `dh_ui_block_command` gives the role's command. Used by: Manage, Test blocks tab.
 
 ### `dh_ui_log(admin_log, now)`
 Adds one admin-log row per applied change and returns the result in words ("Done: Mute pi5: whole host", or "Nothing written: …" when the confirmation no longer fits). What is stored is unchanged. Used by: the three write macros.

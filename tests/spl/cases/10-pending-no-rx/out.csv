@@ -1,3 +1,3 @@
 entity_id,status,cause_code,action,since,real_status
-host|*|wd2l-recv|*|*,PENDING,gate_no_rx,Check that the Splunk container runs and its ports 9997 / 10514 / 20514 / 8088 are open,NOW-120,OK
-sourcetype|linux|wd2l-recv|syslog|*,PENDING,gate_no_rx,Check that the Splunk container runs and its ports 9997 / 10514 / 20514 / 8088 are open,NOW,
+host|*|wd2l-recv|*|*,PENDING,gate_no_rx,Check that the Splunk container runs and receives: HEC 8088 (wd2l and markers) and splunktcp 9997 from Cribl on hl-net,NOW-120,OK
+sourcetype|linux|wd2l-recv|syslog|*,PENDING,gate_no_rx,Check that the Splunk container runs and receives: HEC 8088 (wd2l and markers) and splunktcp 9997 from Cribl on hl-net,NOW,
