@@ -227,5 +227,6 @@ from tampering.
 | "the rendered expected list has no rows" | the inventory groups `uf_linux` / `uf_windows` are empty |
 | `verify` fails naming a row | that row is `MISSING` or `NEVER_SEEN`; see the [runbook](runbook-missing-data.md). When every row is `PENDING` it waits `hl_verify_status_wait`, then reports "Not evaluated" |
 | a search returns nothing for `dh_*` or `punct` | [Searching](#searching) |
+| no markers in `index=data_health source=dh:marker` | HEC 8088 not reachable from pi5, or a wrong `vault_hl_markers_token`; from pi5: `curl -k https://192.168.1.27:8088/services/collector/health`. A failed marker fails `cribl`, `cribl_block`, `cribl_remove` and the Linux `install`, `stop`, `start`, `restart` and `uninstall`; elsewhere it only warns |
 | a false tamper finding `hl-uf-config` after a CLI command | the `splunk` CLI ran as root (see §5) |
 | Overview shows "On hold" | see the banner rows in [dashboards.md](data-health/dashboards.md) |
