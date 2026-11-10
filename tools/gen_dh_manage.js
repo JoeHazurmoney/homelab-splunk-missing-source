@@ -241,8 +241,8 @@ const blocks = rows([
   [90, [["viz_bk_intro", 1440]]],
   [IH, [["input_bk_action", 240], ["input_bk_host", 300], ["input_bk_level", 300], ["input_bk_target", 600]]],
   [IH, [["input_bk_duration", 240], ["input_bk_reason", 720], ["input_bk_ticket", 480]]],
-  [150, [["viz_bk_steps", 480], ["viz_bk_preview", 960]]],
-  [110, [["viz_bk_command", 1440]]],
+  [180, [["viz_bk_steps", 480], ["viz_bk_preview", 960]]],
+  [180, [["viz_bk_command", 1440]]],
   [320, [["viz_bk_sources", 720], ["viz_blocks", 720]]],
 ]);
 const log = rows([
