@@ -1,7 +1,7 @@
 {
-    "about": "The test-block Confirm no longer resets when its form changes.",
+    "about": "The adopt Confirm no longer resets when its form changes.",
     "view": "dh_manage",
-    "pattern": "(\"token\": \"bk_confirm\"),\\s*\"isCascadingInput\": true",
+    "pattern": "(\"token\": \"ad_confirm\"),\\s*\"isCascadingInput\": true",
     "repl": "\\1",
-    "expect": "confirmation bk_confirm must reset when its form changes"
+    "expect": "confirmation ad_confirm must reset when its form changes"
 }

@@ -143,7 +143,7 @@ S('ds_ad_apply', 'Adopt: apply', adReq + ' | eval dh_confirm=$ad_confirm|s$ | `d
 S('ds_bk_sources', 'Raw sources of the host (24 h)', '| tstats count as events max(_indextime) as it where index IN (linux, windows, network) [| makeresults | eval host=$bk_host|s$ | `dh_ui_host_terms`] earliest=-24h latest=+1d by index sourcetype source | eval source_norm=`dh_source_norm(source)`, last_seen=strftime(it, `dh_ui_time_fmt_tz`) | sort 0 sourcetype source | table index sourcetype source source_norm events last_seen');
 C('ds_bk_sources_view', 'Raw sources of the host (24 h) (shown)', 'ds_bk_sources', '| `dh_ui_headers`');
 C('ds_bk_targets', 'Block target choices', 'ds_bk_sources', '| eval lvl=$bk_level|s$ | where lvl!="host" | eval value=if(lvl=="source", sourcetype."|".source, sourcetype."|*"), label=if(lvl=="source", sourcetype." › ".source." (exact raw name; normalized: ".source_norm.")", sourcetype) | stats count by label value | table label value | appendpipe [| stats count | eval label=case($bk_level|s$=="host", "Not needed for a whole-host block", $bk_level|s$=="source", "Choose the raw source", true(), "Choose the sourcetype"), value="-" | table label value] | eval dh_o=if(value=="-", 0, 1) | sort 0 dh_o | table label value');
-const bkReq = '| makeresults | eval dh_action=$bk_action|s$, level=$bk_level|s$, host=$bk_host|s$, target=$bk_target|s$, dh_secs=$bk_duration|s$, reason=$bk_reason|s$, ticket=$bk_ticket|s$ | `dh_ui_actor` | `dh_ui_block_plan(hl_ingest_block, dh_admin_log, now())`';
+const bkReq = '| makeresults | eval dh_action=$bk_action|s$, level=$bk_level|s$, host=$bk_host|s$, target=$bk_target|s$, dh_secs=$bk_duration|s$, reason=$bk_reason|s$, ticket=$bk_ticket|s$ | `dh_ui_actor` | `dh_ui_block_plan(hl_ingest_block, now())`';
 S('ds_bk_plan', 'Test block: plan', bkReq);
 C('ds_bk_preview', 'Test block: preview', 'ds_bk_plan', '| table ui_change ui_item ui_now ui_after check source_norm | `dh_ui_headers`');
 // The block lives in Cribl (spec 7.7, 7.8; task 11b): the form checks the request and shows the
@@ -241,8 +241,8 @@ const blocks = rows([
   [90, [["viz_bk_intro", 1440]]],
   [IH, [["input_bk_action", 240], ["input_bk_host", 300], ["input_bk_level", 300], ["input_bk_target", 600]]],
   [IH, [["input_bk_duration", 240], ["input_bk_reason", 720], ["input_bk_ticket", 480]]],
-  [150, [["viz_bk_steps", 480], ["viz_bk_preview", 960]]],
-  [110, [["viz_bk_command", 1440]]],
+  [180, [["viz_bk_steps", 480], ["viz_bk_preview", 960]]],
+  [180, [["viz_bk_command", 1440]]],
   [320, [["viz_bk_sources", 720], ["viz_blocks", 720]]],
 ]);
 const log = rows([

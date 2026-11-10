@@ -1,0 +1,7 @@
+level,index,host,sourcetype,source,collection,via,profile,interval_secs,max_gap_secs,criticality,enabled,expected_since
+host,,pi5,,,uf,cribl,heartbeat,,,1,,
+sourcetype,network,pi5,hl:devprobe,,uf,cribl,periodic,60,,2,,
+host,,h36b,,,uf,cribl,heartbeat,,,1,,
+sourcetype,network,h36b,hl:devprobe,,uf,cribl,periodic,60,,2,,
+host,,h36c,,,uf,cribl,heartbeat,,,1,,
+sourcetype,network,h36c,hl:devprobe,,uf,cribl,periodic,60,,2,,

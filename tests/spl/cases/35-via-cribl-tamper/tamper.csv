@@ -1,0 +1,3 @@
+host,time,indicator,detail,suppressed
+cribl,NOW-5010,Cribl routes create (r_drop) by admin,action=create; type=routes,0
+cribl,NOW-9010,Cribl lookups change (hl_ingest_block.csv) by admin,type=lookups,1

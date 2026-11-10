@@ -266,7 +266,7 @@
             "type": "ds.search",
             "name": "Tamper findings in 24 h (first seen)",
             "options": {
-                "query": "search index=data_health source=\"dh:tamper\" sourcetype=stash earliest=-31d latest=+1d | eval it=_indextime | `dh_ui_tamper_24h(dh_status, now())`"
+                "query": "search index=data_health source=\"dh:tamper\" sourcetype=stash earliest=-14d latest=+1d | eval it=_indextime | `dh_ui_tamper_24h(dh_status, now())`"
             }
         },
         "ds_tamper_f": {

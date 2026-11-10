@@ -1,0 +1,2 @@
+entity_id,level,index,host,sourcetype,source,collection,via,hypervisor,profile,interval_secs,max_gap_secs,criticality,owner,site,runbook,description,enabled
+,bogus,linux,h9,syslog,,uf,cribl,,continuous,,,2,taylorb,home,,,1

@@ -1,9 +1,9 @@
 # Write hl_state back to the Windows state file; with nothing left in it, delete the file (and its
 # folder when empty), as the uninstall contract asks (spec 5.6).
-- name: Create the state folder
-  ansible.windows.win_file:
-    path: "{{ hl_win_state_file | win_dirname }}"
-    state: directory
+- name: Create the state folder (protected ACL)
+  ansible.builtin.include_tasks: win_state_dir.yml
+  vars:
+    hl_win_dir: "{{ hl_win_state_file | win_dirname }}"
   when: hl_state | length > 0
 
 - name: Write the state file

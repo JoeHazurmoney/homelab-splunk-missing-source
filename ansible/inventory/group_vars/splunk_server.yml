@@ -11,3 +11,12 @@ syslog_devices:
     source: "syslog:udm"
     profile: sporadic
     criticality: 2
+
+# What reaches Splunk over wd2l (spec 4.4 "existing" row): one row per real enclave1 host/sourcetype
+# pair, found with `| tstats count where index=enclave1 earliest=-24h by host sourcetype`. HEC, not
+# through Cribl, so no via=cribl. The expected tag turns each into a row (task 10).
+dh_extra_expected:
+  - {level: sourcetype, index: enclave1, host: pi5, sourcetype: syslog, collection: hec,
+     via: wd2l-recv, profile: continuous, criticality: 3}
+  - {level: sourcetype, index: enclave1, host: wd2l-logsrv, sourcetype: syslog, collection: hec,
+     via: wd2l-recv, profile: continuous, criticality: 3}

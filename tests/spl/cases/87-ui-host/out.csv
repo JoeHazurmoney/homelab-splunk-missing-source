@@ -6,7 +6,6 @@ children,4,linux / df / df,NEVER_SEEN,never arrived / 660 s,Profile default,test
 fwd,,,,,,,,Agent version,10.6.0.0 (expected 10.6.1.1),,,
 fwd,,,,,,,,Operating system,Linux,,,
 fwd,,,,,,,,Agent type,uf,,,
-fwd,,,,,,,,Agent ID (guid),G1,,,
 fwd,,,,,,,,Last heartbeat,2033-05-18 03:32 (00:00:30 ago),,,
 fwd,,,,,,,,Last connection to Cribl,2033-05-18 03:32 (00:00:45 ago),,,
 fwd,,,,,,,,Last Ansible marker,start at 2033-05-18 02:33 by taylorb (run r1),,,

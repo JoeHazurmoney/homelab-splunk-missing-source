@@ -1,7 +1,0 @@
-k,dh_drop,dh_change
-h1|*|*,0,0
-h2|st|*,1,1
-h3|*|*,1,1
-h4|*|*,1,1
-,1,1
-h5|st|/var/log/x.log,0,0
