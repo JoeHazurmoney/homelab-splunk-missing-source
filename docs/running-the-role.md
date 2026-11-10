@@ -5,7 +5,8 @@ it does.** A bare run deploys. Anything that removes, stops, restarts or only ch
 tag (those tags carry `never`). Run everything from `ansible/` on pi5, the Ansible controller:
 
 ```bash
-cd ~/homelab-splunk-missing-source/ansible && . ~/.venvs/ansible/bin/activate
+cd ~/homelab-splunk-missing-source/ansible
+. ~/.venvs/ansible/bin/activate     # when bootstrap-pi.sh built the venv (it does on pi5)
 ```
 
 The commands below omit `ansible-playbook site.yml`.
@@ -24,7 +25,14 @@ The commands below omit `ansible-playbook site.yml`.
   them as `taylorb`.
 - pi5: AlmaLinux 10 (aarch64) with `sudo`, and internet access for pip and `download.splunk.com`.
 
-**The setup steps**, in this order, from a checkout of this repo on HOMEPC:
+The inventory names this lab's hosts and users (`inventory/hosts.yml`, `inventory/host_vars/`), and
+`defaults/main.yml` names HOMEPC's address and paths (`hl_collector`, `hl_marker_hec_url`,
+`hl_splunk_admin_password_file`). Change those for other hosts.
+
+**The setup steps**, in this order, from the root of a clone of this repo on HOMEPC
+(`gh repo clone JoeHazurmoney/homelab-splunk-missing-source`, a private repo). Windows 11 refuses
+local scripts by default; if PowerShell says running scripts is disabled, run each one as
+`powershell -ExecutionPolicy Bypass -File .\scripts\<name>.ps1`.
 
 | Step | Where | What |
 |---|---|---|
@@ -41,7 +49,8 @@ The commands below omit `ansible-playbook site.yml`.
 its sha256 in `defaults/main.yml` (`hl_uf_packages`, 10.6.1.1 build `b2ae2962645c`: x86_64 and
 aarch64 rpm, windows MSI). The TAs are copied by hand: `splunk-add-on-for-unix-and-linux_1034.spl`
 (Splunk_TA_nix 10.3.4) and `splunk-add-on-for-microsoft-windows_1103.spl` (Splunk_TA_windows
-11.0.3), from Splunkbase, under those exact names. Put them in `ansible/files/packages/` on HOMEPC
+11.0.3), from Splunkbase under those exact names (this lab keeps a copy outside the repo, in
+`C:\Users\taylo\Documents\claude-code\splunk-ta-local\`). Put them in `ansible/files/packages/` on HOMEPC
 and run `sync-to-pi.ps1 -IncludePackages`, or copy them straight to pi5. Their sha256 is pinned in
 `hl_tas` in `defaults/main.yml`, and `apps` fails on a missing file or one that doesn't match.
 
@@ -118,7 +127,8 @@ characters, and applies only to `linux`, `windows` and `network`. Set and cleare
 in about 15–17 s. Expiry is checked per event, so a block stops exactly at its time; nothing prunes
 Cribl's table on a schedule, and expired rows leave it at the next `cribl_block` run. `cribl_block`
 is the only tag that adds or removes blocks in Splunk's mirror (`hl_server_base/lookups/hl_ingest_block.csv`);
-`cribl` and `cribl_remove` only reset it to its header.
+`cribl` (when it seeds an empty Cribl table) and `cribl_remove` only reset it to its header. The
+Manage form writes nothing.
 
 **Turning things off:**
 - One input, on every host that has it: `-e '{"hl_disabled_inputs":["monitor:///var/log/secure"]}' --tags apps,expected`.
@@ -182,14 +192,6 @@ over `/opt/splunkforwarder`, which fires the `hl-uf-config` audit rule and raise
 finding. Run it as the UF's own user: `sudo -u splunkfwd /opt/splunkforwarder/bin/splunk btool
 inputs list <stanza> --debug`.
 
-### Searching
-
-- Events delivered by Cribl have **no `punct` field**, so `dedup punct` or `by punct` silently drops
-  them.
-- `dh_*` objects (saved searches, macros, KV lookups) are visible only in the `hl_data_health` app
-  context: use the HL Data Health app in Splunk Web, or
-  `/servicesNS/nobody/hl_data_health/` over REST. A `/services/` search reads 0 rows with no error.
-
 **The Dashboard risky-command check is off, by choice** (`hl_server_base/default/web.conf`,
 `enable_risky_command_check_dashboard = false`). Manage's Apply writes with `outputlookup`, so with
 the check on, Dashboard Studio holds every Apply until the viewer clicks "Run Query". It matters
@@ -202,6 +204,14 @@ Every role-made change shows up as an **Ansible marker** (`index=data_health sou
 fields `action`, `target_host`, `by`, `run_id`), so the data-health app knows the role's own work
 from tampering.
 
+### Searching
+
+- Events delivered by Cribl have **no `punct` field**, so `dedup punct` or `by punct` silently drops
+  them.
+- `dh_*` objects (saved searches, macros, KV lookups) are visible only in the `hl_data_health` app
+  context: use the HL Data Health app in Splunk Web, or
+  `/servicesNS/nobody/hl_data_health/` over REST. A `/services/` search reads 0 rows with no error.
+
 ## 6. Troubleshooting
 
 | Symptom | Look at |
@@ -209,7 +219,7 @@ from tampering.
 | `install` fails at "Wait for the UF to connect to Cribl" | Cribl up? (`--tags verify --limit homepc`). Port 9997 on HOMEPC reachable from the host? A wrong token looks like an ordinary close: `--tags status` shows `last_connect` and `last_close`, and Cribl logs the refused token masked in `index=cribl`. The play waits `hl_uf_connect_timeout` (180 s) before it fails |
 | `cribl` stops at "The Cribl image is not on HOMEPC" | pull it in a desktop session (setup step 5) |
 | `cribl` stops at `hl-net is missing` | run `--tags server_network` first |
-| `cribl` stops at the admin password | a container created by hand with another password: `--tags cribl_remove`, then `--tags cribl` |
+| `cribl` fails at "Set the admin password" (its output is hidden) | Cribl refused both the vault's password and `admin`/`admin`: the container's password was changed outside the role. Put the current one in the vault, or `--tags cribl_remove` then `--tags cribl` (that deletes Cribl's volume: its config, lookups and queue) |
 | `server` fails with btool findings | only findings in the role's apps fail the play; read the listed lines |
 | a Docker command fails over SSH | Docker Desktop must be running in the signed-in session on HOMEPC |
 | a VM is unreachable | the VMs are started by hand; `ansible_host` is `<vm>.mshome.net`, reached through HOMEPC's sshd |
