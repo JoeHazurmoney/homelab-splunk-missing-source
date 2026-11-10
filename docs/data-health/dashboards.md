@@ -70,7 +70,7 @@ When something is late or missing, the app picks the most likely reason, checkin
 | The device answers the network probe but sends no logs … | The device is up but sends no logs; its logging settings probably changed. | Check the remote syslog settings on the device. |
 | The Splunk agent reports late (not yet missing) … | The Splunk agent on the host is slow to report: busy, stopping, or its network path to Cribl (port 9997 on HOMEPC, where agents deliver data) is slow. | Check the agent with the role (*--tags status* shows whether the agent runs and is connected); then check the network path from the host to Cribl. |
 | The Splunk agent stopped reporting … | The host is down or cut off from Cribl, the agent crashed, or someone stopped it outside Ansible. | Ping or SSH to the host; then check the agent with the role (*--tags status*). |
-| The Splunk agent works but this input has never sent anything … | The agent works, but this input has never sent anything: not enabled, wrong index or sourcetype, or no permission to read the file. | Check the input on the host: its settings (*splunk btool inputs list* on the host prints the inputs the agent really uses) and the agent errors on Host detail. |
+| The Splunk agent works but this input has never sent anything … | The agent works, but this input has never sent anything: not enabled, wrong index or sourcetype, or no permission to read the file. | Check the input on the host: its settings (*splunk btool inputs list* on the host prints the inputs the agent really uses; on Linux run it as the agent's own user, *sudo -u splunkfwd /opt/splunkforwarder/bin/splunk btool inputs list*, never as root, which raises a false tamper finding) and the agent errors on Host detail. |
 | The Splunk agent works but sends no data at all … | Its apps or inputs were removed, it cannot forward, or a test block drops everything. | Re-deploy the agent's apps with the role (*--tags apps*) and check Manage for test blocks. |
 | The Splunk agent works but this input stopped … | The file is unreadable, moved or rotated; or auditd or rsyslog stopped; or audit rules were removed. | Read the Splunk agent errors about this sourcetype on Host detail. |
 | Never arrived since it was added … | A host without an agent never sent this. | Check that this input is deployed and sending. |
@@ -447,7 +447,7 @@ A source block needs the **exact raw source** name, as listed in the raw sources
 | Sourcetype or raw source | For the lower levels: the sourcetype, or the exact raw source name (listed with its normalized form). Not needed for a whole-host block. |
 | Block for | How long: 5 minutes to 24 hours (the most allowed). |
 
-The form also has its own **Reason (required)** and **Ticket (optional, - for none)**, as above. It has no Confirm: nothing is written from here.
+The form also has its own **Reason (required)** and **Ticket (optional, - for none)**, as above. It has no Confirm: nothing is written from here. The reason goes into the command; the ticket doesn't, and it isn't stored anywhere (the *cribl_block* tag has no ticket).
 
 #### Test block: preview
 - **What it shows:** the block you are about to add or remove. Columns: **Change**, **Item** (the block key in words), **Now**, **After the change**, **Check** and **Normalized source** (for reference only).

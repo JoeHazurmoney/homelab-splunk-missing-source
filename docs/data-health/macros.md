@@ -36,7 +36,7 @@ The expected list, `dh_expected`: every entity that should send data. Used by: t
 `dh_meta`: run times of the trackers and the admin-log copy. The banner and the evaluator's gate read it. Used by: *DH Tracker fast*, *DH Tracker slow*, *DH Admin log copy*.
 
 ### `dh_lookup_blocks`
-`hl_ingest_block`: Splunk's copy of Cribl's test-block table (the `hl_server_base` lookup that the role's *cribl_block* tag writes; nothing here writes it). Until that app is installed the table doesn't exist and is read as empty. Used by: `dh_evaluate`, the Manage Test blocks tab.
+`hl_ingest_block`: Splunk's copy of Cribl's test-block table (the `hl_server_base` lookup that the role's *cribl_block* tag writes; nothing here writes it). Until that app is installed the table doesn't exist and is read as empty. Used by: nothing. `dh_evaluate` and the Manage Test blocks tab name `hl_ingest_block` directly.
 
 ### `dh_lookup_tamper`
 `dh_tamper`: tamper findings with their suppression. Used by: *DH Tamper*.
@@ -427,7 +427,7 @@ The search box of a table: keeps the rows that contain every word of the box (wo
 The mutes and limit overrides in force, for display: the item in words, when the mute ends and the limit override in words, with their zone. Used by: Manage, Current mutes and limit overrides.
 
 ### `dh_ui_blocks(blocks, now)`
-The current test blocks for display: the key in words, until when (with its zone) and whether each is still active; the placeholder row is left out. Used by: Manage, Current test blocks.
+The current test blocks for display: the key in words, until when (with its zone) and whether each is still active. Used by: Manage, Current test blocks.
 
 ### `dh_ui_indexes`
 The index choices of Manage's Add-row form, read from `dh_indexes` at run time, so the list of watched indexes lives in one place (the add-row check uses `dh_indexes` too). Used by: Manage, Expected list tab, Index.
@@ -520,7 +520,7 @@ The test block lives in Cribl, so Manage shows the command to run instead of wri
 Checks a test-block request (dh_admin only; 1 minute to 24 hours; a source block needs an exact raw source; a sourcetype or source with a character the command can't carry, such as a quote, `$`, a comma, a space or `{`, is refused) against Splunk's copy of the block table and shows the block before and after, in words for the preview and as logged, with the normalized source for reference. Nothing is written from here: when the check says OK, `dh_ui_block_command` gives the role's command. Used by: Manage, Test blocks tab.
 
 ### `dh_ui_log(admin_log, now)`
-Adds one admin-log row per applied change and returns the result in words ("Done: Mute pi5: whole host", or "Nothing written: …" when the confirmation no longer fits). What is stored is unchanged. Used by: the three write macros.
+Adds one admin-log row per applied change and returns the result in words ("Done: Mute pi5: whole host", or "Nothing written: …" when the confirmation no longer fits). What is stored is unchanged. Used by: the two write macros (`dh_ui_override_write`, `dh_ui_expected_write`).
 
 ## The expected list (task 10)
 
