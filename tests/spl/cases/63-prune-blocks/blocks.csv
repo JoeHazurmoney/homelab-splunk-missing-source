@@ -1,7 +1,0 @@
-k,until,reason,set_by
-h1|*|*,NOW+600,keep me,admin
-h2|st|*,NOW-1,expired,admin
-h3|*|*,NOW,expires now,admin
-h4|*|*,abc,bad until,admin
-,NOW+600,no key,admin
-h5|st|/var/log/x.log,NOW+60,keep me too,admin

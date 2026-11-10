@@ -35,8 +35,20 @@
   ansible.builtin.set_fact:
     hl_rm_restart: "{{ hl_rm_apps_done is changed or hl_rm_ta_inputs is changed }}"
 
+# "<lines> <epoch>": where splunkd.log ends and the host's clock, just before the restart
+- name: Note where splunkd.log ends
+  ansible.builtin.shell:
+    cmd: |
+      set -o pipefail
+      f={{ hl_uf_home }}/var/log/splunk/splunkd.log
+      if [ -f "$f" ]; then echo "$(wc -l < "$f") $(date +%s)"; else echo "0 $(date +%s)"; fi
+    executable: /bin/bash
+  register: hl_rm_log_lines
+  changed_when: false
+  when: hl_rm_restart | bool
+
 - name: Marker for the removal
-  ansible.builtin.include_tasks: marker.yml
+  ansible.builtin.include_tasks: marker_best_effort.yml
   vars:
     hl_marker_action: apps_remove
   when: hl_rm_restart | bool
@@ -46,3 +58,11 @@
     name: SplunkForwarder
     state: restarted
   when: hl_rm_restart | bool
+
+# The heartbeat must survive the removal (spec 5.5); not when hl_uf_outputs itself was removed
+- name: Check the UF is still connected through Cribl
+  ansible.builtin.include_tasks: uf_linux_connected.yml
+  vars:
+    hl_uf_log_from: "{{ hl_rm_log_lines.stdout.split()[0] | int }}"
+    hl_uf_since: "{{ hl_rm_log_lines.stdout.split()[1] | int }}"
+  when: hl_rm_restart | bool and 'hl_uf_outputs' not in hl_rm_apps

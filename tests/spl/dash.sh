@@ -13,9 +13,12 @@
 #   writes         the Manage writes end to end on throwaway KV collections and a throwaway CSV:
 #                  preview -> confirm -> apply, the stored rows, the admin log, that a repeated or
 #                  stale confirmation applies nothing, and the test-block command (task 11b).
+#   sync           DH Sync expected, the search as written in savedsearches.conf, on a throwaway KV
+#                  copy of dh_expected: it upserts by _key, so the rows it doesn't change stay as
+#                  they were (DH Evaluate drops the status of any entity missing from dh_expected).
 #
 # Throwaway collections, lookup definitions and files are named dhtest_* and removed on exit.
-# Usage: tests/spl/dash.sh panels | load [hosts] | writes
+# Usage: tests/spl/dash.sh panels | load [hosts] | writes | sync
 # shellcheck disable=SC2016  # backticks here are Splunk macro calls, not shell expansions
 set -euo pipefail
 here=$(cd "$(dirname "$0")" && pwd)
@@ -261,20 +264,78 @@ writes() {
   res=$(kv_get dhtest_kv_expected 'search host=dhtest-w3 | table managed_by profile collection criticality')
   expect "adopted row stored" "$(printf '%s' "$res" | sed -n 2p)" '^ui,continuous,syslog,3$'
   # Test block (task 11b): the block lives in Cribl, so the form writes nothing; it shows the role's
-  # cribl_block command. The block file and the admin log stay as they were.
+  # cribl_block command. A throwaway block table with one live block on the requested key makes the
+  # remove case previewable; it and the admin log stay as they were.
   bk=("bk_action=add" "bk_host=dhtest-w4" "bk_level=source" "bk_target=linux_secure|/var/log/secure.1" "bk_duration=900" "bk_reason=writes test" "bk_ticket=CHG-B")
+  printf 'k,until,reason,set_by
+dhtest-w4|linux_secure|/var/log/secure.1,%s,writes test,admin
+' "$(($(date +%s) + 3600))" >"$work/dhtest_w_blocks.csv"
+  dh_docker cp "$(dh_hostpath "$work/dhtest_w_blocks.csv")" "$DH_CONTAINER:$DH_APP_DIR/lookups/dhtest_w_blocks.csv"
+  dh_docker exec -u root "$DH_CONTAINER" chown splunk:splunk "$DH_APP_DIR/lookups/dhtest_w_blocks.csv"
+  dh_curl -o "$work/reload.out" -X POST "$DH_MGMT/services/data/lookup-table-files/_reload"
+  local bk_sum0 bk_sum1
+  bk_sum0=$(dh_docker exec -u root "$DH_CONTAINER" md5sum "$DH_APP_DIR/lookups/dhtest_w_blocks.csv")
   res=$(w_run ds_bk_plan "${bk[@]}" | col source_norm)
   expect "block preview shows the normalized source" "$res" '^/var/log/secure\.\*$'
   res=$(w_run ds_bk_command "${bk[@]}" | col Command)
-  expect "block command sets the exact-source block" "$res" "^ansible-playbook site.yml --tags cribl_block --limit homepc -e \"hl_block_key='dhtest-w4\\|linux_secure\\|/var/log/secure\\.1'\" -e hl_block_minutes=15 -e \"hl_block_reason='writes test'\"\$"
+  expect "block command sets the exact-source block" "$res" "^ansible-playbook site.yml --tags cribl_block --limit homepc -e hl_block_key='dhtest-w4\|linux_secure\|/var/log/secure\.1' -e hl_block_minutes=15 -e hl_block_reason='writes test'\$"
   bk[0]="bk_action=remove"
   res=$(w_run ds_bk_command "${bk[@]}" | col Command)
-  expect "block command clears it" "$res" "^ansible-playbook site.yml --tags cribl_block --limit homepc -e \"hl_block_key='dhtest-w4\\|linux_secure\\|/var/log/secure\\.1'\" -e hl_block_clear=true\$"
-  res=$(dh_docker exec -u root "$DH_CONTAINER" sh -c "test -e $DH_APP_DIR/lookups/dhtest_w_blocks.csv && echo present || echo absent")
-  expect "the block form wrote no file" "$res" '^absent$'
+  expect "block command clears it" "$res" "^ansible-playbook site.yml --tags cribl_block --limit homepc -e hl_block_key='dhtest-w4\|linux_secure\|/var/log/secure\.1' -e hl_block_clear=true\$"
+  bk_sum1=$(dh_docker exec -u root "$DH_CONTAINER" md5sum "$DH_APP_DIR/lookups/dhtest_w_blocks.csv")
+  expect "the block form left its table as it was" "$bk_sum1" "^${bk_sum0%% *}"
+  # An unknown key cannot be removed: the preview says why and there is no command.
+  bk=("bk_action=remove" "bk_host=dhtest-w4" "bk_level=host" "bk_target=-" "bk_duration=900" "bk_reason=writes test" "bk_ticket=CHG-B")
+  res=$(w_run ds_bk_command "${bk[@]}" | col Command)
+  expect "block command for a key with no active block" "$res" '^Not ready: This has no active test block'
   res=$(kv_get dhtest_kv_admin_log 'stats count')
   expect "admin log: every applied change, nothing for the refused ones (no block rows: task 11b)" "$(printf '%s' "$res" | sed -n 2p)" '^6$'
   [ "$WFAIL" -eq 0 ] && echo "writes: PASS"
+  [ "$WFAIL" -eq 0 ]
+}
+
+########## sync: DH Sync expected on a throwaway KV copy of dh_expected (spec 7.2, task 10)
+sync() {
+  WFAIL=0
+  local src=$work/sync_src spl res
+  mkdir -p "$src"
+  : >"$src/search.spl"
+  cat >"$src/ansible.csv" <<'EOF'
+entity_id,level,index,host,sourcetype,source,collection,via,hypervisor,profile,interval_secs,max_gap_secs,criticality,owner,site,runbook,description,enabled
+,sourcetype,linux,dhtest-s1,syslog,,uf,cribl,,continuous,,,2,taylorb,home,,,1
+,sourcetype,linux,dhtest-s2,syslog,,uf,cribl,,continuous,,,1,taylorb,home,,,1
+,sourcetype,linux,dhtest-new,syslog,,uf,cribl,,continuous,,,2,taylorb,home,,,1
+EOF
+  cat >"$src/seed.csv" <<'EOF'
+entity_id,level,index,host,sourcetype,source,collection,via,hypervisor,profile,interval_secs,max_gap_secs,criticality,owner,site,runbook,description,managed_by,enabled,expected_since
+sourcetype|linux|dhtest-s1|syslog|*,sourcetype,linux,dhtest-s1,syslog,,uf,cribl,,continuous,,,2,taylorb,home,,,ansible,1,NOW-9000
+sourcetype|linux|dhtest-s2|syslog|*,sourcetype,linux,dhtest-s2,syslog,,uf,cribl,,continuous,,,3,taylorb,home,,,ansible,1,NOW-9000
+sourcetype|linux|dhtest-s3|syslog|*,sourcetype,linux,dhtest-s3,syslog,,uf,cribl,,continuous,,,2,taylorb,home,,,ansible,1,NOW-9000
+sourcetype|linux|dhtest-s4|syslog|*,sourcetype,linux,dhtest-s4,syslog,,uf,,,sporadic,,,3,ops,lab,,,ui,1,NOW-5000
+EOF
+  upload sync "$src"
+  kv_make dhtest_kv_expected dh_expected
+  dh_search '| inputlookup dhtest_sync_seed.csv | eval _key=entity_id | fields - dh_* | outputlookup append=true key_field=_key dhtest_kv_expected' csv >/dev/null
+  spl=$(conf_lines "$here/../../splunk/apps/$DH_APP/default/savedsearches.conf" | grep -F '|[DH Sync expected]|search = ' | sed 's/.*|search = //')
+  if [ -z "$spl" ]; then echo "sync: FAIL DH Sync expected not found"; return 1; fi
+  spl=$(printf '%s' "$spl" | sed 's/\<dh_expected_ansible\>/dhtest_sync_ansible.csv/g; s/\<dh_expected\>/dhtest_kv_expected/g')
+  res=$(dh_search "$spl" csv | tr -d '\r' | col written)
+  expect "first sync writes only the three changes" "$res" '^3$'
+  res=$(kv_get dhtest_kv_expected 'stats count')
+  expect "no row left dh_expected" "$(printf '%s' "$res" | sed -n 2p)" '^5$'
+  res=$(kv_get dhtest_kv_expected 'search host=dhtest-s1 | table managed_by enabled criticality expected_since')
+  expect "an unchanged row keeps its expected_since" "$(printf '%s' "$res" | sed -n 2p)" '^ansible,1,2,1999991000(\.0)?$'
+  res=$(kv_get dhtest_kv_expected 'search host=dhtest-s2 | table enabled criticality expected_since')
+  expect "an updated row keeps its expected_since" "$(printf '%s' "$res" | sed -n 2p)" '^1,1,1999991000(\.0)?$'
+  res=$(kv_get dhtest_kv_expected 'search host=dhtest-s3 | table enabled expected_since')
+  expect "a row that left the file is retired" "$(printf '%s' "$res" | sed -n 2p)" '^0,1999991000(\.0)?$'
+  res=$(kv_get dhtest_kv_expected 'search host=dhtest-s4 | table managed_by enabled expected_since')
+  expect "a UI row stays" "$(printf '%s' "$res" | sed -n 2p)" '^ui,1,1999995000(\.0)?$'
+  res=$(kv_get dhtest_kv_expected 'search host=dhtest-new | eval es=if(abs(expected_since-now())<120, "now", expected_since) | table managed_by enabled es')
+  expect "a new row starts its grace now" "$(printf '%s' "$res" | sed -n 2p)" '^ansible,1,now$'
+  res=$(dh_search "$spl" csv | tr -d '\r' | col written)
+  expect "a second sync writes nothing (KV types read back as written)" "$res" '^0$'
+  [ "$WFAIL" -eq 0 ] && echo "sync: PASS"
   [ "$WFAIL" -eq 0 ]
 }
 
@@ -282,5 +343,6 @@ case ${1:-} in
   panels) panels ;;
   load) load "${2:-300}" ;;
   writes) writes ;;
-  *) echo "usage: $0 panels | load [hosts] | writes" >&2; exit 2 ;;
+  sync) sync ;;
+  *) echo "usage: $0 panels | load [hosts] | writes | sync" >&2; exit 2 ;;
 esac

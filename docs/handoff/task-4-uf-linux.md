@@ -1,10 +1,18 @@
 # Handoff: task 4 — Linux UF on wd2l-logsrv, wd2l-recv and pi5 → Cribl
 
-Issue #5 · branch `feat/4-uf-linux`, **stacked on `feat/3b-cribl`** (rebase onto `main` after 3b
-merges) · drafted in a cloud session on 2026-11-01 with no access to the hosts.
+Issue #5 · branch `feat/4-uf-linux`, drafted on `feat/3b-cribl` in a cloud session on 2026-11-01
+with no access to the hosts; merged with `main` after 3b merged (`4de84f9`).
 
-**State:** written; yamllint, ansible-lint (production) and shellcheck clean; `--syntax-check` OK. The tamper
-rules and `hl_uf_outputs` templates were rendered locally. **Nothing has run on a host.**
+**State:** verified live 2026-11-07 on wd2l-recv, wd2l-logsrv and pi5: checks 1–15 below pass, after
+seven fixes found on the hosts (the `-F key=` audit counts in install and uninstall, Cribl's
+`in_splunk_tcp` `maxS2Sversion: v4`, FIPS read from splunkd.log, the connection checked on every
+install run and on a start of a running UF, and the Splunk-side proof counting `_internal` sent after
+the (re)start). Check 15's winner, the Cribl hold released on splunktcp 9997, is now the default.
+Results, one row per check: spec §14.10. Review fix round 1 (same day): FIPS and the build read from the
+running splunkd and `etc/splunk.version` (splunkd.log rotates), no fast fail on a close and the Splunk
+proof anchored on the running splunkd's start (a wrong token had passed), the package record written
+before dnf, a stricter uninstall contract, and markers around the Cribl hold. The text below is the
+draft's plan, kept as the record.
 
 ## What the branch adds
 
@@ -20,7 +28,7 @@ rules and `hl_uf_outputs` templates were rendered locally. **Nothing has run on 
 | `tasks/uf_linux_connected.yml` | the UF's splunkd.log: the latest `Connected to idx=<collector>:9997` is newer than the latest token refusal; then the host's `_internal` in Splunk < 120 s old (REST search delegated to homepc) |
 | `tasks/uf_linux_tamper.yml` | render, `augenrules --load` on change, then check `hl-uf-config` rules are loaded **and wd2l's rule count is unchanged** |
 | `tasks/uf_linux_uninstall.yml` | spec §5.6 order, then the full contract (rpm, home, units, polkit, user/group, mail, tamper, `auditctl` vs the baseline, new nouser paths vs the baseline, packages) |
-| `tasks/uf_linux_service.yml` | start/stop/restart (marker: before a stop, after a start), status (service, rpm, build, last connect, last refusal, apps, FIPS) |
+| `tasks/uf_linux_service.yml` | start/stop/restart (marker: before a stop, after a start), status (service, rpm, build, last connect, `last_close`, apps, FIPS) |
 | `tasks/verify.yml` | Linux UF running + connected + seen in Splunk; Cribl healthy |
 | `tasks/download.yml` | `get_url` with the pinned sha256 into `ansible/files/packages/` |
 | `tasks/main.yml` | `become: true` on every `uf_linux` import |

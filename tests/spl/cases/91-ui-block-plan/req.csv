@@ -7,3 +7,14 @@ b5,remove,source,h3,cpu|cpu,,r,taylor,admin
 b6,add,host,h1,-,90000,r,taylor,admin
 b7,add,host,h1,-,3600,r,ana,dh_analyst
 b8,add,source,h5,linux_audit|*,60,r,taylor,admin
+r1,add,source,h5,linux_audit|/var/log/$(rm).log,60,r,taylor,admin
+r2,add,source,h5,linux_audit|/var/log/`id`.log,60,r,taylor,admin
+r3,add,source,h5,linux_audit|/var/log/a'b.log,60,r,taylor,admin
+r4,add,source,h5,linux_audit|/var/log/a#Q#b.log,60,r,taylor,admin
+r5,add,source,h5,linux_audit|/var/log/a#B#b.log,60,r,taylor,admin
+r6,add,source,h5,linux_audit|/var/log/a;b.log,60,r,taylor,admin
+r7,add,source,h5,linux_audit|/var/log/a|b.log,60,r,taylor,admin
+r8,add,source,h5,linux_audit|/var/log/a~b.log,60,r,taylor,admin
+r9,add,source,h5,linux_audit|/var/log/a b.log,60,r,taylor,admin
+r10,add,source,h5,linux_audit|/var/log/{{x}}.log,60,r,taylor,admin
+r11,add,sourcetype,h5,bad$st|*,60,r,taylor,admin

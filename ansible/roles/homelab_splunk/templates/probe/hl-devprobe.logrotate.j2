@@ -1,4 +1,5 @@
-# Managed by the homelab_splunk role (probe tag). The UF follows rotated files by content (CRC).
+# Managed by the homelab_splunk role (probe tag); local edits are overwritten.
+# The UF monitors only probe.log, by path, so a rotated copy is never read again (task 8 R7).
 {{ hl_probe_dir }}/probe.log {
     daily
     rotate 7

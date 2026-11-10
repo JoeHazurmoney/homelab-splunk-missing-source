@@ -58,10 +58,11 @@
         executable: /bin/bash
       changed_when: true
 
+    # Unit files without the transient ones (session-N.scope of each SSH login), as uninstall compares
     - name: Save the systemd unit list
       ansible.builtin.shell: |
         set -o pipefail
-        systemctl list-unit-files --no-legend | awk '{print $1}' | LC_ALL=C sort > {{ hl_linux_state_dir }}/units.before
+        systemctl list-unit-files --no-legend | awk '$2 != "transient" {print $1}' | LC_ALL=C sort > {{ hl_linux_state_dir }}/units.before
       args:
         executable: /bin/bash
       changed_when: true
@@ -75,6 +76,20 @@
   changed_when: false
   failed_when: false
 
+# Recorded and written before dnf runs: a run that fails after this point (dnf itself, a missing
+# rpm, …) leaves the record, and the next run's list is the union, so uninstall still removes and
+# checks them (task 4 fix round 1: a failed first run left sysstat out of the record).
+- name: Record the packages the role adds
+  ansible.builtin.set_fact:
+    hl_state: "{{ hl_state | combine({'packages_added': ((hl_state.packages_added | default([]))
+      + hl_uf_pkgs_missing) | unique | sort}) }}"
+  vars:
+    hl_uf_pkgs_missing: "{{ hl_uf_pkgs_before.results | selectattr('rc', 'ne', 0) | map(attribute='item') | list }}"
+
+- name: Write the package record
+  ansible.builtin.include_tasks: linux_state_write.yml
+  when: hl_uf_pkgs_before.results | selectattr('rc', 'ne', 0) | list | length > 0
+
 - name: Install the missing packages
   ansible.builtin.dnf:
     name: "{{ hl_uf_pkgs_missing }}"
@@ -82,11 +97,6 @@
   when: hl_uf_pkgs_missing | length > 0
   vars:
     hl_uf_pkgs_missing: "{{ hl_uf_pkgs_before.results | selectattr('rc', 'ne', 0) | map(attribute='item') | list }}"
-
-- name: Record the packages the role added
-  ansible.builtin.set_fact:
-    hl_state: "{{ hl_state | combine({'packages_added': ((hl_state.packages_added | default([]))
-      + (hl_uf_pkgs_before.results | selectattr('rc', 'ne', 0) | map(attribute='item') | list)) | unique | sort}) }}"
 
 # --- The package ---
 - name: Install the UF package
@@ -203,11 +213,12 @@
   ansible.builtin.import_tasks: uf_linux_tamper.yml
 
 # --- Start, then prove the path through Cribl ---
+# "<lines> <epoch>": where splunkd.log ends and the host's clock, just before the (re)start
 - name: Note where splunkd.log ends before the start
   ansible.builtin.shell: |
     set -o pipefail
     f={{ hl_uf_home }}/var/log/splunk/splunkd.log
-    if [ -f "$f" ]; then wc -l < "$f"; else echo 0; fi
+    if [ -f "$f" ]; then echo "$(wc -l < "$f") $(date +%s)"; else echo "0 $(date +%s)"; fi
   args:
     executable: /bin/bash
   register: hl_uf_log_lines
@@ -220,20 +231,35 @@
     enabled: true
   register: hl_uf_started
 
+# Every run, so a rerun after a failed connect can't pass without one: after a (re)start from the
+# start's log line, otherwise the whole log, where the latest state counts (as verify does)
 - name: Check the UF is connected through Cribl
   ansible.builtin.include_tasks: uf_linux_connected.yml
   vars:
-    hl_uf_log_from: "{{ hl_uf_log_lines.stdout | trim | int }}"
-  when: hl_uf_started is changed or hl_uf_fresh | bool
+    hl_uf_log_from: "{{ (hl_uf_log_lines.stdout.split()[0] | int) if hl_uf_started is changed else 0 }}"
+    hl_uf_since: "{{ (hl_uf_log_lines.stdout.split()[1] | int) if hl_uf_started is changed else 0 }}"
 
+# From the running splunkd (the service's MainPID), not `splunk show fips-mode`, which needs a
+# login (task 4 check 5; -auth would put the admin password on argv), and not splunkd.log, whose
+# start lines are gone once the log rotates (25 MB). The launcher passes splunk-launch.conf to
+# splunkd as its environment, and FIPS mode loads OpenSSL's FIPS 140-3 provider module (seen live:
+# fips140-3/fips.so on the VMs, only legacy.so on pi5).
 - name: Check the UF runs in FIPS mode (FIPS hosts only)
-  ansible.builtin.command:
-    argv: ["{{ hl_uf_cli }}", show, fips-mode]
-  become: true
-  become_user: "{{ hl_uf_user }}"
+  ansible.builtin.shell: |
+    set -o pipefail
+    p=$(systemctl show -p MainPID --value SplunkForwarder)
+    [ "${p:-0}" -gt 0 ] || { echo "HL_PID=none"; exit 0; }
+    echo "HL_PID=$p"
+    tr '\0' '\n' < /proc/"$p"/environ | grep -E '^SPLUNK_FIPS(_VERSION)?=' || true
+    grep -q -F '/ossl-modules/fips140-3/fips.so' /proc/"$p"/maps && echo "HL_FIPS_MODULE=loaded" || echo "HL_FIPS_MODULE=absent"
+  args:
+    executable: /bin/bash
   register: hl_uf_fips_mode
   changed_when: false
-  failed_when: "'FIPS mode enabled' not in hl_uf_fips_mode.stdout"
+  failed_when: >-
+    'SPLUNK_FIPS=1' not in hl_uf_fips_mode.stdout_lines
+    or 'SPLUNK_FIPS_VERSION=140-3' not in hl_uf_fips_mode.stdout_lines
+    or 'HL_FIPS_MODULE=loaded' not in hl_uf_fips_mode.stdout_lines
   when: (hl_uf_fips.content | default('MA==') | b64decode | trim) == '1'
 
 - name: Marker for the install

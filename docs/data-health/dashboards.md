@@ -61,12 +61,12 @@ When something is late or missing, the app picks the most likely reason, checkin
 | Test block until … (data dropped on purpose): *reason* | A test is deliberately dropping this data in Cribl. | Remove the test block when the test ends (Manage, Test blocks tab, gives the command). |
 | Stopped with Ansible at … by … and not started again | Someone ran the role's `stop` and no `start` followed. | Start it again with the role: *ansible-playbook site.yml --tags start --limit host* (this starts the Splunk agent on that host). |
 | The VM is off: Hyper-V event … | Hyper-V reports the VM was turned off, shut down or saved. | Start the VM in Hyper-V, or mute it if it is meant to be off. |
-| Possible deliberate blinding: … just before the data stopped | A tamper sign (a log cleared, auditd stopped, the agent stopped, a big clock step) appeared close to when the data stopped, and not during Ansible work. | Escalate: someone may be hiding activity. |
+| Possible deliberate blinding: … just before the data stopped | A tamper sign (a log cleared, auditd stopped, the agent stopped, a big clock step, or for data that passes through Cribl a change to Cribl's routes, pipelines, inputs, outputs or lookups) appeared close to when the data stopped, and not during Ansible work. | Escalate: someone may be hiding activity. |
 | Cribl DOWN: the real state is unknown … | Everything collected (the agents and the UDM) passes through Cribl Stream, and Cribl itself has stopped reporting. So nobody can tell whether this data stopped or just can't get through. HEC data (wd2l, the markers) doesn't use Cribl, so Splunk itself still looks fine. | Check the *cribl* container on HOMEPC (`docker ps --filter name=cribl`), then run the role's *--tags verify --limit homepc*. |
 | Cribl DOWN: nothing from Cribl itself … | The row for Cribl: its own logs (each worker logs every minute) stopped arriving. | The same as above. |
 | The relay … is DOWN: this data comes through it … | This data comes through another relay host that is itself down, so its real state is unknown. | Fix the relay first. |
 | The device does not answer the network probe … | The device doesn't answer the regular ping from *hl-devprobe* on pi5. | Check the power and network of the device. |
-| The device probe (hl-devprobe on pi5) stopped reporting on this device | The probe service on pi5 (*hl-devprobe*, which pings each device every minute into a file pi5's agent forwards) has gone quiet. | Check *hl-devprobe* on pi5 (`systemctl status hl-devprobe.timer`), or rerun the role's *--tags probe --limit pi5*. |
+| The device probe (hl-devprobe on pi5) stopped reporting on this device | The probe service on pi5 (*hl-devprobe*, which pings each device every minute into a file pi5's agent forwards) has gone quiet. It shows on pi5's *hl:devprobe* row while pi5's agent is healthy; a network device's own row stays OK for its much longer limit. | Check *hl-devprobe* on pi5 (`systemctl status hl-devprobe.timer`), or rerun the role's *--tags probe --limit pi5*. |
 | The device answers the network probe but sends no logs … | The device is up but sends no logs; its logging settings probably changed. | Check the remote syslog settings on the device. |
 | The Splunk agent reports late (not yet missing) … | The Splunk agent on the host is slow to report: busy, stopping, or its network path to Cribl (port 9997 on HOMEPC, where agents deliver data) is slow. | Check the agent with the role (*--tags status* shows whether the agent runs and is connected); then check the network path from the host to Cribl. |
 | The Splunk agent stopped reporting … | The host is down or cut off from Cribl, the agent crashed, or someone stopped it outside Ansible. | Ping or SSH to the host; then check the agent with the role (*--tags status*). |
@@ -198,7 +198,7 @@ Everything about one host. Pick the host at the top, or arrive here by clicking 
 - **How to read it:** steady bars are normal. A gap shows when a stream stopped; a sudden drop or spike is worth comparing with the status changes below.
 
 ### Forwarder (the Splunk agent on the host)
-- **What it shows:** one fact per row: Agent version (with "(expected 10.6.1.1)" when it differs), Operating system, Agent type, Agent ID (guid), Last heartbeat, Last connection to Cribl, Last Ansible marker (action, when, by whom, run id), Last Hyper-V event and Last device probe. A host without one shows a single row: "No forwarder facts: this host has no Splunk agent or no Splunk agent has connected yet" (a network device, a syslog-only host, or an agent that has never connected).
+- **What it shows:** one fact per row: Agent version (with "(expected 10.6.1.1)" when it differs), Operating system, Agent type, Last heartbeat, Last connection to Cribl, Last Ansible marker (action, when, by whom, run id), Last Hyper-V event and Last device probe. A host without one shows a single row: "No forwarder facts: this host has no Splunk agent or no Splunk agent has connected yet" (a network device, a syslog-only host, or an agent that has never connected).
 - **Where it comes from:** what the arrival tracker last recorded for this host.
 - **How to read it:** a heartbeat a few seconds ago is good. A heartbeat minutes old with the host DOWN means the agent or host stopped; the last Ansible marker or Hyper-V event often explains why. A version flag means the agent needs the role's install.
 
@@ -235,7 +235,7 @@ Where you change what the app expects and how it alerts: mute data during planne
 
 - **Who may do what.** Anyone who can open the app may mute, unmute and set or clear a limit. Adding or adopting expected rows and test blocks need the **dh_admin** role; without it the preview says "Needs the dh_admin role" and nothing can be applied.
 - **Nothing is written until you choose Apply.** A form shows a preview of the change as you fill it in. The change is written only when you open that form's **Confirm (writes the change)** list and choose the line that starts with **Apply**. There is no other button: choosing that line writes the change at once and records it on the Admin log tab.
-- **Each form stands alone.** Every form has its own Reason, Ticket and Confirm, and a choice under one form's Confirm writes only that form's change.
+- **Each form stands alone.** Every form that writes has its own Reason, Ticket and Confirm, and a choice under one form's Confirm writes only that form's change. (The test-block form has no Confirm: it writes nothing.)
 - **Boxes apply as you go.** There is no Submit button on Manage. A list applies as soon as you pick from it; a text box applies when you press Enter or click outside it. Lists that depend on a host (the items of a host, a host's sourcetypes and raw sources) fill as soon as you pick the host.
 - **Until a form is filled in**, its preview area shows what to fill in instead of a table. A required box (Reason, Host name) must not be empty. Optional boxes hold `-`, which means "none"; leave it there unless you have a value.
 - **The Confirm list** appears once the form is filled in. It offers the Apply line only when the preview's **Check** column says "OK: …"; otherwise it says "No results", and the Check column says what to fix.
@@ -243,6 +243,7 @@ Where you change what the app expects and how it alerts: mute data during planne
 - **A confirmation fits only once.** It fits only the state you previewed, and never again after its change was applied, even if that change has since expired and been cleaned up. After a reload, or when you come back to a tab, the result may say "Nothing written: this confirmation fits only the state you previewed, …". That is expected: the change was applied the first time. Check the tables or the Admin log tab.
 - **The tables don't refresh by themselves.** Manage never refreshes on its own. After applying a change, reload the page to see it in the tables of the tab.
 - **Times** are shown in the time zone of your Splunk account (Settings > your name > Preferences) and always end with the zone, for example `2026-10-31 17:46 MDT`. That may differ from your PC clock.
+- **If "This visualization has a potential security risk" appears after Apply** (the result stays empty with a red icon, and nothing is written until you click the icon and then **Run Query**): Dashboard Studio's risky-command check is still on. Apply writes with `outputlookup`, which is on Studio's risky list, so the server app hl_server_base turns that check off (`enable_risky_command_check_dashboard = false` in its `default/web.conf`). If the prompt appears, that setting is not in effect: check `splunk btool web list settings --debug | grep risky` (it should show `false` from `apps/hl_server_base/default/web.conf`) and that hl_server_base is deployed (the role's `server` tag, which restarts splunkd). If btool already shows `false`, splunkd hasn't restarted since the deploy or the page is stale: restart splunkd, then reload the page.
 
 ### Item IDs
 
@@ -331,7 +332,7 @@ If the item is muted when you set or clear its limit, the mute and its reason st
   | Learned before bounds (s) | The learned value before it was kept within those values. |
   | Default limit (s) | The profile's default. |
   | Configured limit (s) | A fixed limit written on the item's expected row, if any. |
-  | Days covered, Days skipped | Days of history learned from, and days skipped because Splunk was up too little to learn from them. |
+  | Days covered, Days skipped | Days of history learned from (the last 14 at most: the indexes keep 14 days), and days skipped because Splunk was up too little to learn from them. |
   | Suggested profile | The profile the app would choose from what it saw. |
   | Managed by | ansible (from the inventory) or ui (added on Manage). |
   | Item ID | The item's ID. |
@@ -464,7 +465,7 @@ The form also has its own **Reason (required)** and **Ticket (optional, - for no
 - **How to read it:** a source-level block must use one of these exact raw names.
 
 #### Current test blocks
-- **What it shows:** every block in the test-block table. Columns: **Item** (the block key in words), **Until**, **Reason**, **Set by**, **State** ("test block until hh:mm", or "expired (removed within about 2 min)"), **Block key**.
+- **What it shows:** every block in the test-block table. Columns: **Item** (the block key in words), **Until**, **Reason**, **Set by**, **State** ("test block until hh:mm", or "expired: no longer applied (it leaves this list at the next cribl_block run)"), **Block key**.
 - **Where it comes from:** the copy of Cribl's block table that the role's *cribl_block* tag writes into Splunk.
 - **How to read it:** blocked data is **thrown away** in Cribl before it reaches Splunk, so a block is a real outage, on purpose. Remove blocks as soon as a test ends.
 
@@ -485,8 +486,8 @@ Every change made on Manage, newest first.
 | Search the log (words separated by *) | Words that must all appear in a row (who, change, item, detail, reason or ticket), separated by `*`; not case-sensitive. `*` shows all. |
 
 #### Admin log (every change made on Manage)
-- **What it shows:** the last 1000 changes that match the search. Columns: **Time**, **Who**, **Change** (Mute, Unmute, Set limit, Clear limit, Add expected row, Adopt, Add test block or Remove test block), **Item**, **Detail** (before → after, as recorded at the time; times in it are in the time zone of whoever made the change), **Reason**, **Ticket**, **Item ID** (for a test block, its key).
-- **Where it comes from:** the admin log, written by every applied change. It is also copied to the `data_health` index every 5 minutes and kept 90 days in the table.
+- **What it shows:** the last 1000 changes that match the search. Columns: **Time**, **Who**, **Change** (Mute, Unmute, Set limit, Clear limit, Add expected row, Adopt; Add test block or Remove test block only on older rows, since a test block is now set by the role), **Item**, **Detail** (before → after, as recorded at the time; times in it are in the time zone of whoever made the change), **Reason**, **Ticket**, **Item ID** (for a test block, its key).
+- **Where it comes from:** the admin log, written by every applied change. It is also copied to the `data_health` index every 5 minutes (which keeps 14 days) and kept 90 days in the table.
 - **How to read it:** use it to answer "who muted this, and why?".
 
 ## Daily state of health

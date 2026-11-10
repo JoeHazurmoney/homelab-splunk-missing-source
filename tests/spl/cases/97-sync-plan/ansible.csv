@@ -6,3 +6,5 @@ entity_id,level,index,host,sourcetype,source,collection,via,hypervisor,profile,i
 ,host,,H7.mshome.net,,,uf,cribl,hyperv,heartbeat,,,2,taylorb,home,,,1
 ,source,linux,h8,syslog,/var/log/messages,uf,cribl,,continuous,,,2,taylorb,home,,,1
 ,bogus,linux,h9,syslog,,uf,cribl,,continuous,,,2,taylorb,home,,,1
+,sourcetype,linux,h10,syslog,,uf,cribl,,continuous,,,2,taylorb,home,,,1
+,sourcetype,linux,h11,syslog,,uf,cribl,,continuous,,,2,taylorb,home,,,0

@@ -36,7 +36,7 @@ The expected list, `dh_expected`: every entity that should send data. Used by: t
 `dh_meta`: run times of the trackers and the admin-log copy. The banner and the evaluator's gate read it. Used by: *DH Tracker fast*, *DH Tracker slow*, *DH Admin log copy*.
 
 ### `dh_lookup_blocks`
-`hl_ingest_block`: the test-block table (owned by the `hl_server_base` app). Until that app is installed the table doesn't exist and is read as empty. Used by: *DH Prune*.
+`hl_ingest_block`: Splunk's copy of Cribl's test-block table (the `hl_server_base` lookup that the role's *cribl_block* tag writes; nothing here writes it). Until that app is installed the table doesn't exist and is read as empty. Used by: `dh_evaluate`, the Manage Test blocks tab.
 
 ### `dh_lookup_tamper`
 `dh_tamper`: tamper findings with their suppression. Used by: *DH Tamper*.
@@ -53,7 +53,7 @@ The expected list, `dh_expected`: every entity that should send data. Used by: t
 ## Entities and normalization
 
 ### `dh_indexes`
-The indexes the trackers watch: `linux, windows, network, wd2l_uf_audit, enclave1, wd2l`. `data_health` (this app's own output) and `wd2l_audit` are left out on purpose. Used by: *DH Tracker fast*, *DH Tracker slow*, *DH Baseline daily*, *DH Volume hourly*, the Host detail chart.
+The indexes the trackers watch: `linux, windows, network, wd2l_uf_audit, enclave1, wd2l, cribl`. `data_health` (this app's own output), `wd2l_audit` and `cribl_metrics` (a metrics index, whose dimensions carry the data's hosts and sourcetypes) are left out on purpose. Used by: *DH Tracker fast*, *DH Tracker slow*, *DH Baseline daily*, *DH Volume hourly*, the Host detail chart.
 
 ### `dh_host_norm(h)`
 Turns a host name into its short lowercase form (`WD2L-RECV.mshome.net` becomes `wd2l-recv`), so the same machine always gets the same name. The test-block rule at ingest uses the same rule. Arguments: `h`, a field or expression. Used by: nearly every step that reads a host.
@@ -126,7 +126,7 @@ Rolls a host's rows up to DOWN (its liveness is missing, or, for agentless hosts
 ## Likely cause and action
 
 ### `dh_eval_cause`
-Picks the most likely cause of an entity that is not OK, in a fixed order: the hold, a mute, "just added" (newly expected and not yet seen), a test block, an Ansible stop, the VM being off, a tamper finding, a relay down, the device probe, the heartbeat, and finally "this stream stopped". Used by: `dh_eval`.
+Picks the most likely cause of an entity that is not OK, in a fixed order: the hold, a mute, "just added" (newly expected and not yet seen), a test block, an Ansible stop, the VM being off, a tamper finding, a relay down, the device probe, a silent *hl:devprobe* row while its host's heartbeat is OK, the heartbeat, and finally "this stream stopped". Used by: `dh_eval`.
 
 ### `dh_eval_cause_text`
 Turns each cause code into the plain sentence shown in the Cause column and the next step shown in the Action column (for example "Start it again with the role: ansible-playbook site.yml --tags start --limit wd2l-recv"). The texts use the names the panels use ("Splunk agent", not UF or splunkd) and say what any command does. The full list is in [dashboards.md](dashboards.md#causes-what-the-cause-column-can-say). Used by: `dh_eval`.
@@ -137,7 +137,7 @@ Turns each cause code into the plain sentence shown in the Cause column and the 
 Loads the enabled expected rows and joins each with the latest arrival at its level (source, sourcetype or whole host), taking the later of the fast and slow trackers. Arguments: the expected list and the two arrival tables. Used by: `dh_eval`.
 
 ### `dh_eval_facts(fwd, overrides, baseline, tamper, prev)`
-Adds the facts each row needs: forwarder heartbeat, last Ansible marker, last Hyper-V event and device probe (by host); the entity's and its host's override; the learned baseline; tamper findings on the host (marking those suppressed by a marker); and the previous status. Used by: `dh_eval`.
+Adds the facts each row needs: forwarder heartbeat, last Ansible marker, last Hyper-V event and device probe (by host); the entity's and its host's override; the learned baseline; tamper findings on the host, and on host *cribl* too for a row that arrives through Cribl (marking those suppressed by a marker); and the previous status. Used by: `dh_eval`.
 
 ### `dh_eval_blocks(blocks)`
 Marks rows covered by an active test block (whole host, a sourcetype, or one exact raw source) so the cause says "test block until hh:mm". Only the linux, windows and network indexes can be blocked. Arguments: `blocks`, the test-block table. Used by: `dh_eval`.
@@ -194,7 +194,7 @@ Writes the arrival tracker's run record: this run's time, the previous run, the 
 **300 seconds.** A clock change the operating system reports at least this large is a tamper finding ("big clock step"). Raise it to ignore bigger time corrections; lower it to catch smaller ones (normal NTP corrections may then show). Used by: `dh_tamper_win`, `dh_tamper_linux`.
 
 ### `dh_tamper_lookback_secs`
-**604800 seconds (7 days).** How far back DH Tamper re-checks each finding against Ansible markers on every run. Raise it to re-check older findings (slower); lower it to stop sooner. Keep it equal to `dh_tamper_finding_earliest`. Used by: `dh_tamper_finish`.
+**604800 seconds (7 days).** How far back DH Tamper re-checks each finding against Ansible markers on every run. Only findings this recent are written to the index, so an older finding is never alerted again. Raise it to re-check older findings (slower), but not past the indexes' 14-day retention, inside which DH Tamper reads what it already wrote; lower it to stop sooner. Keep it equal to `dh_tamper_finding_earliest`. Used by: `dh_tamper_finish`.
 
 ### `dh_tamper_finding_earliest`
 **`-7d`.** The event-time window DH Tamper reads findings from. Widen it to catch findings that arrive later (slower runs); narrow it to read less. It must match `dh_tamper_lookback_secs` (a test checks this). Used by: *DH Tamper*.
@@ -221,7 +221,7 @@ Writes the arrival tracker's run record: this run's time, the previous run, the 
 **2592000 seconds (30 days).** Forwarder rows not updated for this long, of hosts no longer expected, are pruned daily. Raise it to keep facts about retired hosts longer; lower it to forget them sooner. Used by: `dh_prune_mark_fwd`.
 
 ### `dh_tamper_retention_secs`
-**2592000 seconds (30 days).** Tamper findings older than this are pruned from the collection (the `data_health` index keeps them). Raise it to keep them on Host detail longer; lower it to keep the collection smaller. Used by: `dh_prune_mark_tamper`.
+**2592000 seconds (30 days).** Tamper findings older than this are pruned from the collection (the `data_health` index keeps them for 14 days, its retention). Raise it to keep them on Host detail longer; lower it to keep the collection smaller. Used by: `dh_prune_mark_tamper`.
 
 ### `dh_volume_retention_secs`
 **172800 seconds (2 days).** Volume rows not updated for this long are pruned. Raise it to keep stale hourly rows longer (nothing reads them); lower it to clean up sooner. Used by: `dh_prune_mark_volume`.
@@ -230,7 +230,7 @@ Writes the arrival tracker's run record: this run's time, the previous run, the 
 **2592000 seconds (30 days).** Baseline rows not recomputed for this long (the entity stopped sending) are pruned. Raise it to keep what was learned about a stream that comes back after a long break; lower it to forget it sooner. Used by: `dh_prune_mark_baseline`.
 
 ### `dh_admin_retention_secs`
-**7776000 seconds (90 days).** Admin-log rows older than this, already copied to the index, are pruned from the collection. Raise it to see more history on Manage; lower it to keep the table small (the index keeps a copy either way). Used by: `dh_prune_mark_admin_log`.
+**7776000 seconds (90 days).** Admin-log rows older than this, already copied to the index, are pruned from the collection. Raise it to see more history on Manage; lower it to keep the table small (the index keeps a copy for 14 days, its retention). Used by: `dh_prune_mark_admin_log`.
 
 ### `dh_fwd_expected_version`
 **`10.6.1.1`.** The Splunk agent version the role installs. Agents on another version are listed in the daily report and flagged on Host detail. Change it when the role pins a new version. Used by: `dh_soh_fwd`, `dh_ui_fwd`.
@@ -266,7 +266,7 @@ Writes the daily report rows (`source=dh:soh`). Used by: *DH Daily SoH report*.
 For each entity and completed day: how many events, how many active minutes, the longest and 95th-percentile silence, how late data arrived, and the hourly counts. Only minutes when Splunk (and, for agent hosts, the agent) were up count, so PC sleep never looks like silence; a silence still open at midnight carries into the next day. Arguments: `fwd`, `expected`. Used by: *DH Baseline daily*.
 
 ### `dh_daily_todo(now)`
-The completed days of the last 14 that have no daily record yet, so a missed night is caught up on the next run. Used by: *DH Baseline daily*, `dh_daily_window`.
+The completed days of the last 13 that have no daily record yet, so a missed night is caught up on the next run. Not 14: the indexes keep 14 days, so the raw data of the day that began 14 days ago may already be partly gone, and filling it in would record a silence that never happened. Used by: *DH Baseline daily*, `dh_daily_window`.
 
 ### `dh_daily_window(now)`
 The time window that covers those days (empty when nothing is due). Used by: *DH Baseline daily*.
@@ -291,7 +291,7 @@ Finds Linux tamper indicators: auditd stopped or aborted, audit rules changed, t
 Cribl's audit log: any create, update, delete, reorder or upload of routes, pipelines, outputs, inputs or lookups is a finding on the host *cribl*. The log can't tell a Drop function from any other pipeline edit, so every such change counts. The role's own changes fall inside its *cribl* and *cribl_block* marker windows and are suppressed. Used by: *DH Tamper*.
 
 ### `dh_tamper_finish(tamper, now)`
-Groups indicators into findings (one per host, kind and 5-minute bucket), re-checks each finding of the last 7 days against every Ansible marker (a finding within `dh_tamper_window_secs` of a marker is the role's own work and is suppressed), and marks which ones still need writing to the index. Used by: *DH Tamper*.
+Groups indicators into findings (one per host, kind and 5-minute bucket), re-checks each finding of the last 7 days against every Ansible marker (a finding within `dh_tamper_window_secs` of a marker is the role's own work and is suppressed), and marks which ones of the last 7 days still need writing to the index (an older one never does: the index keeps 14 days, the collection 30). Used by: *DH Tamper*.
 
 ### `dh_tamper_collect_rows`
 Shapes findings for writing to the index. Used by: *DH Tamper*.
@@ -312,9 +312,6 @@ The admin-log rows written since the last copy (and at least 60 s old), for copy
 ## Prune
 
 Each "mark" macro marks the rows to delete; the prune searches rewrite a table only when something is marked.
-
-### `dh_prune_mark_blocks(now)`
-Test blocks that have expired, or that have no key or no valid expiry. Used by: *DH Prune* (every minute).
 
 ### `dh_prune_mark_overrides(now)`
 Expired mutes are cleared; an override row with nothing left is deleted. Used by: *DH Prune* (every minute).
@@ -517,16 +514,10 @@ Writes the expected row when the confirmation matches, and logs it. Used by: Man
 Turns an unregistered entity into an expected-row request: agent hosts become `uf`, others `syslog`. An agent host's own row gets the `heartbeat` profile; any other row takes the baseline's suggestion, else continuous. Used by: Manage, Expected list tab (adopt).
 
 ### `dh_ui_block_command`
-The test block lives in Cribl, so Manage shows the command to run instead of writing it: the role's *cribl_block* line for a checked request (setting with minutes and reason, or clearing), with the reason reduced to plain characters. Used by: Manage, form 4 (once the redesigned Manage is merged, task 12e).
+The test block lives in Cribl, so Manage shows the command to run instead of writing it: the role's *cribl_block* line for a checked request (setting with minutes and reason, or clearing), with the key in plain single quotes and the reason reduced to plain characters. Used by: Manage, Test blocks tab.
 
-### `dh_ui_block_plan(blocks, admin_log, now)`
-Checks a test-block request (dh_admin only; 1 minute to 24 hours; a source block needs an exact raw source) and shows the block before and after, in words for the preview and as logged, with the normalized source for reference, its Confirm text and its confirmation code. The code covers the whole current table and the key's admin-log times (`admin_log`), so a confirmation fits only once, even after DH Prune has removed the expired block. Used by: Manage, Test blocks tab.
-
-### `dh_ui_block_rows(blocks, now)`
-The whole new test-block table for a confirmed request; when that would leave the table empty, one placeholder row that matches nothing (DH Prune removes it within a minute). Used by: `dh_ui_block_write`.
-
-### `dh_ui_block_write(blocks, admin_log, now)`
-Rewrites the test-block table (key column first, as the ingest rule needs) and logs the change. Used by: Manage, Test blocks tab.
+### `dh_ui_block_plan(blocks, now)`
+Checks a test-block request (dh_admin only; 1 minute to 24 hours; a source block needs an exact raw source; a sourcetype or source with a character the command can't carry, such as a quote, `$`, a comma, a space or `{`, is refused) against Splunk's copy of the block table and shows the block before and after, in words for the preview and as logged, with the normalized source for reference. Nothing is written from here: when the check says OK, `dh_ui_block_command` gives the role's command. Used by: Manage, Test blocks tab.
 
 ### `dh_ui_log(admin_log, now)`
 Adds one admin-log row per applied change and returns the result in words ("Done: Mute pi5: whole host", or "Nothing written: …" when the confirmation no longer fits). What is stored is unchanged. Used by: the three write macros.
@@ -534,17 +525,17 @@ Adds one admin-log row per applied change and returns the result in words ("Done
 ## The expected list (task 10)
 
 The role's `expected` tag writes `dh_expected_ansible.csv` from the inventory. *DH Sync expected*
-merges it into `dh_expected` every 5 minutes, and right after each push. Rows added on the Manage
-dashboard are never touched.
+merges it into `dh_expected` every 5 minutes, and right after each push. An enabled row added on
+the Manage dashboard is never overwritten.
 
 ### `dh_sync_rows(ansible)`
-The Ansible rows, cleaned up the way a Manage row is: level and host in lowercase, the host's domain dropped, index and sourcetype only below host level, the raw source kept for a source row, and the entity id built from them. Rows with an unknown level or no host are dropped. Arguments: `ansible`, the Ansible file. Used by: `dh_sync_plan`.
+The Ansible rows, cleaned up the way a Manage row is: level and host in lowercase, the host's domain dropped, index and sourcetype only below host level, the raw source kept for a source row, and the entity id built from them. A row the file marks disabled counts as not in the file, and rows with an unknown level or no host are dropped. Arguments: `ansible`, the Ansible file. Used by: `dh_sync_plan`.
 
 ### `dh_sync_sig`
 One fingerprint of the fields Ansible owns (level, index, host, sourcetype, source, collection, via, hypervisor, profile, interval, maximum gap, criticality, owner, site, runbook, description), so an unchanged row is never rewritten. Used by: `dh_sync_plan`.
 
 ### `dh_sync_plan(ansible, expected, now)`
-The rows *DH Sync expected* writes, each with its reason: **add** (new, disabled before, or a Manage row that Ansible now takes over), **update** (a field Ansible owns changed; the "expected since" time is kept), **retire** (an Ansible row that left the file: switched off, so its status goes and a later re-add starts a fresh grace period). Manage rows are never touched, and nothing is written while the Ansible file has no valid rows, so an empty or broken file can't retire the list. Arguments: the Ansible file, the expected list, `now`. Used by: *DH Sync expected*.
+The rows *DH Sync expected* writes, each with its reason: **add** (new, or disabled before, a disabled Manage row included), **update** (a field Ansible owns changed; the "expected since" time is kept), **retire** (an Ansible row that left the file or that the file marks disabled: switched off, so its status goes and a later re-add starts a fresh grace period). It returns only the rows that change, written as `_key` upserts, so `dh_expected` is never rewritten whole (DH Evaluate drops the status of any entity missing from it). An enabled Manage row is never overwritten, not even when Ansible lists the same entity, and nothing is written while the Ansible file has no valid rows, so an empty or broken file can't retire the list. Arguments: the Ansible file, the expected list, `now`. Used by: *DH Sync expected*.
 
 ### `dh_discover_summary(expected, state_fast, state_slow, baseline, now)`
 One summary row of what arrives without being expected: how many entities, how many hosts, and up to 50 of their ids. The same rows as Manage's "adopt" list and the Daily report's "unregistered" section. Used by: *DH Discover unregistered*.

@@ -1,26 +1,31 @@
 # apps (uf_windows, spec 5.3/5.5): Splunk_TA_windows unmodified (its local/inputs.conf is the
 # role's: perfmon CPU/Memory at 60 s), hl_uf_windows_inputs (the event log channels, renderXml, in
-# local/) and hl_uf_outputs; restart only on change, prove the path, marker.
+# local/) and hl_uf_outputs; restart only on a real change, prove the path (every run, the rules of
+# uf_windows_connected.yml), marker (best effort). PowerShell blocks use `cmd: |`, Jinja values in
+# single-quoted strings double their quotes, and a read error fails (task 5 review).
 - name: Check the TA package is pinned and on the controller
   ansible.builtin.stat:
     path: "{{ hl_uf_packages_dir }}/{{ hl_tas.Splunk_TA_windows.file }}"
     checksum_algorithm: sha256
   delegate_to: localhost
+  become: false
   register: hl_ta_win_pkg
   failed_when: >-
     hl_tas.Splunk_TA_windows.sha256 | length != 64 or not hl_ta_win_pkg.stat.exists
     or hl_ta_win_pkg.stat.checksum != hl_tas.Splunk_TA_windows.sha256
 
 - name: Read the installed TA's version
-  ansible.windows.win_shell: |
-    $f = '{{ hl_uf_win_home }}\etc\apps\Splunk_TA_windows\default\app.conf'
-    if (-not (Test-Path -LiteralPath $f)) { exit 0 }
-    $l = $false
-    foreach ($line in Get-Content -LiteralPath $f) {
-      if ($line -match '^\[launcher\]') { $l = $true; continue }
-      if ($line -match '^\[') { $l = $false }
-      if ($l -and $line -match '^\s*version\s*=\s*(\S+)') { $Matches[1]; break }
-    }
+  ansible.windows.win_shell:
+    cmd: |
+      $ErrorActionPreference = 'Stop'
+      $f = '{{ hl_uf_win_home | replace("'", "''") }}\etc\apps\Splunk_TA_windows\default\app.conf'
+      if (-not (Test-Path -LiteralPath $f)) { exit 0 }
+      $l = $false
+      foreach ($line in Get-Content -LiteralPath $f) {
+        if ($line -match '^\[launcher\]') { $l = $true; continue }
+        if ($line -match '^\[') { $l = $false }
+        if ($l -and $line -match '^\s*version\s*=\s*(\S+)') { $Matches[1]; break }
+      }
   register: hl_ta_win_ver
   changed_when: false
 
@@ -37,16 +42,21 @@
         src: "{{ hl_uf_packages_dir }}/{{ hl_tas.Splunk_TA_windows.file }}"
         dest: "{{ hl_win_state_dir }}\\ta\\{{ hl_tas.Splunk_TA_windows.file }}"
 
+    # A .spl is a gzip tar; tar.exe doesn't go by the extension. Copy-Item keeps the shipped files'
+    # timestamps, so the TA's folder is stamped for the "newer than the running splunkd" check below.
     - name: Unpack it and swap its shipped files in (everything but local/)
-      ansible.windows.win_shell: |
-        $stage = '{{ hl_win_state_dir }}\ta'
-        tar.exe -xzf (Join-Path $stage '{{ hl_tas.Splunk_TA_windows.file }}') -C $stage
-        if ($LASTEXITCODE -ne 0) { throw "tar failed ($LASTEXITCODE)" }
-        $src = Join-Path $stage 'Splunk_TA_windows'
-        $dst = '{{ hl_uf_win_home }}\etc\apps\Splunk_TA_windows'
-        New-Item -ItemType Directory -Force -Path $dst | Out-Null
-        Get-ChildItem -LiteralPath $dst -Force | Where-Object Name -ne 'local' | Remove-Item -Recurse -Force
-        Get-ChildItem -LiteralPath $src -Force | Where-Object Name -ne 'local' | Copy-Item -Destination $dst -Recurse -Force
+      ansible.windows.win_shell:
+        cmd: |
+          $ErrorActionPreference = 'Stop'
+          $stage = '{{ hl_win_state_dir | replace("'", "''") }}\ta'
+          tar.exe -xzf (Join-Path $stage '{{ hl_tas.Splunk_TA_windows.file | replace("'", "''") }}') -C $stage
+          if ($LASTEXITCODE -ne 0) { throw "tar failed ($LASTEXITCODE)" }
+          $src = Join-Path $stage 'Splunk_TA_windows'
+          $dst = '{{ hl_uf_win_home | replace("'", "''") }}\etc\apps\Splunk_TA_windows'
+          New-Item -ItemType Directory -Force -Path $dst | Out-Null
+          Get-ChildItem -LiteralPath $dst -Force | Where-Object Name -ne 'local' | Remove-Item -Recurse -Force
+          Get-ChildItem -LiteralPath $src -Force | Where-Object Name -ne 'local' | Copy-Item -Destination $dst -Recurse -Force
+          (Get-Item -LiteralPath $dst).LastWriteTimeUtc = [DateTime]::UtcNow
       changed_when: true
 
   always:
@@ -59,7 +69,7 @@
   ansible.windows.win_file:
     path: "{{ hl_uf_win_home }}\\etc\\apps\\{{ item.0 }}\\{{ item.1 }}"
     state: directory
-  loop: "{{ (hl_uf_input_apps_windows + ['Splunk_TA_windows']) | product(['default', 'local']) | list }}"
+  loop: "{{ hl_uf_input_apps_windows | product(['default', 'local']) | list + [['Splunk_TA_windows', 'local']] }}"
 
 - name: Render the role-owned apps' app.conf
   ansible.windows.win_template:
@@ -82,22 +92,50 @@
 - name: Deploy hl_uf_outputs
   ansible.builtin.import_tasks: uf_windows_outputs.yml
 
+# As on Linux: a file newer than the running splunkd means a run died before its restart. The
+# TA's folder is stamped by its swap; local\outputs.conf is left out because splunkd rewrites it.
+- name: Check the running splunkd is newer than the role's files
+  ansible.windows.win_shell:
+    cmd: |
+      $ErrorActionPreference = 'Stop'
+      $a = '{{ hl_uf_win_home | replace("'", "''") }}\etc\apps'
+      $svc = Get-CimInstance Win32_Service -Filter "Name='{{ hl_uf_win_service }}'"
+      if (-not ($svc -and $svc.State -eq 'Running' -and $svc.ProcessId -gt 0)) { 'HL_STALE=unknown'; exit 0 }
+      $st = (Get-Process -Id $svc.ProcessId).StartTime.ToUniversalTime()
+      $files = @((Get-Item -LiteralPath "$a\Splunk_TA_windows"), (Get-Item -LiteralPath "$a\Splunk_TA_windows\local\inputs.conf"))
+      $files += @(Get-ChildItem -LiteralPath "$a\hl_uf_outputs\default" -File)
+      foreach ($n in @({{ hl_uf_input_apps_windows | map('to_json') | join(', ') }})) {
+        $files += Get-Item -LiteralPath "$a\$n\default\app.conf"
+        $files += Get-Item -LiteralPath "$a\$n\local\inputs.conf"
+      }
+      $newest = ($files | Measure-Object -Property LastWriteTimeUtc -Maximum).Maximum
+      if ($newest -gt $st) { 'HL_STALE=1' } else { 'HL_STALE=0' }
+  register: hl_appsw_stale
+  changed_when: false
+
 - name: Note whether the UF must restart
   ansible.builtin.set_fact:
     hl_appsw_restart: >-
       {{ (hl_ta_win_ver.stdout | trim != hl_tas.Splunk_TA_windows.version) or hl_appsw_appconf is changed
-         or hl_appsw_inputs is changed or hl_uf_outputs_changed | bool }}
+         or hl_appsw_inputs is changed or hl_uf_outputs_changed | bool
+         or hl_appsw_stale.stdout is not search('HL_STALE=0') }}
 
+# "<lines> <epoch>": where splunkd.log ends and the host's clock, just before the restart
 - name: Note where splunkd.log ends
-  ansible.windows.win_shell: |
-    $f = '{{ hl_uf_win_home }}\var\log\splunk\splunkd.log'
-    if (Test-Path -LiteralPath $f) { @(Get-Content -LiteralPath $f).Count } else { 0 }
+  ansible.windows.win_shell:
+    cmd: |
+      $f = '{{ hl_uf_win_home | replace("'", "''") }}\var\log\splunk\splunkd.log'
+      $n = 0
+      if (Test-Path -LiteralPath $f) {
+        $fs = [IO.File]::Open($f, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]'ReadWrite, Delete')
+        try { $sr = New-Object IO.StreamReader($fs); while ($null -ne $sr.ReadLine()) { $n++ } } finally { $fs.Dispose() }
+      }
+      "$n $([DateTimeOffset]::UtcNow.ToUnixTimeSeconds())"
   register: hl_appsw_log_lines
   changed_when: false
-  when: hl_appsw_restart | bool
 
 - name: Marker before the restart
-  ansible.builtin.include_tasks: marker.yml
+  ansible.builtin.include_tasks: marker_best_effort.yml
   vars:
     hl_marker_action: apps
   when: hl_appsw_restart | bool
@@ -108,8 +146,9 @@
     state: restarted
   when: hl_appsw_restart | bool
 
+# Every run, as install: without a restart, the whole log (the latest state counts) and the last 120 s
 - name: Check the UF is connected through Cribl
   ansible.builtin.include_tasks: uf_windows_connected.yml
   vars:
-    hl_uf_log_from: "{{ hl_appsw_log_lines.stdout | default('0') | trim | int }}"
-  when: hl_appsw_restart | bool
+    hl_uf_log_from: "{{ (hl_appsw_log_lines.stdout.split()[0] | int) if hl_appsw_restart | bool else 0 }}"
+    hl_uf_since: "{{ (hl_appsw_log_lines.stdout.split()[1] | int) if hl_appsw_restart | bool else 0 }}"

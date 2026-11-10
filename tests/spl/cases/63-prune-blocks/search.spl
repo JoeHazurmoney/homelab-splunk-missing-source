@@ -1,1 +1,0 @@
-| inputlookup @blocks@ | `dh_prune_mark_blocks(@NOW@)`

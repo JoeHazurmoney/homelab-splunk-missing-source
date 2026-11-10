@@ -1,0 +1,7 @@
+entity_id,status,cause_code,action
+host|*|pi5|*|*,OK,,
+sourcetype|network|pi5|hl:devprobe|*,LATE,probe_stale,Check hl-devprobe on pi5: systemctl status hl-devprobe.timer (or rerun: ansible-playbook site.yml --tags probe --limit pi5)
+host|*|h36b|*|*,MISSING,ansible_stop,Start it again with the role: ansible-playbook site.yml --tags start --limit h36b
+sourcetype|network|h36b|hl:devprobe|*,MISSING,ansible_stop,Start it again with the role: ansible-playbook site.yml --tags start --limit h36b
+host|*|h36c|*|*,MISSING,hb_missing,Ping or SSH to h36c; then check the agent with the role: ansible-playbook site.yml --tags status --limit h36c
+sourcetype|network|h36c|hl:devprobe|*,MISSING,hb_missing,Ping or SSH to h36c; then check the agent with the role: ansible-playbook site.yml --tags status --limit h36c

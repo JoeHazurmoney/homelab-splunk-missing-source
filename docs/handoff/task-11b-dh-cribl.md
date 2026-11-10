@@ -1,16 +1,17 @@
 # Handoff: task 11b — data health adapted to Cribl
 
-Issue #25 · branch `feat/11b-dh-cribl`, **stacked on `feat/10-expected`** · drafted in a cloud
-session on 2026-11-01.
+Issue #25 · branch `feat/11b-dh-cribl` (on `main`) · drafted in a cloud session on 2026-11-01; run and corrected on 2026-11-09 (spec §14.18).
 
-**State:** written; the dashboards' static check, the docs coverage check, yamllint and shellcheck pass
-here. **This branch also contains PR #31 (task 12e)**, merged in so that 11b could finish the Manage
-change on top of it. Conflicts were end-of-file appends, and both sides were kept. Three new fixture
-cases and five updated ones have **not run in Splunk**, and the Manage tab has **not been seen in
-a browser**.
+**State:** the draft below ran in Splunk on 2026-11-09 (spec §14.18). Its fixtures and regexes were
+corrected against real data: `dh_tamper_cribl` read Splunk's auto-extracted JSON fields twice (doubled
+into multivalues, so it found nothing on real events) and now uses the eval `spath()`; `dh_ui_block_command`
+read a field the plan had dropped; the writer and DH Prune's block branch were removed instead of left for
+later (see "Rulings that changed this note" below).
 
-**Merge order:** #31 first (after its browser click-through), then this branch. Once #31 is on
-`main`, this PR's diff shrinks to the 11b changes.
+## Rulings that changed this note
+- Writer and Prune: `dh_ui_block_write`, `dh_ui_block_rows`, `dh_prune_mark_blocks` and DH Prune's block branch are gone (controller, R1). `cribl_block` is the only writer of the mirror.
+- `Agent ID (guid)` row dropped from Host detail (R5).
+- Browser checks are the controller's (R12); this task proves them through panel searches.
 
 ## What the branch changes
 
@@ -38,32 +39,27 @@ a browser**.
   and clear) and that the form wrote no file. The admin-log total is now **6** (no block rows).
 - `docs/data-health/dashboards.md`: the Test blocks section, the recipe and the "Test block: command"
   entry are rewritten; "Current test blocks" reads the mirror.
-- **Left for later:** `dh_ui_block_write` and `dh_ui_block_rows` have no user left. Delete them, with
-  their `macros.md` entries and any rows in `91-ui-block-plan` that use them, once the tab is
-  confirmed in a browser.
 
 ## Before running
 
 Tasks 3b, 4 and 10 are verified (Cribl data, UF `_internal` through Cribl, `via=cribl` rows). Deploy:
 `ansible-playbook site.yml --tags server --limit homepc`.
 
-## Checks (record in spec §14.16 "Task 11b checks")
+## Checks (recorded in spec §14.18 "Task 11b checks")
 
 | # | Check | How | Pass | If it fails |
 |---|---|---|---|---|
 | 1 | Fixtures | `tests/spl/run.sh` and `tests/spl/dash.sh writes` (on HOMEPC; `tests/spl/dev-deploy.sh` first) | all PASS, including 94, 95, 96, 97 and the updated ones | read the diff; for 40, check the `rex` against the real lines (check 2) |
-| 1b | **Manage in a browser** (12e's open item, plus this tab) | open Manage → Test blocks (admin), fill in a whole-host block for pi5 | the preview, then a command line; no Confirm; run it on pi5 and reload: Current test blocks lists it | the generator's layout (`blocks` rows) |
+| 1b | **Manage's form** (12e's open item, plus this tab; browser check is the controller's, R12) | the panel searches `ds_bk_plan` and `ds_bk_command` over REST (and `tests/spl/dash.sh writes`) with one test block as the data: `wd2l-recv\|linux_secure\|*` (R9) | the preview, then a command line; no Confirm; Current test blocks lists it | the generator's layout (`blocks` rows) |
 | 2 | **Forwarder identity from real lines** | `index=_internal sourcetype=splunkd host=wd2l-recv* ("Connected to idx=" OR "System info:" OR "Splunkd starting") \| head 5`; and the same for `host=homepc` | the regexes match. **Windows wording** (from task 5 check 11): if `System info:` differs, adjust the `rex` in `dh_fwd_from_ufint` and add a Windows row to `40-fwd-fold` | — |
-| 3 | **Host detail shows UF version and last connect again** (done-when) | open Host detail for wd2l-recv | Agent version 10.6.1.1, Operating system "Linux x86_64", Last connection to Cribl < 1 min ago. Agent ID (guid) is now empty: no source gives it. Drop that row, or read the guid from the UF's `etc/instance.cfg` with a scripted input (Taylor's call) | the version comes only at a UF start, so restart the UF once (`--tags restart`) if `dh_fwd` predates the change |
-| 4 | **The Cribl tamper finding fires** (done-when) | in Cribl's UI (no marker), add a Drop function to `pl_test_block` (filter `false`), save; wait ≤ 10 min | a tamper finding on host `cribl` ("Cribl pipelines update (pl_test_block) by admin"), not suppressed; the Overview's tamper panel shows it. Remove the function afterwards, or run `--tags cribl` (which replaces the file) | no `cribl:audit` events: task 3b check 7 |
+| 3 | **Host detail shows UF version and last connect again** (done-when) | the Host detail panel search for wd2l-recv and homepc over REST (browser check is the controller's, R12) | Agent version 10.6.1.1, Operating system "Linux x86_64" / "Windows x64", Last connection to Cribl < 1 min ago. No Agent ID row (R5) | the identity lines appear only at a UF start: R7 fills `dh_fwd` once with a manual dispatch over a wider window; never restart a UF to get them |
+| 4 | **The Cribl tamper finding fires** (done-when; R10) | save a Drop function (filter `false`, so it drops nothing) to `pl_test_block` through Cribl's API as admin, ≥ 15 min away from any `cribl*` marker; wait ≤ 10 min; restore the function (PATCH the original back, or `--tags cribl --limit homepc` if that leaves a difference) | a tamper finding on host `cribl` ("Cribl pipelines update (pl_test_block) by admin"), not suppressed; the Overview's tamper panel shows it. **The finding stays in `dh_tamper`**: do not delete it | no `cribl:audit` events: task 3b check 7 |
 | 5 | Suppression of the role's own work | `--tags cribl_block …` (task 3b check 12) | its `lookups` entries are suppressed (inside the marker window) | the marker's `target_host` must be `cribl` |
-| 6 | **Cribl DOWN** (E2E §12) | `docker stop cribl`; ≤ 3 min | `cribl` DOWN; every `via=cribl` row "Cribl DOWN: the real state is unknown"; **no** "Splunk not receiving" banner (HEC still flows); then `docker start cribl` | a banner: HEC isn't flowing either; check wd2l |
-| 7 | Probe stale names pi5 | `systemctl stop hl-devprobe.timer` on pi5, past 180 s | "Check hl-devprobe on pi5: …"; then start it again | — |
-| 8 | Test-block label | `--tags cribl_block -e "hl_block_key='wd2l-recv\|linux_secure\|*'" -e hl_block_minutes=10 -e "hl_block_reason='11b label'"` | the row shows "Test block until hh:mm" and the cause "test_block" once it goes LATE | the mirror wasn't written: `\| inputlookup hl_ingest_block` |
+| 6 | **Cribl DOWN** (E2E §12; R11) | `docker stop cribl` **once**; the `cribl` row needs MISSING (2 × 120 s plus the 1-minute evaluator), so keep it down ≥ 5 min and at most what the check needs; note the UDP loss | `cribl` DOWN; every `via=cribl` row "Cribl DOWN: the real state is unknown"; **no** "Splunk not receiving" banner (HEC still flows); then `docker start cribl`; count the stop | a banner: HEC isn't flowing either; check wd2l |
+| 7 | Probe stale names pi5 (R4; T8's check 9 wording) | `systemctl stop hl-devprobe.timer` on pi5, past 180 s | pi5's `hl:devprobe` row (not the `udm` host row, which is sporadic, 24 h) goes LATE with "Check hl-devprobe on pi5: …" (cause `probe_stale`; fix round 1); then restore with `--tags probe --limit pi5`; no action says "on the relay" | — |
+| 8 | Test-block label | `--tags cribl_block -e "hl_block_key='wd2l-recv\|linux_secure\|*'" -e hl_block_minutes=10 -e "hl_block_reason='11b label'"` (R9: this one block serves checks 1b and 8; clear it afterwards) | the row shows "test block until hh:mm" (done-when, R2; linux_secure is sporadic, so the cause "test_block" shows only past its 24 h threshold; fixture 23 proves the cause) | the mirror wasn't written: `\| inputlookup hl_ingest_block` |
 
 ## Then
 
-- Spec: §14.16; §7.2's open item closed (the mirror); §7.3 and §8 (`dh_fwd_from_ufint`, `dh_uf_builds`);
-  §7.6 (`dh_tamper_cribl`).
-- PR: `feat(data-health): Cribl relay cause, UF identity from _internal, Cribl tamper indicator (task 11b)`,
-  `Closes #25`. Merge after #31.
+- Spec: §14.18; §7.2's open item closed (the mirror, no scheduled expiry); §7.3 and §8 (`dh_fwd_from_ufint`, `dh_uf_builds`, DH Prune); §7.6 (`dh_tamper_cribl`, `dh_probe_host`); §7.7, §7.8.
+- PR: `feat(data-health): Cribl relay cause, UF identity from _internal, Cribl tamper indicator (task 11b)`, `Closes #25`.

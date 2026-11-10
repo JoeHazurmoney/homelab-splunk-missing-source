@@ -1,5 +1,7 @@
-c,dh_ok,dh_action,dh_rk,dh_secs,reason
+c,dh_ok,dh_action,k,dh_secs,reason
 b1,1,add,wd2l-recv|linux_secure|*,1800,E2E row 4
 b2,1,remove,udm|*|*,,done
 b3,0,add,bad,60,x
 b4,1,add,pi5|*|*,90,quote' and $(rm) stripped
+b5,1,add,homepc|XmlWinEventLog:Security|*,600,win
+b6,1,remove,wd2l-recv|linux_audit|/var/log/audit/audit.log.1,,done

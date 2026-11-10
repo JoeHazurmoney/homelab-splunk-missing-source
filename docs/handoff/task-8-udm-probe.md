@@ -3,10 +3,10 @@
 Issue #9 · branch `feat/8-udm-probe`, **stacked on `feat/7-audit-rules`** (needs 3b and 4; the probe
 file is read by task 6's `hl_uf_linux_inputs`) · drafted in a cloud session on 2026-11-01.
 
-**State:** written; yamllint, ansible-lint (production) and shellcheck clean (on the rendered script). The probe
-script was rendered and run here, both branches (reachable, and unreachable with a stub `ping`).
-The UDM side is the Cribl config from task 3b (`in_udm_syslog` on 5514/udp, host/index/sourcetype/source
-from the port, `pl_syslog_pre` for the receive time). **Not run on pi5, the UDM or HOMEPC.**
+**State:** implemented and live on pi5 (2026-11-09). Results are in spec §14.16, which supersedes the
+checks below where they differ. UniFi remote syslog is `192.168.1.27`, port `5514`, UDP (Taylor set it
+in the UI). The UDM side is the Cribl config from task 3b (`in_udm_syslog` on 5514/udp,
+host/index/sourcetype/source from the port, `pl_syslog_pre` for the receive time).
 
 **Note:** the issue's title text still describes the retired rsyslog relay. The Cribl addendum
 replaced it (pi5 is a UF host; the UDM sends straight to Cribl). This branch deletes the
@@ -27,8 +27,7 @@ there is nothing to clean up there.
 ## Before running
 
 1. Tasks 3b, 4 and 6 are verified (pi5's UF reads `probe.log`).
-2. **Taylor's gate (spec §11):** in the UniFi UI, set remote syslog to `192.168.1.27`, port `5514`, UDP
-   (CEF if offered). Note the exact setting names for the docs.
+2. **Taylor's gate (spec §11), done:** UniFi remote syslog is `192.168.1.27`, port `5514`, UDP; CEF arrives.
 
 ## Run
 
@@ -37,13 +36,13 @@ ansible-playbook site.yml --tags probe --limit pi5 -v
 ansible-playbook site.yml --tags probe --limit pi5        # expect changed=0
 ```
 
-## Checks (record in spec §14.14 "Task 8 checks")
+## Checks (results in spec §14.16 "Task 8 checks")
 
 | # | Check | How | Pass | If it fails |
 |---|---|---|---|---|
 | 1 | **UDM events arrive** | `index=network host=udm sourcetype=unifi:syslog earliest=-15m \| stats count latest(_raw) by source` | events with `source=syslog:udm` | no events at all: on HOMEPC `Get-NetFirewallRule -DisplayName 'Docker Desktop Backend' \| Get-NetFirewallPortFilter` (read-only). If UDP 5514 from 192.168.1.1 is blocked, **stop and ask Taylor** before adding the inbound rule (elevation, spec §11). Cribl's live capture (Sources → in_udm_syslog → Live) shows whether packets reach Cribl |
 | 2 | **No new firewall rule needed** (§11 row 8) | as check 1 | arrives with the existing Docker rule | — |
-| 3 | **A UDM CEF sample** (deferred from task 2, §14.2) | copy 3 raw events (`index=network host=udm \| head 3 \| table _time _indextime _raw`) into §14.14 | — | — |
+| 3 | **A UDM CEF sample** (deferred from task 2, §14.2) | 3 raw events (`index=network host=udm \| head 3 \| table _time _indextime _raw`), **redacted** (MACs, IPs, client and device names), into §14.16 | — | — |
 | 4 | **`_time` decision** (§3, §11 row 8) | compare the CEF header timestamp with `_indextime` over a day; does it carry a zone? | keep the receive time (default) unless the device time is reliable **and** zoned. Then remove the Eval in `pl_syslog_pre` and set `timestampTimezone` on `in_udm_syslog` | — |
 | 5 | Probe lines arrive | `index=network sourcetype=hl:devprobe earliest=-10m \| stats count latest(reachable) by device` | ≈ 10 per device, `reachable=1` | the UF input (task 6) on pi5: `splunk list monitor` |
 | 6 | **Nothing leaks into wd2l** (spec §3 pi5 row, §4.4) | on pi5: `journalctl --since -10min \| grep -i devprobe`; in Splunk: `index=enclave1 host=pi5* devprobe earliest=-30m` | both empty | `LogLevelMax` didn't silence systemd's own lines: switch to a long-running `Type=simple` loop (`while :; do …; sleep 60; done`), so systemd logs only once at boot. Update the E2E row to `systemctl stop hl-devprobe.service` |
@@ -55,7 +54,7 @@ ansible-playbook site.yml --tags probe --limit pi5        # expect changed=0
 
 ## Then
 
-- Spec: §14.14 (CEF sample, time decision, firewall, journal); §3 UDM row and §4.4 if the time source
+- Spec: §14.16 (CEF sample, time decision, firewall, journal); §3 UDM row and §4.4 if the time source
   changed; §12's probe row if check 6 changed the unit.
 - `docs/data-health/*.md`: unchanged unless the cause wording moves (task 11b).
 - PR: `feat(probe): device probe on pi5, UDM through Cribl, syslog relay retired (task 8)`, `Closes #9`.
