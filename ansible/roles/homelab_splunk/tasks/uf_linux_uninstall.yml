@@ -2,7 +2,8 @@
 # marker → stop → remove the tamper rules FIRST and reload auditd (otherwise augenrules stops at
 # the failing file and drops wd2l.rules) → disable boot-start → rpm -e → rm -rf the UF home →
 # userdel → daemon-reload → the packages the role added → the contract (fails on any leftover)
-# → baselines and state removed. The next `expected` run retires the host's rows.
+# → baselines and state removed. The host's expected rows stay: a host that is merely off must stay
+# expected. To retire them, set hl_expected: false for the host and run `--tags expected` (spec 12).
 - name: Read the state file
   ansible.builtin.import_tasks: linux_state_read.yml
 
