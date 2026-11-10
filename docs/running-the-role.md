@@ -43,6 +43,7 @@ local scripts by default; if PowerShell says running scripts is disabled, run ea
 | 5 | HOMEPC, **desktop** PowerShell | `docker pull cribl/cribl@sha256:cb2b2e32933e492f439b5825b0c36f420df2fa986fe36d5f31fce6755190eb71`. Docker Desktop has no credential store over SSH, so the role never pulls |
 | 6 | pi5 and HOMEPC | the packages, below |
 | 7 | pi5 | `ansible uf_linux -m ansible.builtin.ping` and `ansible uf_windows -m ansible.windows.win_ping` |
+| 8 | UniFi Network UI | Remote syslog to HOMEPC: server `192.168.1.27`, port `5514`, UDP. The role never logs in to the UDM, so this is the only place it is set. No new Windows firewall rule is needed: Docker Desktop's existing rule lets the UDM's packets in. If this step is missing, nothing fails: the `udm` row reads NEVER_SEEN an hour after it is first expected (MISSING if it stops later), with the cause "The device answers the network probe but sends no logs", and `verify` only reports it, because the row is sporadic |
 
 **The packages** go in `ansible/files/packages/` on pi5 (gitignored). The UF packages come from
 `--tags download --limit pi5`, which fetches them from `download.splunk.com` and checks each against

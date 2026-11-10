@@ -68,7 +68,7 @@ columns. Each row: what is injected, what the Overview must show, the limit, and
 | 15 | mute a host | MUTED with its children, expiry shown | ≤ 1 min | | | |
 | 16 | restart splunkd; sleep and wake the PC | PENDING, **no** false alerts | — | | | |
 | 17 | deploy twice | the second run reports 0 changes | — | | | |
-| 18 | `uninstall` then `install` | contract passes; rows retire and return | — | | | |
+| 18 | `uninstall` then `install` | contract passes; after `uninstall` alone the host's rows stay expected; `hl_expected: false` plus `--tags expected` retires its UF-derived rows (`dh_extra_expected` rows stay); `hl_expected` back to `true` plus `--tags expected` brings them back | — | | | |
 | 19 | wd2l | `soak-check.sh` + its dashboard unchanged | — | | | |
 
 ### Static checks for the run
