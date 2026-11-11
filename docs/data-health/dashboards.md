@@ -75,6 +75,8 @@ When something is late or missing, the app picks the most likely reason, checkin
 | The Splunk agent works but this input stopped … | The file is unreadable, moved or rotated; or auditd or rsyslog stopped; or audit rules were removed. | Read the Splunk agent errors about this sourcetype on Host detail. |
 | Never arrived since it was added … | A host without an agent never sent this. | Check that this input is deployed and sending. |
 | Nothing at all from this host (it has no Splunk agent) … | A host without an agent sends nothing at all. | Check the host and its syslog path. |
+| Cribl late: nothing recent from Cribl itself (not yet DOWN) … | The row for Cribl: its own logs are late but not yet missing (the 2 minutes before "Cribl DOWN"). | The same as for Cribl DOWN. |
+| Everything from this host is late (not yet missing; it has no Splunk agent) … | Every stream of a host without an agent is late, none missing yet. | Check the host and its syslog path. |
 | This stream stopped while the host still sends others … | One stream stopped; the host still sends others. | Check the program or input that sends this stream. |
 
 ## The banner: is the data current?

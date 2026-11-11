@@ -43,6 +43,8 @@ The first cause that fits wins. `<…>` marks the parts the app fills in.
 | **Cribl DOWN: nothing from Cribl itself so every collected stream is unknown** | the `cribl` row: its workers' own logs stopped | as for "Cribl DOWN" above | as for "Cribl DOWN" above |
 | **Nothing at all from this host (it has no Splunk agent): the host is down or its syslog path is broken** | an agentless host sends nothing | the host and its syslog path | — |
 | **Never arrived since it was added: the input is not deployed or not sending** | an expected entity has never arrived | is it deployed? | deploy it, or retire the row (`hl_disabled_inputs`, or Manage for a row added there) |
+| **Cribl late: nothing recent from Cribl itself (not yet DOWN) so collected streams may soon be unknown** | the `cribl` row while its own logs are late but not yet missing: the 2 minutes before "Cribl DOWN" | as for "Cribl DOWN" above | as for "Cribl DOWN" above |
+| **Everything from this host is late (not yet missing; it has no Splunk agent): the host or its syslog path is slow or stopping** | every stream of an agentless host is late, none missing yet | the host and its syslog path | — |
 | **This stream stopped while the host still sends others: its program or input stopped** | as it says; for `enclave1` rows, wd2l's delivery | the program behind the stream | — |
 
 ## Known limits

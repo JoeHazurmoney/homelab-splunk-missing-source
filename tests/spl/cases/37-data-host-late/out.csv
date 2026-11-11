@@ -1,0 +1,8 @@
+entity_id,status,cause_code,cause,host_rollup
+host|*|cribl|*|*,LATE,host_late,Cribl late: nothing recent from Cribl itself (not yet DOWN) so collected streams may soon be unknown,DEGRADED
+sourcetype|cribl|cribl|cribl|*,LATE,host_late,Cribl late: nothing recent from Cribl itself (not yet DOWN) so collected streams may soon be unknown,DEGRADED
+host|*|h37a|*|*,LATE,host_late,Everything from this host is late (not yet missing; it has no Splunk agent): the host or its syslog path is slow or stopping,DEGRADED
+sourcetype|linux|h37a|syslog|*,LATE,host_late,Everything from this host is late (not yet missing; it has no Splunk agent): the host or its syslog path is slow or stopping,DEGRADED
+host|*|h37b|*|*,OK,,,DEGRADED
+sourcetype|linux|h37b|syslog|*,OK,,,DEGRADED
+sourcetype|linux|h37b|auth|*,LATE,stream_stopped,This stream stopped while the host still sends others: its program or input stopped,DEGRADED
