@@ -311,9 +311,32 @@ manage_generated() {
   return 1
 }
 
+# AppInspect's app.conf rules (task 14): the app has no setup page, so it must not ship
+# [install] is_configured (check_that_setup_has_not_been_performed fails it), and [id] names it
+# with a semver version. Reads the repo's file; needs no Splunk.
+app_conf_check() {
+  local f="$here/../../splunk/apps/$DH_APP/default/app.conf"
+  if tr -d '\r' <"$f" | awk -v app="$DH_APP" '
+    /^[[:space:]]*\[/ { s = $0; gsub(/[[:space:]]|\[|\]/, "", s); next }
+    /^[[:space:]]*is_configured[[:space:]]*=/ { print "  default/app.conf: is_configured is set in [" s "]"; bad = 1 }
+    s == "id" && /^[[:space:]]*name[[:space:]]*=/ { v = $0; sub(/^[^=]*=[[:space:]]*/, "", v); if (v == app) name = 1 }
+    s == "id" && /^[[:space:]]*version[[:space:]]*=/ { v = $0; sub(/^[^=]*=[[:space:]]*/, "", v); if (v ~ /^[0-9]+\.[0-9]+\.[0-9]+$/) ver = 1 }
+    END {
+      if (!name) { print "  default/app.conf: [id] name is not " app; bad = 1 }
+      if (!ver) { print "  default/app.conf: [id] version is not semver"; bad = 1 }
+      exit bad
+    }'; then
+    echo "PASS app-conf"
+    return 0
+  fi
+  echo "FAIL app-conf"
+  return 1
+}
+
 run_cases() {
   local pattern=${1:-*} pass=0 fail=0 dir name id ok
   if [ "$pattern" = "*" ]; then
+    if app_conf_check; then pass=$((pass + 1)); else fail=$((fail + 1)); fi
     if names_check; then pass=$((pass + 1)); else fail=$((fail + 1)); fi
     if static_names_check; then pass=$((pass + 1)); else fail=$((fail + 1)); fi
     if retention_check; then pass=$((pass + 1)); else fail=$((fail + 1)); fi
