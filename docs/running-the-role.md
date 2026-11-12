@@ -90,7 +90,9 @@ also run alone with `--tags <name>`. None of them removes anything.
 **Costs of a run.** A rerun with nothing to change restarts nothing. A `server` run that restarts
 splunkd pauses Cribl for about 2 min 14 s, so UDP syslog (the UDM) sent during that time is lost and
 UF data arrives up to 2.5 min late. A `cribl` run that changes a file does a plain `docker restart
-cribl`, costing about 12 s of UDP syslog. Both post markers, so the gap is attributable.
+cribl`, costing about 12 s of UDP syslog. Both post markers, so the gap is attributable. A splunkd
+restart outside the role (Splunk Web, `docker exec … splunk restart`) has no Cribl hold: task 14 lost
+one 30-s sample (about 10–25 s of UF data) on three of the four UFs that way.
 
 `ansible-playbook site.yml --list-tags` lists every tag. It also shows `never` and `always`
 (Ansible's own tag on the role's argument check, which runs on every run).
@@ -184,7 +186,14 @@ A full removal: `--tags audit_policy_remove,audit_rules_remove,probe_remove,unin
 stay expected. To retire them, set `hl_expected: false` in the host's `host_vars` (or remove the host
 from `uf_linux` / `uf_windows`) and run `--tags expected --limit homepc`. That retires only the
 host's UF-derived rows (its host row and input rows). Any `dh_extra_expected` row naming the host
-stays, because that data doesn't depend on the UF.
+stays, because that data doesn't depend on the UF. **Don't pass `-e hl_expected=false`:** an extra
+var overrides every host's value, so that run would retire every UF host's rows.
+
+To put a host back: `--tags install,apps,audit_rules --limit <host>`, then remove the
+`hl_expected: false` line and run `--tags expected --limit homepc`. Until the install, its rows read
+"Uninstalled with Ansible at … by … and not installed again". **A reinstalled UF re-reads every monitored file from the start** (it has no record of what
+the old one read), so everything still in those files is indexed again: about 17,000 duplicate
+events on wd2l-recv in task 14, 596 of them in `wd2l_uf_audit`.
 
 ## 5. Things to know
 
@@ -200,6 +209,15 @@ because the setting covers every dashboard on this Splunk, wd2l's included: a da
 `outputlookup`, `collect` or `delete` now runs without a prompt. The Search page check stays on. To
 turn it back on, delete that file or set the value to `true`, then run `--tags server`, which restarts
 splunkd.
+
+**`cribl` doesn't undo an edit made in Cribl's UI or API.** It compares the repo's files with its
+own record of what it pushed, not with Cribl's live config, so after a UI edit it reports no change
+and restarts nothing. Its load check ("Check Cribl loaded the role's inputs, outputs, routes,
+pipelines and breakers") then fails if the edit changed the route list or removed one of the role's
+objects; an edit inside a pipeline passes it. Undo the edit in Cribl (UI or API) and rerun `--tags
+cribl --limit homepc` until it passes. An unmarked edit is a tamper finding: note its finding ID
+first, because a `cribl` run within 15 min of the edit marks it as Ansible work (see the
+[runbook](runbook-missing-data.md)).
 
 Every role-made change shows up as an **Ansible marker** (`index=data_health source=dh:marker`,
 fields `action`, `target_host`, `by`, `run_id`), so the data-health app knows the role's own work
@@ -218,6 +236,7 @@ from tampering.
 | Symptom | Look at |
 |---|---|
 | `install` fails at "Wait for the UF to connect to Cribl" | Cribl up? (`--tags verify --limit homepc`). Port 9997 on HOMEPC reachable from the host? A wrong token looks like an ordinary close: `--tags status` shows `last_connect` and `last_close`, and Cribl logs the refused token masked in `index=cribl`. The play waits `hl_uf_connect_timeout` (180 s) before it fails |
+| `cribl` fails at "Check Cribl loaded the role's inputs, outputs, routes, pipelines and breakers" | Cribl's live config differs from the repo's, most likely an edit in Cribl's UI or API: see [§5](#5-things-to-know). Undo it in Cribl, then rerun |
 | `cribl` stops at "The Cribl image is not on HOMEPC" | pull it in a desktop session (setup step 5) |
 | `cribl` stops at `hl-net is missing` | run `--tags server_network` first |
 | `cribl` fails at "Set the admin password" (its output is hidden) | Cribl refused both the vault's password and `admin`/`admin`: the container's password was changed outside the role. Put the current one in the vault, or `--tags cribl_remove` then `--tags cribl` (that deletes Cribl's volume: its config, lookups and queue) |
