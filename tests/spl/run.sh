@@ -15,7 +15,8 @@
 # A full run (no glob) first runs these checks: lookup-names (dh_evaluate vs dh_lookup_*),
 # lookup-names-static (every literal lookup name in the conf files is defined, and merge macros
 # get the collection their search writes), retention-windows (nothing looks back past the indexes'
-# retention) and savedsearch-settings (savedsearches.expect.csv).
+# retention), savedsearch-settings (savedsearches.expect.csv) and scheduled-lispy (each scheduled
+# search's first stage, run the way the scheduler runs it, requires no stray "search" term).
 #
 # shellcheck disable=SC2016  # backticks here are Splunk macro calls, not shell expansions
 # Usage: tests/spl/run.sh [case-glob]     e.g. tests/spl/run.sh '1*'
@@ -250,6 +251,37 @@ conf_check() {
   return 1
 }
 
+# The scheduler runs a saved search that doesn't start with "|" as "search " + its text (seen in
+# _audit and the jobs' search.log, 10.6.0.5), so a text that itself starts with the search command
+# runs as "search search index=...", and the second "search" becomes a required term: the Windows
+# stage of DH Tamper matched no event on a schedule (task 14 row 13), while the same text run by
+# hand matched. This dispatches each deployed scheduled search's first stage the scheduler's way
+# and fails if its base lispy (search.log) requires the bare term "search".
+scheduled_lispy_check() {
+  local bad=0 n=0 title base sid log
+  while IFS=$'\t' read -r title base; do
+    [ -n "$title" ] || continue
+    n=$((n + 1))
+    sid=$(dh_curl "$DH_MGMT/servicesNS/admin/$DH_APP/search/jobs" -d "tz=$DH_TZ" -d exec_mode=blocking -d output_mode=json \
+      --data-urlencode "search=search $base | head 1" | grep -o '"sid":"[^"]*"' | cut -d'"' -f4)
+    if [ -z "$sid" ]; then echo "  '$title': the first stage did not dispatch"; bad=1; continue; fi
+    log=$(dh_curl "$DH_MGMT/servicesNS/admin/$DH_APP/search/jobs/$sid/search.log" | grep 'base lispy:' || true)
+    dh_curl -o "$work/del.out" -X DELETE "$DH_MGMT/servicesNS/admin/$DH_APP/search/jobs/$sid"
+    if [ -z "$log" ]; then echo "  '$title': no base lispy in search.log"; bad=1; continue; fi
+    if printf '%s\n' "$log" | sed 's/.*base lispy: //' | grep -qE '(^|[[ ])search([] ]|$)'; then
+      echo "  '$title' runs on a schedule as \"search search ...\": its first stage requires the term \"search\""
+      bad=1
+    fi
+  done < <(dh_search "| rest splunk_server=local count=0 /servicesNS/nobody/$DH_APP/saved/searches
+    | search eai:acl.app=$DH_APP is_scheduled=1 | where NOT match(search, \"^\\s*\\|\")
+    | eval base=replace(replace(search, \"(?s)\\n\\s*\\|.*\$\", \"\"), \"\\s+\", \" \")
+    | eval _raw=title.urldecode(\"%09\").base | fields _raw" raw | tr -d '\r')
+  if [ "$n" -eq 0 ]; then echo "  no scheduled search to check (none, or the rest call failed)"; bad=1; fi
+  if [ "$bad" -eq 0 ]; then echo "PASS scheduled-lispy ($n searches)"; return 0; fi
+  echo "FAIL scheduled-lispy"
+  return 1
+}
+
 # dash <mode> [args]: tests/spl/dash_check.py inside the container, on the deployed app.
 dash() { dh_docker exec -i -u splunk "$DH_CONTAINER" /opt/splunk/bin/python3 - "$@" <"$here/dash_check.py"; }
 
@@ -341,6 +373,7 @@ run_cases() {
     if static_names_check; then pass=$((pass + 1)); else fail=$((fail + 1)); fi
     if retention_check; then pass=$((pass + 1)); else fail=$((fail + 1)); fi
     if conf_check; then pass=$((pass + 1)); else fail=$((fail + 1)); fi
+    if scheduled_lispy_check; then pass=$((pass + 1)); else fail=$((fail + 1)); fi
     if dash_static; then pass=$((pass + 1)); else fail=$((fail + 1)); fi
     if docs_check; then pass=$((pass + 1)); else fail=$((fail + 1)); fi
     if dash_negative; then pass=$((pass + 1)); else fail=$((fail + 1)); fi
