@@ -25,6 +25,26 @@
   register: hl_uf_tamper_before
   changed_when: false
 
+# The write and the load raise audit events (CONFIG_CHANGE, hl-* keys) that DH Tamper reports
+# unless a marker came first (final review I3). A run with nothing to do posts none.
+- name: Check whether the tamper rules file would change
+  ansible.builtin.template:
+    src: uf/zz-hl-uf-tamper.rules.j2
+    dest: "{{ hl_uf_tamper_file }}"
+    owner: root
+    group: root
+    mode: "0600"
+  check_mode: true
+  register: hl_uf_tamper_would
+
+- name: Marker before the tamper rules change
+  ansible.builtin.include_tasks: marker.yml
+  vars:
+    hl_marker_action: install
+  when: >-
+    hl_uf_tamper_would.changed
+    or ('HL_UF=' ~ hl_uf_tamper_expected) not in hl_uf_tamper_before.stdout_lines
+
 - name: Render the tamper rules
   ansible.builtin.template:
     src: uf/zz-hl-uf-tamper.rules.j2

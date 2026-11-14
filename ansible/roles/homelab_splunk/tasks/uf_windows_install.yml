@@ -2,7 +2,8 @@
 # before the first start: FIPS (only if Windows' FIPS policy is on), user-seed.conf,
 # hl_uf_outputs (Cribl on 127.0.0.1:9997, token, useACK; mgmt 127.0.0.1:8090) → the virtual
 # account into Event Log Readers and Performance Monitor Users → start → connected through Cribl
-# and seen in Splunk (every run) → the mgmt listener checked → marker (best effort). Needs the
+# and seen in Splunk (every run) → the mgmt listener checked → marker (best effort; one also comes
+# before the MSI and before the start, final review I3). Needs the
 # elevated SSH session (administrators_authorized_keys, spec 5.1). The rules are uf_linux_install's
 # (task 4's final ones): records before the step that can fail, FIPS from the running splunkd.
 # PowerShell blocks use `cmd: |`: the free-form form is split like k=v arguments and fails on
@@ -35,6 +36,15 @@
       UniversalForwarder {{ (hl_ufw_msi.stdout | from_json).version | default('?') }} is installed, but the role
       pins {{ hl_uf_version }} or has no record of installing it. Remove it first (--tags uninstall or Apps & features).
     quiet: true
+
+# Markers come before each change (final review I3): the MSI's own 7045 and 4697 (the
+# SplunkForwarder service and its drivers) and the first start's events must find a marker that is
+# already indexed, because DH Tamper decides a finding's suppression once (#49).
+- name: Marker before the install
+  ansible.builtin.include_tasks: marker_best_effort.yml
+  vars:
+    hl_marker_action: install
+  when: hl_ufw_fresh | bool
 
 # Written before the MSI runs (as uf_linux_install records its packages before dnf): a run that
 # fails after the MSI (reading its ids, the groups, the start, …) leaves the record, so the next
@@ -244,6 +254,20 @@
       "$n $([DateTimeOffset]::UtcNow.ToUnixTimeSeconds())"
   register: hl_ufw_log_lines
   changed_when: false
+
+- name: Check whether the start changes the service
+  ansible.windows.win_service:
+    name: "{{ hl_uf_win_service }}"
+    start_mode: auto
+    state: "{{ 'restarted' if (hl_uf_outputs_changed | bool and not hl_ufw_fresh | bool) else 'started' }}"
+  check_mode: true
+  register: hl_ufw_start_would
+
+- name: Marker before the start
+  ansible.builtin.include_tasks: marker_best_effort.yml
+  vars:
+    hl_marker_action: install
+  when: hl_ufw_fresh | bool or hl_ufw_start_would is changed
 
 - name: Start the UF (restart when its outputs changed on a running UF)
   ansible.windows.win_service:

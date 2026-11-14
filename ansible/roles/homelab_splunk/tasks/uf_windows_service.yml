@@ -1,7 +1,8 @@
 # start / stop / restart / status (uf_windows, spec 5.3): service control + marker, as
-# uf_linux_service.yml. main.yml imports this file once per action, with hl_service_action set. A
-# stop posts its marker first (so a finding during the stop is the role's own work); start/restart
-# post theirs once connected. Markers are best effort (they warn, never fail the action).
+# uf_linux_service.yml. main.yml imports this file once per action, with hl_service_action set.
+# Every action that changes the service posts its marker first, so a finding the change itself
+# causes (7036 "stopped" of a restart) is the role's own work (final review I3, #49); start/restart
+# post a second marker once connected. Markers are best effort (they warn, never fail the action).
 # status = service state, MSI version and build, apps, the outputs connection (from splunkd.log)
 # and FIPS (the running splunkd).
 - name: Marker before the stop
@@ -9,6 +10,21 @@
   vars:
     hl_marker_action: stop
   when: hl_service_action == 'stop'
+
+# A start of a running UF changes nothing and posts no marker before it
+- name: Check whether the start or restart changes the service
+  ansible.windows.win_service:
+    name: "{{ hl_uf_win_service }}"
+    state: "{{ {'start': 'started', 'restart': 'restarted'}[hl_service_action] }}"
+  check_mode: true
+  register: hl_svcw_would
+  when: hl_service_action in ['start', 'restart']
+
+- name: Marker before the start or restart
+  ansible.builtin.include_tasks: marker_best_effort.yml
+  vars:
+    hl_marker_action: "{{ hl_service_action }}"
+  when: hl_service_action in ['start', 'restart'] and hl_svcw_would is changed
 
 # "<lines> <epoch>": where splunkd.log ends and the host's clock, just before the (re)start
 - name: Note where splunkd.log ends

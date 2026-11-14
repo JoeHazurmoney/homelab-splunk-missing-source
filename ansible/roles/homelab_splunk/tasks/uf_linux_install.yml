@@ -1,7 +1,8 @@
 # install (uf_linux, spec 5.3/5.4/5.6, spike 14 d, 14.7 a/i): baselines for the uninstall contract
 # → sysstat → the pinned rpm (sha256 checked) → before the first start: FIPS, user-seed.conf,
 # hl_uf_outputs (Cribl, token, useACK; mgmt on loopback; no thruput cap) → boot-start as splunkfwd
-# → the tamper audit rules → start → connected through Cribl and seen in Splunk → marker.
+# → the tamper audit rules → start → connected through Cribl and seen in Splunk → marker. A marker
+# also comes before each change: the install, the rules change and the start (final review I3).
 # A host where the pinned version is already installed only gets its outputs and rules checked.
 - name: Pick the package for this host
   ansible.builtin.set_fact:
@@ -29,6 +30,15 @@
       if hl_uf_rpm.stdout != hl_uf_version else 'did not install it (no state record)' }}.
       Remove it by hand or with --tags uninstall first.
     quiet: true
+
+# Markers come before each change (final review I3): a fresh install's own events (the splunkfwd
+# user, the package, the first start) must find a marker that is already indexed, because DH Tamper
+# decides a finding's suppression once (#49). The rules load and the start post their own below.
+- name: Marker before the install
+  ansible.builtin.include_tasks: marker.yml
+  vars:
+    hl_marker_action: install
+  when: hl_uf_fresh | bool
 
 # --- Baselines for the uninstall contract (spec 5.6), taken once, before anything is installed ---
 - name: Take the install baselines
@@ -223,6 +233,20 @@
     executable: /bin/bash
   register: hl_uf_log_lines
   changed_when: false
+
+- name: Check whether the start changes the service
+  ansible.builtin.systemd_service:
+    name: SplunkForwarder
+    state: "{{ 'restarted' if (hl_uf_outputs_changed | bool and not hl_uf_fresh | bool) else 'started' }}"
+    enabled: true
+  check_mode: true
+  register: hl_uf_start_would
+
+- name: Marker before the start
+  ansible.builtin.include_tasks: marker.yml
+  vars:
+    hl_marker_action: install
+  when: hl_uf_fresh | bool or hl_uf_start_would is changed
 
 - name: Start the UF (restart when its outputs changed on a running UF)
   ansible.builtin.systemd_service:
