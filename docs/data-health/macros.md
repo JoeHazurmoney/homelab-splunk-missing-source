@@ -93,7 +93,10 @@ The host that runs the device probe (*hl-devprobe*): `pi5`, the role's `hl_probe
 **3600 seconds.** A newly expected entity that has never sent anything is PENDING for this long, then NEVER_SEEN. Raise it for inputs that take long to start; lower it to report missing inputs sooner. Used by: `dh_eval_status`.
 
 ### `dh_tamper_window_secs`
-**900 seconds.** A tamper finding this close to the start of a silence makes the cause "possible deliberate blinding"; a finding this close to an Ansible marker is treated as the role's own work and suppressed. Raise it to link findings further apart (more false links); lower it to link only very close ones. Used by: `dh_eval_cause`, `dh_tamper_finish`.
+**900 seconds.** A tamper finding this close to the start of a silence makes the cause "possible deliberate blinding"; a finding that comes at most this long after an Ansible marker for its host is treated as the role's own work and suppressed. Raise it to link findings further apart (more false links); lower it to link only very close ones. Used by: `dh_eval_cause`, `dh_tamper_finish`.
+
+### `dh_tamper_marker_slack_secs`
+**60 seconds.** A marker up to this long *after* a finding still suppresses it, because markers carry pi5's clock and findings the host's. A marker posted later, such as a restore run's, never hides a finding. Raise it only if the hosts' clocks drift further apart. Used by: `dh_tamper_finish`.
 
 ## Profiles and thresholds
 
@@ -194,7 +197,7 @@ Writes the arrival tracker's run record: this run's time, the previous run, the 
 **300 seconds.** A clock change the operating system reports at least this large is a tamper finding ("big clock step"). Raise it to ignore bigger time corrections; lower it to catch smaller ones (normal NTP corrections may then show). Used by: `dh_tamper_win`, `dh_tamper_linux`.
 
 ### `dh_tamper_lookback_secs`
-**604800 seconds (7 days).** How far back DH Tamper re-checks each finding against Ansible markers on every run. Only findings this recent are written to the index, so an older finding is never alerted again. Raise it to re-check older findings (slower), but not past the indexes' 14-day retention, inside which DH Tamper reads what it already wrote; lower it to stop sooner. Keep it equal to `dh_tamper_finding_earliest`. Used by: `dh_tamper_finish`.
+**604800 seconds (7 days).** How old a finding DH Tamper still writes to the index (when it is new, or its stored suppression isn't there yet). An older finding is never alerted again. Keep it inside the indexes' 14-day retention, inside which DH Tamper reads what it already wrote. Keep it equal to `dh_tamper_finding_earliest`. Used by: `dh_tamper_finish`.
 
 ### `dh_tamper_finding_earliest`
 **`-7d`.** The event-time window DH Tamper reads findings from. Widen it to catch findings that arrive later (slower runs); narrow it to read less. It must match `dh_tamper_lookback_secs` (a test checks this). Used by: *DH Tamper*.
@@ -291,7 +294,7 @@ Finds Linux tamper indicators: auditd stopped or aborted, audit rules changed, t
 Cribl's audit log: any create, update, delete, reorder or upload of routes, pipelines, outputs, inputs or lookups is a finding on the host *cribl*. The log can't tell a Drop function from any other pipeline edit, so every such change counts. The role's own changes fall inside its *cribl* and *cribl_block* marker windows and are suppressed. Used by: *DH Tamper*.
 
 ### `dh_tamper_finish(tamper, now)`
-Groups indicators into findings (one per host, kind and 5-minute bucket), re-checks each finding of the last 7 days against every Ansible marker (a finding within `dh_tamper_window_secs` of a marker is the role's own work and is suppressed), and marks which ones of the last 7 days still need writing to the index (an older one never does: the index keeps 14 days, the collection 30). Used by: *DH Tamper*.
+Groups indicators into findings (one per host, kind and 5-minute bucket) and decides, once, whether each new finding is the role's own work: suppressed when an Ansible marker for its host came at most `dh_tamper_window_secs` before it (or `dh_tamper_marker_slack_secs` after it). A stored finding keeps its suppression on every later run, so a later marker never hides it; if its `dh_tamper` row is gone, the latest `dh:tamper` record (by index time) gives it. Marks which findings of the last 7 days still need writing to the index (an older one never does: the index keeps 14 days, the collection 30). Used by: *DH Tamper*.
 
 ### `dh_tamper_collect_rows`
 Shapes findings for writing to the index. Used by: *DH Tamper*.

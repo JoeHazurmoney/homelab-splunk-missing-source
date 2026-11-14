@@ -1,0 +1,19 @@
+kind,time,host,code,indicator,detail,target_host,action,by,run_id,finding_id,suppressed,it
+finding,NOW-1000,hp,win1102,1102 security log cleared by taylo,channel=Security,,,,,,,
+marker,NOW-280,,,,,hp,cribl,taylorb,r1,,,
+finding,NOW-1000,hq,win1102,1102 security log cleared by taylo,channel=Security,,,,,,,
+index,NOW-1000,,,,,,,,,hq|win1102|1999998900,0,NOW-990
+marker,NOW-280,,,,,hq,cribl,taylorb,r2,,,
+finding,NOW-1000,hr,win1102,1102 security log cleared by taylo,channel=Security,,,,,,,
+marker,NOW-970,,,,,hr,restart,taylorb,r3,,,
+finding,NOW-1000,hs,win1102,1102 security log cleared by taylo,channel=Security,,,,,,,
+marker,NOW-1600,,,,,hs,apps,taylorb,r4,,,
+finding,NOW-1000,ht,win1102,1102 security log cleared by taylo,channel=Security,,,,,,,
+index,NOW-1000,,,,,,,,,ht|win1102|1999998900,0,NOW-990
+index,NOW-1000,,,,,,,,,ht|win1102|1999998900,1,NOW-700
+marker,NOW-280,,,,,ht,cribl,taylorb,r5,,,
+finding,NOW-1000,hu,win1102,1102 security log cleared by taylo,channel=Security,,,,,,,
+index,NOW-1000,,,,,,,,,hu|win1102|1999998900,0,NOW-990
+marker,NOW-1100,,,,,hu,apps,taylorb,r6,,,
+finding,NOW-1000,hv,win1102,1102 security log cleared by taylo,channel=Security,,,,,,,
+marker,NOW-1950,,,,,hv,apps,taylorb,r7,,,

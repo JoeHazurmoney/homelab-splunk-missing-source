@@ -66,13 +66,16 @@ lookup `dh_uf_builds` maps build to version; add a row with each new pinned UF.
 - On a `via=cribl` row, a tamper finding within 15 min of a Cribl outage takes precedence: the row
   reads "Possible deliberate blinding", not "Cribl DOWN".
 - A `via=cribl` row also takes host `cribl`'s tamper findings, so a Drop added in Cribl explains the
-  rows it blinds. But a marker for the row's own host within 15 min silences that Cribl finding for
-  that row.
+  rows it blinds. A marker for the row's own host doesn't silence it.
 
 ## Tamper indicators
 
-Findings within 15 minutes of a silence, outside an Ansible marker window for that host, become
-"possible deliberate blinding":
+Findings within 15 minutes of a silence become "possible deliberate blinding", unless DH Tamper
+marked them as the role's own work. A finding is the role's own work when an Ansible marker for its
+host came at most 15 minutes before it (or up to 60 s after, for clock skew). The role posts its
+marker before each change it makes. This is decided once, when the finding is first stored: a
+marker posted later, for example by a restore run, never hides a finding that already alerted.
+The indicators:
 - **Windows:** 1102 (log cleared), 104, 1100, 4719 (audit policy changed), 4697/7045 (service
   installed), 7036/7040 (SplunkForwarder or EventLog stopped or its start type changed).
 - **Linux:** auditd `DAEMON_END`/`DAEMON_ABORT`, `CONFIG_CHANGE`, `SERVICE_STOP` of SplunkForwarder,

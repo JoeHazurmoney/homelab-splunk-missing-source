@@ -109,7 +109,7 @@ Desktop's NAT hides source addresses, so nothing here is identified by IP.
 | Tag | Hosts | Example | Notes |
 |---|---|---|---|
 | `status` | UF hosts | `--tags status --limit wd2l-recv` | read-only: service, version (rpm or MSI) and build, `last_connect`, `last_close`, apps, FIPS; on Windows also the service account |
-| `stop` / `start` / `restart` | UF hosts | `--tags stop --limit wd2l-recv` | posts a marker before a stop and after a start or restart, so the Overview says "Stopped with Ansible …" |
+| `stop` / `start` / `restart` | UF hosts | `--tags stop --limit wd2l-recv` | posts a marker before each stop, start or restart that changes the service, and again after a start or restart, so the Overview says "Stopped with Ansible …" and the restart's own events aren't tamper findings |
 | `verify` | all | `--tags verify` | read-only: UFs running on the vault's current token and connected through Cribl, their `_internal` seen in Splunk, Cribl healthy, and every expected row seen. Fails on a `MISSING` or `NEVER_SEEN` row whose profile isn't sporadic |
 | `cribl_block` | homepc | see below | a test block in Cribl |
 | `download` | pi5 (`--limit pi5`) | `--tags download --limit pi5` | the UF packages |

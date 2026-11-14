@@ -136,7 +136,9 @@ Open, follow-up issues (not changed in this branch):
   runbook's own fix (run the role) is what hid it. The forward look is needed because some markers
   follow the change they cover: `restart` posts its marker once the UF is back, after the restart's
   `SERVICE_STOP`. Narrowing it (for example: look forward only for `start` and `restart`, or never
-  re-mark a finding that has already alerted) is a design change.
+  re-mark a finding that has already alerted) is a design change. **Fixed after this run** (final
+  review, #49): the role posts its marker before every change, and a finding's suppression is decided
+  once, so a later marker never hides it.
 Ruled (no change):
 - **Reboot tamper noise** (R12, row 3; Taylor's ruling 2026-11-14: keep the throttle per host and
   code, so a second, different tamper code within the hour still alerts). An unmarked reboot raises
