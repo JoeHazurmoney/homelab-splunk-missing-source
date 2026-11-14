@@ -60,6 +60,7 @@ When something is late or missing, the app picks the most likely reason, checkin
 | Added less than 1 h ago: waiting for its first data | Just added to the expected list; no data yet. | None yet: wait up to 1 h for its first data. |
 | Test block until … (data dropped on purpose): *reason* | A test is deliberately dropping this data in Cribl. | Remove the test block when the test ends (Manage, Test blocks tab, gives the command). |
 | Stopped with Ansible at … by … and not started again | Someone ran the role's `stop` and no `start` followed. | Start it again with the role: *ansible-playbook site.yml --tags start --limit host* (this starts the Splunk agent on that host). |
+| Uninstalled with Ansible at … by … and not installed again | Someone ran the role's `uninstall` and no `install` followed; the host stays expected until its rows are retired. | Install it again with the role, or retire its rows (*hl_expected: false*, then *--tags expected*). |
 | The VM is off: Hyper-V event … | Hyper-V reports the VM was turned off, shut down or saved. | Start the VM in Hyper-V, or mute it if it is meant to be off. |
 | Possible deliberate blinding: … just before the data stopped | A tamper sign (a log cleared, auditd stopped, the agent stopped, a big clock step, or for data that passes through Cribl a change to Cribl's routes, pipelines, inputs, outputs or lookups) appeared close to when the data stopped, and not during Ansible work. | Escalate: someone may be hiding activity. |
 | Cribl DOWN: the real state is unknown … | Everything collected (the agents and the UDM) passes through Cribl Stream, and Cribl itself has stopped reporting. So nobody can tell whether this data stopped or just can't get through. HEC data (wd2l, the markers) doesn't use Cribl, so Splunk itself still looks fine. | Check the *cribl* container on HOMEPC (`docker ps --filter name=cribl`), then run the role's *--tags verify --limit homepc*. |
@@ -75,6 +76,8 @@ When something is late or missing, the app picks the most likely reason, checkin
 | The Splunk agent works but this input stopped … | The file is unreadable, moved or rotated; or auditd or rsyslog stopped; or audit rules were removed. | Read the Splunk agent errors about this sourcetype on Host detail. |
 | Never arrived since it was added … | A host without an agent never sent this. | Check that this input is deployed and sending. |
 | Nothing at all from this host (it has no Splunk agent) … | A host without an agent sends nothing at all. | Check the host and its syslog path. |
+| Cribl late: nothing recent from Cribl itself (not yet DOWN) … | The row for Cribl: its own logs are late but not yet missing (the 2 minutes before "Cribl DOWN"). | The same as for Cribl DOWN. |
+| Everything from this host is late (not yet missing; it has no Splunk agent) … | Every stream of a host without an agent is late, none missing yet. | Check the host and its syslog path. |
 | This stream stopped while the host still sends others … | One stream stopped; the host still sends others. | Check the program or input that sends this stream. |
 
 ## The banner: is the data current?

@@ -1,0 +1,5 @@
+entity_id,status,cause_code,cause,action,host_rollup
+host|*|h39a|*|*,MISSING,ansible_uninstall,Uninstalled with Ansible at 2033-05-18 03:23 GMT by taylorb and not installed again,Install it again with the role (ansible-playbook site.yml --tags install --tags apps --tags audit_rules --limit h39a) or retire its rows: set hl_expected false for it and run --tags expected --limit homepc,DOWN
+sourcetype|linux|h39a|syslog|*,MISSING,ansible_uninstall,Uninstalled with Ansible at 2033-05-18 03:23 GMT by taylorb and not installed again,Install it again with the role (ansible-playbook site.yml --tags install --tags apps --tags audit_rules --limit h39a) or retire its rows: set hl_expected false for it and run --tags expected --limit homepc,DOWN
+host|*|h39b|*|*,OK,,,,OK
+sourcetype|linux|h39b|syslog|*,OK,,,,OK
