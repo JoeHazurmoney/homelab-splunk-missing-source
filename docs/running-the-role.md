@@ -213,7 +213,7 @@ docker pull cribl/cribl@sha256:cb2b2e32933e492f439b5825b0c36f420df2fa986fe36d5f3
 ```
 
 Docker Desktop has no credential store over SSH, so the role never pulls images. To check the pull,
-run this. It prints the image ID.
+run this. On HOMEPC, in PowerShell, any folder. It prints the image ID.
 
 ```powershell
 docker image inspect --format "{{.Id}}" cribl/cribl@sha256:cb2b2e32933e492f439b5825b0c36f420df2fa986fe36d5f31fce6755190eb71
@@ -222,7 +222,7 @@ docker image inspect --format "{{.Id}}" cribl/cribl@sha256:cb2b2e32933e492f439b5
 #### Step 6: put the packages on pi5
 
 The packages go in `ansible/files/packages/` on pi5. Git ignores that folder, so a fresh clone
-doesn't have it. Sending files never deletes what is already on pi5. A sent file replaces a file with
+doesn't have it. Sending packages never deletes packages already on pi5. A sent package replaces one with
 the same name. So you can do the two parts below in either order.
 
 **The UF packages.** The `download` tag fetches the Splunk agent ([UF](glossary.md#universal-forwarder-uf))
@@ -286,6 +286,14 @@ UI, turn on remote syslog. The menu path depends on your UniFi version. Use thes
 - Port: `5514`, UDP.
 
 You don't need a new Windows firewall rule. Docker Desktop's existing rule lets the UDM's packets in.
+
+To check it, search in Splunk Web, in the HL Data Health app:
+
+```
+index=network sourcetype="unifi:syslog" host=udm earliest=-15m | head 5
+```
+
+You should see rows within a few minutes, once the UDM logs an event.
 
 If you skip this step, nothing fails. The Overview shows the UDM as missing after an hour. That is
 expected ([status words](glossary.md#status)). Its cause reads "The device answers the network probe
@@ -436,6 +444,9 @@ In the table, "UF hosts" means the groups `uf_linux` and `uf_windows`. "Linux UF
 - **`expected`** builds the expected list from the whole inventory. Then it runs *DH Sync expected*,
   the saved search that merges that list into the app.
 
+**Keep the probe's path.** pi5's UF input watches exactly `/var/log/hl-devprobe/probe.log`. That
+input doesn't follow `hl_probe_dir`. So leave `hl_probe_dir` at its default, or the probe's data stops.
+
 ### `audit-rules` package
 
 The `audit_rules` tag reads the sample rules in `/usr/share/audit-rules/`. They are
@@ -447,12 +458,10 @@ the `audit-rules` package. It must already be on each Linux UF host. To check, r
 ansible uf_linux -m command -a 'rpm -q audit-rules'
 ```
 
-Each host should print a package name and version. If one says the package is not installed, install
-`audit-rules` with dnf on that host. Then run `audit_rules` again. Use the same Ansible form to run
+Each host should print a package name and version. If one is missing it, Ansible prints `FAILED` with
+return code 1 and "package audit-rules is not installed". Then install
+`audit-rules` with dnf on that host, and run `audit_rules` again. Use the same Ansible form to run
 one command on any host ([how to reach a host](runbook-missing-data.md#how-to-reach-a-host)).
-
-**Keep the probe's path.** pi5's UF input watches exactly `/var/log/hl-devprobe/probe.log`. That
-input doesn't follow `hl_probe_dir`. So leave `hl_probe_dir` at its default, or the probe's data stops.
 
 ### Costs of a run
 
@@ -877,7 +886,8 @@ Run the steps in order.
    python3 -c 'import uuid; print(uuid.uuid4())'
    ```
 
-   The last command prints the new token. Edit `$work/vault.yml` with an editor. Copy the old
+   The last command prints the new token. Edit `$work/vault.yml` with an editor that writes no swap file, such as `nano`. Close it before the next
+   command. Copy the old
    `vault_hl_s2s_token` value to a new line, `vault_hl_s2s_token_previous: "<old>"`. Then put the
    new token in `vault_hl_s2s_token`. Then, in the same shell:
 
@@ -888,6 +898,7 @@ Run the steps in order.
    ansible-vault view inventory/group_vars/all/vault.yml | grep -c '^vault_hl_'
    ```
 
+   `rmdir` fails, safely, if the editor left a file in `$work`. Then `shred -u` that file too.
    The last command must print `5`: the four keys plus the previous token. The copy
    `~/vault.before-rotation` is the old vault, still encrypted. Keep it until the rotation is
    finished.

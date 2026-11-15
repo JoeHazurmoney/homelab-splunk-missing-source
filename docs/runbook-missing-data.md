@@ -119,7 +119,7 @@ curl.exe -sk https://127.0.0.1:8088/services/collector/health
 ```
 
 You should see a `wd2l-splunk` line whose status starts with `Up`. The second command prints
-`{"text":"HEC is healthy","code":17}`. If the container isn't listed, or says `Exited`, start it.
+`{"text":"HEC is healthy","code":17}`. If the container isn't listed, it is stopped. Start it.
 On HOMEPC, in PowerShell, any folder:
 
 ```powershell
@@ -135,7 +135,8 @@ check that both containers are on that network, run this on HOMEPC, in PowerShel
 docker network inspect hl-net --format "{{range .Containers}}{{.Name}} {{end}}"
 ```
 
-It should print `wd2l-splunk` and `cribl`. If `wd2l-splunk` is missing, attach it again. On pi5, in
+It should print `wd2l-splunk` and `cribl`. If `cribl` is missing, see [Cribl is down](#cribl-is-down).
+If `wd2l-splunk` is missing, attach it again. On pi5, in
 `~/homelab-splunk-missing-source/ansible`, venv on:
 
 ```bash
@@ -249,8 +250,8 @@ docker ps --filter name=cribl
 docker logs --tail 50 cribl
 ```
 
-A healthy `docker ps` line shows `Up` in its status and the name `cribl`. If the line is missing or
-says `Exited`, pick one option:
+A healthy `docker ps` line shows `Up` in its status and the name `cribl`. If no line is listed, Cribl
+is stopped. Pick one option:
 
 1. **Start it with Docker.** On HOMEPC, in PowerShell, any folder:
 
@@ -358,21 +359,32 @@ user who logged in. Search the minutes around the stop time:
 index=linux host=<host> sourcetype=linux_audit USER_CMD
 ```
 
-**On Windows,** use the steps for your Windows type:
+To turn an `auid` number into a user name, run this on pi5, in `~/homelab-splunk-missing-source/ansible`,
+venv on:
 
-1. On Windows Server, look for event 7036 in the System log. In Splunk Web, in the HL Data Health app:
+```bash
+ansible <host> -m command -a 'getent passwd <auid>'
+```
+
+**On Windows,** pick the option that fits your Windows type. They are alternatives.
+
+**Option A: Windows Server.**
+
+1. Look for event 7036 in the System log. In Splunk Web, in the HL Data Health app:
 
    ```
    index=windows host=<host> source="XmlWinEventLog:System" 7036
    ```
 
-2. Desktop Windows doesn't log 7036 (in this lab: HOMEPC). There, search `_internal` instead:
+**Option B: desktop Windows** (in this lab: HOMEPC). It doesn't log 7036.
+
+1. Search `_internal` instead. In Splunk Web, in the HL Data Health app:
 
    ```
    index=_internal host=<host> "Shutting down splunkd"
    ```
 
-3. That line often arrives only when the UF starts again. So wait for the UF to come back before you
+2. That line often arrives only when the UF starts again. So wait for the UF to come back before you
    search.
 
 ### The agent works but an input is missing
