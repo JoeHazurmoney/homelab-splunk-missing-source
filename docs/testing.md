@@ -60,6 +60,16 @@ cd ansible && ansible-lint --strict && ansible-playbook site.yml --syntax-check
 
 These suites use throwaway objects named `dhtest_*`. They remove them on exit.
 
+More detail on two of them:
+- **`tests/spl/run.sh`** runs every case at a fixed clock.
+- **`tests/spl/dash.sh writes`** covers each step of a Manage write:
+  - the preview;
+  - the confirmation;
+  - the apply;
+  - the admin log;
+  - that a repeated or stale confirmation writes nothing;
+  - the test-block command.
+
 ### Run `tests/spl/run.sh` and `dash.sh`
 
 These suites need Splunk. Deploy the `hl_data_health` app first. Either run the role's `server` tag,
