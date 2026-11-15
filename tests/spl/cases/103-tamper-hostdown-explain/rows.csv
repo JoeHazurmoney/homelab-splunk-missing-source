@@ -1,0 +1,9 @@
+kind,time,host,code,indicator,detail,target_host,action,by,run_id,reason,finding_id,suppressed,it,hd_rank,hd_text,fwd_type,last_heartbeat
+hostdown,NOW-997,ha,,,,,,,,,,,,0,host shutdown: SYSTEM_SHUTDOWN,,
+finding,NOW-1000,hb,win7036,7036 SplunkForwarder Service stopped,,,,,,,,,,,,,
+hostdown,NOW-1021,hb,,,,,,,,,,,,0,host shutdown: restart by taylorb (Operating System: Upgrade (Planned)),,
+hostdown,NOW-999,hb,,,,,,,,,,,,1,host shutdown: the event log service stopped (6006),,
+fwd,,hc,,,,,,,,,,,,,,uf,NOW-600
+hostdown,NOW-700,hc,,,,,,,,,,,,0,host shutdown: SYSTEM_SHUTDOWN,,
+fwd,,hd,,,,,,,,,,,,,,uf,NOW-600
+hostdown,NOW-1700,hd,,,,,,,,,,,,0,host shutdown: SYSTEM_SHUTDOWN,,

@@ -125,6 +125,15 @@ Raise it to link findings that are further apart, which gives more false links. 
 ### `dh_tamper_marker_slack_secs`
 **60 seconds.** A marker up to this long *after* a finding still suppresses it. Markers carry pi5's clock, and findings carry the host's clock. A marker posted later, such as one from a restore run, never hides a finding. Raise it only if the hosts' clocks drift further apart. Used by: `dh_tamper_finish`.
 
+### `dh_tamper_hostdown_before_secs`
+**600 seconds.** A held Splunk agent stop is explained by a host-shutdown record that is at most this long *before* the stop. Raise it to accept older shutdown records. Lower it if a record from an earlier, unrelated shutdown is ever matched. Used by: `dh_tamper_finish`.
+
+### `dh_tamper_hostdown_after_secs`
+**120 seconds.** The same window, after the stop. A Windows 6006 record comes just after the agent stops. Raise it and a later reboot may explain an agent stop that was not part of it. Lower it and a slow shutdown may not be matched. Used by: `dh_tamper_finish`.
+
+### `dh_tamper_settle_secs`
+**600 seconds.** A held Splunk agent stop waits this long after the agent is heard from again. Then, if nothing explains it, it becomes a finding and alerts once. The wait lets late evidence arrive: a Linux shutdown record is only sent when the VM boots. Raise it to wait longer before alerting. Lower it to alert sooner. Used by: `dh_tamper_finish`.
+
 ## Profiles and thresholds
 
 ### `dh_profile_defaults`
@@ -417,6 +426,7 @@ Groups indicators into findings. There is one finding per host, kind and 5-minut
 - A finding is suppressed when an Ansible marker for its host came at most `dh_tamper_window_secs` before it. A marker that came at most `dh_tamper_marker_slack_secs` after it also counts.
 - A stored finding keeps its suppression on every later run. So a later marker never hides it.
 - If the finding's `dh_tamper` row is gone, the latest `dh:tamper` record (by index time) gives the stored state.
+- A Splunk agent stop, and the host-shutdown records that come with it, is held as pending. A marker, a host-shutdown record, or the agent coming back and settling then judges it. A pending finding never alerts. A judged one never changes.
 - It also marks which findings of the last 7 days still need writing to the index. An older finding never does, because the index keeps 14 days and the collection keeps 30.
 
 Used by: *DH Tamper*.

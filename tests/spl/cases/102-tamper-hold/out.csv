@@ -1,0 +1,10 @@
+finding_id,code,state,held,suppressed,explained_by,explanation,back_at,dh_new,indicator
+ha|uf_shutdown|1999998900,uf_shutdown,pending,1,0,,,NOW,0,Splunk agent stopped (shutdown line)
+hb|uf_shutdown|1999998900,uf_shutdown,judged,1,0,,,NOW-600,1,Splunk agent stopped (shutdown line)
+hc|uf_shutdown|1999998900,uf_shutdown,pending,1,0,,,NOW-300,0,Splunk agent stopped (shutdown line)
+hd|uf_shutdown|1999998900,uf_shutdown,pending,1,0,,,,0,Splunk agent stopped (shutdown line)
+he|uf_shutdown|1999299900,uf_shutdown,pending,1,0,,,,0,Splunk agent stopped (shutdown line)
+hf|uf_shutdown|1999998900,uf_shutdown,judged,1,1,role work,Ansible restart by taylorb (run r1),,1,Splunk agent stopped (shutdown line)
+hg|uf_shutdown|1999998900,uf_shutdown,judged,1,1,role work,Ansible restart by taylorb (run r1): patching,,1,Splunk agent stopped (shutdown line)
+hh|uf_shutdown|1999998900,uf_shutdown,,,0,,,,0,Splunk agent stopped (shutdown line)
+hi|svcstop_splunkforwarder|1999998900,svcstop_splunkforwarder,pending,1,0,,,NOW-300,0,Splunk agent stopped (SERVICE_STOP + shutdown line)
