@@ -1,0 +1,3 @@
+host,time,code,indicator,detail
+homepc,NOW-300,uf_shutdown,Splunk agent stopped (shutdown line),index=_internal; component=Shutdown
+wd2l-recv,NOW-200,uf_shutdown,Splunk agent stopped (shutdown line),index=_internal; component=Shutdown

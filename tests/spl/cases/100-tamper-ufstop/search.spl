@@ -1,0 +1,1 @@
+| inputlookup @events@ | eval _time=tonumber(time), _raw=raw | fields _time _raw host | `dh_tamper_ufstop(@fwd@)`

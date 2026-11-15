@@ -403,6 +403,12 @@ Finds Linux tamper indicators:
 
 Used by: *DH Tamper*.
 
+### `dh_tamper_ufstop(fwd)`
+Reads the Splunk agent's own log in `_internal`. The line "Shutting down splunkd" is the agent's own record that it stopped, and it becomes a finding with the code *uf_shutdown*. Only hosts that `fwd` (the *dh_fwd* lookup) lists as a universal forwarder count. A full Splunk server restarts for ordinary reasons, so it never raises a finding. Used by: *DH Tamper*.
+
+### `dh_tamper_hostdown`
+Reads evidence that the whole host shut down, not only the Splunk agent. On Windows that is event 1074 (names the user and the reason) and event 6006 (the event log service stopped). On Linux it is the audit record SYSTEM_SHUTDOWN. A 1074 or SYSTEM_SHUTDOWN ranks first, so it wins over a 6006 when both are close. Used by: *DH Tamper*.
+
 ### `dh_tamper_cribl`
 Reads Cribl's audit log. Any create, update, delete, reorder or upload of routes, pipelines, outputs, inputs or lookups is a finding on the host *cribl*. The log can't tell a Drop function from any other pipeline edit, so every such change counts. The role's own changes fall inside its *cribl* and *cribl_block* marker windows, so they are suppressed. Used by: *DH Tamper*.
 
