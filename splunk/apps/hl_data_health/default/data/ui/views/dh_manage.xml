@@ -1039,13 +1039,13 @@
         "viz_mute_intro": {
             "type": "splunk.markdown",
             "options": {
-                "markdown": "**Mute** an item during planned work, so it does not alert, or change how long it may stay silent before it counts as late (its **limit**). Fill in the form; the preview shows the change; nothing is written until you choose **Apply** under **Confirm**. Analysts may mute; every change is recorded on the Admin log tab. Times are in your Splunk time zone."
+                "markdown": "**Mute** an item during planned work, so it does not alert. You can also change its **limit**: how long it may stay silent before it counts as late. Fill in the form. The preview shows the change. Nothing is written until you choose **Apply** under **Confirm**. Analysts may mute. Every change goes to the Admin log tab. Times use your Splunk time zone."
             }
         },
         "viz_ov_steps": {
             "type": "splunk.markdown",
             "options": {
-                "markdown": "**Preview: fill in the form above.** Choose the **Host**, then the **Item** (the host's own row, *whole host*, mutes everything it sends). Choose the **Action**, how long, and write a **Reason**. The preview of the change then appears here."
+                "markdown": "**Preview: fill in the form above.** Choose the **Host**, then the **Item**. The host's own row, *whole host*, covers everything it sends. Choose the **Action**. For a mute, choose how long. For a limit, type the new limit. Write a **Reason**. The preview then appears here."
             },
             "containerOptions": {
                 "visibility": {
@@ -1064,7 +1064,7 @@
             "options": {
                 "count": 25
             },
-            "description": "The change you are about to make, before and after, and whether it can be applied. Nothing is written yet. Guide (project repo): docs/data-health/dashboards.md > Manage > Mute or limit: preview",
+            "description": "The change you are about to make, before and after. It also says whether you can apply it. Nothing is written yet. Guide (project repo): docs/data-health/dashboards.md > Manage > Mute or limit: preview",
             "containerOptions": {
                 "visibility": {
                     "showConditions": [
@@ -1129,13 +1129,13 @@
         "viz_ex_intro": {
             "type": "splunk.markdown",
             "options": {
-                "markdown": "**Add an expected row** (needs the dh_admin role): tell the app about data it should expect, so it alerts when that data stops. Rows that Ansible manages are changed in the Ansible inventory, not here. Nothing is written until you choose **Apply** under **Confirm**."
+                "markdown": "**Add an expected row** (needs the dh_admin role) to tell the app what data to expect. The app then alerts when that data stops. Ansible manages some rows. Change those in the Ansible inventory, not here. Nothing is written until you choose **Apply** under **Confirm**."
             }
         },
         "viz_ex_steps": {
             "type": "splunk.markdown",
             "options": {
-                "markdown": "**Preview: fill in the form above.** Choose the **Level**, enter the **Host name** (and the sourcetype or source for those levels), pick a **Profile**, and write a **Reason**. Optional boxes keep \"-\" for none. The preview of the change then appears here."
+                "markdown": "**Preview: fill in the form above.** Choose the **Level**. Enter the **Host name**. For a sourcetype or source row, fill in that box too. Pick a **Profile** and write a **Reason**. Optional boxes keep `-`, which means none. The preview then appears here."
             },
             "containerOptions": {
                 "visibility": {
@@ -1154,7 +1154,7 @@
             "options": {
                 "count": 25
             },
-            "description": "The expected-list row you are about to add or change, and whether it can be applied. Nothing is written yet. Guide (project repo): docs/data-health/dashboards.md > Manage > Add an expected row: preview",
+            "description": "The expected-list row you are about to add or change. It also says whether you can apply it. Nothing is written yet. Guide (project repo): docs/data-health/dashboards.md > Manage > Add an expected row: preview",
             "containerOptions": {
                 "visibility": {
                     "showConditions": [
@@ -1203,18 +1203,18 @@
             "options": {
                 "count": 25
             },
-            "description": "Data that arrives but that nobody listed as expected. Adopt it below if it should be watched. Guide (project repo): docs/data-health/dashboards.md > Manage > Unregistered: seen in the last 7 d but not expected"
+            "description": "Data that arrives but is not on the expected list. Adopt it below if it should be watched. Guide (project repo): docs/data-health/dashboards.md > Manage > Unregistered: seen in the last 7 d but not expected"
         },
         "viz_ad_intro": {
             "type": "splunk.markdown",
             "options": {
-                "markdown": "**Adopt an unregistered item** (needs the dh_admin role): add a row of the table above to the expected list, with the collection and profile the app suggests. Nothing is written until you choose **Apply** under **Confirm**."
+                "markdown": "**Adopt an unregistered item** (needs the dh_admin role) to add a row of the table above to the expected list. The app suggests the collection and profile. Nothing is written until you choose **Apply** under **Confirm**."
             }
         },
         "viz_ad_steps": {
             "type": "splunk.markdown",
             "options": {
-                "markdown": "**Preview: fill in the form above.** Choose the **Unregistered item**, its **Criticality**, and write a **Reason**. The preview of the change then appears here."
+                "markdown": "**Preview: fill in the form above.** Choose the **Unregistered item** and its **Criticality**. Write a **Reason**. The preview then appears here."
             },
             "containerOptions": {
                 "visibility": {
@@ -1233,7 +1233,7 @@
             "options": {
                 "count": 25
             },
-            "description": "The expected row that adopting this item would add, and whether it can be applied. Nothing is written yet. Guide (project repo): docs/data-health/dashboards.md > Manage > Adopt: preview",
+            "description": "The expected row that adopting this item would add. It also says whether you can apply it. Nothing is written yet. Guide (project repo): docs/data-health/dashboards.md > Manage > Adopt: preview",
             "containerOptions": {
                 "visibility": {
                     "showConditions": [
@@ -1282,18 +1282,18 @@
             "options": {
                 "count": 25
             },
-            "description": "Expected items with no data for 7 days or more, or never seen though expected for 7 days, muted ones included. One that is gone for good can be retired with the form below. Guide (project repo): docs/data-health/dashboards.md > Manage > Retirement candidates: expected but silent for 7 d or more"
+            "description": "Expected items with no data for 7 days or more. It also lists items never seen in the 7 days they were expected. Muted items are included. Retire one that is gone for good with the form below. Guide (project repo): docs/data-health/dashboards.md > Manage > Retirement candidates: expected but silent for 7 d or more"
         },
         "viz_rt_intro": {
             "type": "splunk.markdown",
             "options": {
-                "markdown": "**Retire an expected item** (needs the dh_admin role) when a host or a stream is gone for good: it stops being expected, so it stops alerting, and its row stays on the list, disabled, for its history. Nothing is deleted. A whole host retires with all its rows. If the Ansible inventory still lists it, the retirement holds until the inventory drops it, so remove it there too. **Undo a retirement** brings it back. Nothing is written until you choose **Apply** under **Confirm**."
+                "markdown": "**Retire an expected item** (needs the dh_admin role) when a host or a stream is gone for good. The app stops expecting it, so it stops alerting. Its row stays on the list, disabled, for its history. Nothing is deleted. A whole host retires with all its rows. If the Ansible inventory still lists the item, the retirement holds until the inventory drops it. Remove it there too. **Undo a retirement** brings it back. Nothing is written until you choose **Apply** under **Confirm**."
             }
         },
         "viz_rt_steps": {
             "type": "splunk.markdown",
             "options": {
-                "markdown": "**Preview: fill in the form above.** Choose **Retire** or **Undo a retirement**, then the **Expected item** (a whole host, or one of its rows), and write a **Reason**. The preview of the change then appears here."
+                "markdown": "**Preview: fill in the form above.** Choose **Retire** or **Undo a retirement**. Then choose the **Expected item**: a whole host, or one of its rows. Write a **Reason**. The preview then appears here."
             },
             "containerOptions": {
                 "visibility": {
@@ -1312,7 +1312,7 @@
             "options": {
                 "count": 25
             },
-            "description": "The rows you are about to retire or bring back, and whether it can be applied. Nothing is written yet. Guide (project repo): docs/data-health/dashboards.md > Manage > Retire: preview",
+            "description": "The rows you are about to retire or bring back. It also says whether you can apply it. Nothing is written yet. Guide (project repo): docs/data-health/dashboards.md > Manage > Retire: preview",
             "containerOptions": {
                 "visibility": {
                     "showConditions": [
@@ -1355,13 +1355,13 @@
         "viz_bk_intro": {
             "type": "splunk.markdown",
             "options": {
-                "markdown": "A **test block** throws a host's real data away in Cribl Stream, before it reaches Splunk (linux, windows and network indexes only), so you can check that the app notices the data going missing. The Ansible role sets it: fill in the form, check the preview, then run the **command** it shows on pi5, in the repository's ansible folder. The block starts in Cribl about 20 seconds later and ends by itself; the table below lists it once the command has run. It needs the dh_admin role. Remove it as soon as the test is over: in production, a block is a way to blind monitoring."
+                "markdown": "A **test block** throws a host's real data away in Cribl Stream, before it reaches Splunk. It works for the linux, windows and network indexes only. Use it to check that the app notices missing data. This form writes nothing. Check the preview, then run the **command** it shows on pi5, in the repository's ansible folder. The block takes effect within about a minute and ends by itself. **Current test blocks** lists it once the command has run. It needs the dh_admin role. Remove a block as soon as the test is over. In production, a block is a way to blind monitoring."
             }
         },
         "viz_bk_steps": {
             "type": "splunk.markdown",
             "options": {
-                "markdown": "**Preview: fill in the form above.** Choose **Add** or **Remove**, the **Host** and the **Block level**; for one sourcetype or source, choose it in the next list (it fills from the host's data of the last 24 h, shown below). Write a **Reason**. The preview of the change then appears here."
+                "markdown": "**Preview: fill in the form above.** Choose the **Action** (add or remove), the **Host** and the **Block level**. For one sourcetype or source, choose it in the next list. That list fills from the host's data of the last 24 h, shown below. Write a **Reason**. The preview then appears here."
             },
             "containerOptions": {
                 "visibility": {
@@ -1380,7 +1380,7 @@
             "options": {
                 "count": 25
             },
-            "description": "The block you are about to add or remove, and whether it can be applied. Nothing is written yet. Guide (project repo): docs/data-health/dashboards.md > Manage > Test block: preview",
+            "description": "The block you are about to add or remove. It also says whether the command below is ready. This form never writes anything. Guide (project repo): docs/data-health/dashboards.md > Manage > Test block: preview",
             "containerOptions": {
                 "visibility": {
                     "showConditions": [
@@ -1398,7 +1398,7 @@
             "options": {
                 "count": 25
             },
-            "description": "The command that sets or removes this block, once the preview says OK. Run it on pi5; nothing is written from here. Guide (project repo): docs/data-health/dashboards.md > Manage > Test block: command",
+            "description": "The command that sets or removes this block, once the preview says OK. Run it on pi5. Nothing is written from here. Guide (project repo): docs/data-health/dashboards.md > Manage > Test block: command",
             "containerOptions": {
                 "visibility": {
                     "showConditions": [
@@ -1416,7 +1416,7 @@
             "options": {
                 "count": 25
             },
-            "description": "The exact source names the chosen host sent in the last 24 h; a source block must use one of them. Guide (project repo): docs/data-health/dashboards.md > Manage > Raw sources of the host (24 h)"
+            "description": "The exact source names the chosen host sent in the last 24 h. A source block must use one of them. Guide (project repo): docs/data-health/dashboards.md > Manage > Raw sources of the host (24 h)"
         },
         "viz_blocks": {
             "type": "splunk.table",
@@ -1427,7 +1427,7 @@
             "options": {
                 "count": 25
             },
-            "description": "Data that is being thrown away on purpose for a test. Guide (project repo): docs/data-health/dashboards.md > Manage > Current test blocks"
+            "description": "Test blocks in force, and any that ended but are not cleared yet. A block throws data away on purpose. Guide (project repo): docs/data-health/dashboards.md > Manage > Current test blocks"
         },
         "viz_log": {
             "type": "splunk.table",

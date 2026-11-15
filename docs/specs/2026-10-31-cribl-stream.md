@@ -1,5 +1,10 @@
 # Cribl Stream in the data path: design addendum
 
+> **This is a design record.** It is the Cribl Stream addendum as approved on 2026-10-31, kept as
+> written. It is not kept up to date. Where it differs from the docs, the docs are right. For how the
+> system behaves now, read the [README](../../README.md), [running-the-role.md](../running-the-role.md)
+> and [data-health-design.md](../data-health-design.md).
+
 Status: **approved** by Taylor 2026-10-31, with the documentation additions in §11. Amends [the approved spec](2026-10-30-design.md). Once Taylor approves it, its changes are folded into that spec in place (§3–§8, §11, §12, §14), and this file stays as the record of why.
 
 ## 1. Context

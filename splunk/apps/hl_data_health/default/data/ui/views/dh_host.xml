@@ -1,10 +1,10 @@
 <dashboard version="2" theme="dark">
     <label>Host detail</label>
-    <description>Everything about one host: what it should send and how late each item is, its data over 24 hours, its Splunk agent, recent agent errors, tamper findings, status changes and Hyper-V events.</description>
+    <description>Everything about one host. It shows what the host should send and how late each item is, its data over 24 hours, its Splunk agent and agent errors, tamper findings, status changes and Hyper-V events.</description>
     <definition><![CDATA[
 {
     "title": "Host detail",
-    "description": "Everything about one host: what it should send and how late each item is, its data over 24 hours, its Splunk agent, recent agent errors, tamper findings, status changes and Hyper-V events.",
+    "description": "Everything about one host. It shows what the host should send and how late each item is, its data over 24 hours, its Splunk agent and agent errors, tamper findings, status changes and Hyper-V events.",
     "inputs": {
         "input_host": {
             "type": "input.dropdown",
@@ -115,7 +115,7 @@
         "viz_children": {
             "type": "splunk.table",
             "title": "Expected data from this host",
-            "description": "Each stream this host should send: its status and how late it is against its limit. Guide (project repo): docs/data-health/dashboards.md > Host detail > Expected data from this host",
+            "description": "Each item this host should send: its status, and how late it is against its limit. Times in the Cause use the server's time zone, not yours. Guide (project repo): docs/data-health/dashboards.md > Host detail > Expected data from this host",
             "dataSources": {
                 "primary": "ds_children"
             },
@@ -132,7 +132,7 @@
             "options": {
                 "stackMode": "stacked"
             },
-            "description": "How much data arrived from this host over the day. Guide (project repo): docs/data-health/dashboards.md > Host detail > Events in the last 24 h by sourcetype"
+            "description": "Events from this host over the last 24 hours, by sourcetype. Guide (project repo): docs/data-health/dashboards.md > Host detail > Events in the last 24 h by sourcetype"
         },
         "viz_fwd": {
             "type": "splunk.table",
@@ -143,7 +143,7 @@
             "options": {
                 "count": 25
             },
-            "description": "Version and last contact of the Splunk agent and the last Ansible and VM events. Guide (project repo): docs/data-health/dashboards.md > Host detail > Forwarder (the Splunk agent on the host)"
+            "description": "The Splunk agent's version and last contact, and the last Ansible and VM events. Guide (project repo): docs/data-health/dashboards.md > Host detail > Forwarder (the Splunk agent on the host)"
         },
         "viz_errors": {
             "type": "splunk.table",
@@ -154,7 +154,7 @@
             "options": {
                 "count": 25
             },
-            "description": "What the Splunk agent on this host complained about. Guide (project repo): docs/data-health/dashboards.md > Host detail > Latest Splunk agent errors and warnings (24 h)"
+            "description": "The latest errors and warnings this host's Splunk agent wrote about itself. Read them before you change anything. Guide (project repo): docs/data-health/dashboards.md > Host detail > Latest Splunk agent errors and warnings (24 h)"
         },
         "viz_tamper": {
             "type": "splunk.table",
@@ -165,7 +165,7 @@
             "options": {
                 "count": 25
             },
-            "description": "Signs that someone may have switched off logging here. Guide (project repo): docs/data-health/dashboards.md > Host detail > Tamper findings on this host"
+            "description": "Signs that someone may have switched off logging on this host. Findings that Ansible work explains are left out. Guide (project repo): docs/data-health/dashboards.md > Host detail > Tamper findings on this host"
         },
         "viz_transitions": {
             "type": "splunk.table",
@@ -176,7 +176,7 @@
             "options": {
                 "count": 25
             },
-            "description": "When each stream went late or missing and when it came back. Guide (project repo): docs/data-health/dashboards.md > Host detail > Status changes (7 d)"
+            "description": "When each item went late or missing, and when it came back. Guide (project repo): docs/data-health/dashboards.md > Host detail > Status changes (7 d)"
         },
         "viz_hyperv": {
             "type": "splunk.table",
