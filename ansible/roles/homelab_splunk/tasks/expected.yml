@@ -90,7 +90,8 @@
     $rows = Invoke-HlSearch -App hl_data_health -Spl '| savedsearch "DH Sync expected"'
     $r = $rows | Select-Object -First 1
     if ($null -eq $r) { throw 'DH Sync expected returned no result' }
-    @{ written = [int]$r.written; held = [int]$r.held; shadowed = [int]$r.shadowed; changes = @(@($r.changes) | Where-Object { $_ }) } | ConvertTo-Json -Compress
+    $changes = @(@($r.changes) | Where-Object { $_ })
+    @{ written = [int]$r.written; held = [int]$r.held; shadowed = [int]$r.shadowed; changes = $changes } | ConvertTo-Json -Compress
   register: hl_exp_sync
   changed_when: (hl_exp_sync.stdout | from_json).written > 0
 
