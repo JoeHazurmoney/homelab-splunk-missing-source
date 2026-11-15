@@ -89,7 +89,7 @@ panels() {
     args=()
     case $view in
       dh_host) args=("host=$host") ;;
-      dh_manage) args=("ov_host=$host" "ov_entity=host|*|$host|*|*" "bk_host=$host" "ov_reason=panel check" "ex_reason=panel check" "ad_reason=panel check" "bk_reason=panel check" "ex_host=dhtest-panel" "ad_entity=${unreg:-sourcetype|linux|dhtest-panel|syslog|*}") ;;
+      dh_manage) args=("ov_host=$host" "ov_entity=host|*|$host|*|*" "bk_host=$host" "ov_reason=panel check" "ex_reason=panel check" "ad_reason=panel check" "bk_reason=panel check" "rt_reason=panel check" "rt_entity=host|*|$host|*|*" "ex_host=dhtest-panel" "ad_entity=${unreg:-sourcetype|linux|dhtest-panel|syslog|*}") ;;
     esac
     # Searches run as jobs; chains run as post-process searches on their base's job, as in Studio.
     while IFS=$'\t' read -r ds base spl; do
@@ -197,7 +197,7 @@ w_run() {
 }
 col() { awk -F, -v n="$1" 'NR == 1 { for (i = 1; i <= NF; i++) { gsub(/"/, "", $i); c[$i] = i } next } { v = $c[n]; gsub(/"/, "", v); print v }'; }
 # ccol <name>: like col, for CSV whose cells may hold commas (a real CSV reader).
-ccol() { python -c 'import csv, sys; [print(r.get(sys.argv[1], "")) for r in csv.DictReader(sys.stdin)]' "$1"; }
+ccol() { PYTHONIOENCODING=utf-8 python -c 'import csv, sys; [print(r.get(sys.argv[1], "")) for r in csv.DictReader(sys.stdin)]' "$1" | tr -d '\r'; }
 expect() { # expect <label> <got> <want-regex>
   if printf '%s' "$2" | grep -Eq -- "$3"; then echo "PASS $1"; else echo "FAIL $1: got '$2', want /$3/"; WFAIL=1; fi
 }
@@ -306,7 +306,7 @@ dhtest-w4|linux_secure|/var/log/secure.1,%s,writes test,admin
   expect "retire confirmation offers one Apply line" "$res" '^Apply: retire dhtest-w5: whole host \(2 rows\)$'
   n0=$(kv_get dhtest_kv_nonce 'table nonce' | sed -n 2p)
   res=$(w_run ds_rt_apply "${rt[@]}" "rt_confirm=$tok" | ccol Result | sort | tr '\n' ';')
-  expect "retire applied to both rows" "$res" '^Done: Retire dhtest-w5 . auth \(linux\);Done: Retire dhtest-w5 . syslog \(linux\);$'
+  expect "retire applied to both rows" "$res" '^Done: Retire dhtest-w5 .{1,3} auth \(linux\);Done: Retire dhtest-w5 .{1,3} syslog \(linux\);$'
   res=$(kv_get dhtest_kv_expected 'search host=dhtest-w5 | sort entity_id | eval e=sourcetype.":".managed_by.":".enabled.":".retired_by.":".retired_hold.":".retired_ticket.":".if(expected_since<now()-8000, "kept", "new") | stats list(e) as e | eval e=mvjoin(e, " ")' | sed -n 2p)
   expect "retired rows kept, disabled, held, owner kept" "$res" '^"?auth:ui:0:admin:1:CHG-R:kept syslog:ansible:0:admin:1:CHG-R:kept"?$'
   n1=$(kv_get dhtest_kv_nonce 'table nonce' | sed -n 2p)
@@ -316,7 +316,7 @@ dhtest-w4|linux_secure|/var/log/secure.1,%s,writes test,admin
   rt=("rt_action=unretire" "rt_entity=host|*|dhtest-w5|*|*" "rt_reason=writes test undo" "rt_ticket=-")
   tok=$(w_run ds_rt_plan "${rt[@]}" | ccol dh_token | sort -u)
   res=$(w_run ds_rt_apply "${rt[@]}" "rt_confirm=$tok" | ccol Result | sort | tr '\n' ';')
-  expect "undo applied to both rows" "$res" '^Done: Undo retirement dhtest-w5 . auth \(linux\);Done: Undo retirement dhtest-w5 . syslog \(linux\);$'
+  expect "undo applied to both rows" "$res" '^Done: Undo retirement dhtest-w5 .{1,3} auth \(linux\);Done: Undo retirement dhtest-w5 .{1,3} syslog \(linux\);$'
   res=$(kv_get dhtest_kv_expected 'search host=dhtest-w5 | sort entity_id | eval e=sourcetype.":".managed_by.":".enabled.":".coalesce(retired_by, "-").":".retired_hold.":".if(expected_since<now()-8000, "kept", "new") | stats list(e) as e | eval e=mvjoin(e, " ")' | sed -n 2p)
   expect "undo: the UI row is expected again, the Ansible row waits for the sync" "$res" '^"?auth:ui:1:-:0:new syslog:ansible:0:admin:0:kept"?$'
   res=$(kv_get dhtest_kv_admin_log 'stats count')
