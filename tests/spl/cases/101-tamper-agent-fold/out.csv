@@ -1,0 +1,10 @@
+finding_id,code,time,events,fold_events,indicator,dh_new
+ha|uf_shutdown|1999998900,uf_shutdown,NOW-1003,2,1,Splunk agent stopped (shutdown line + SERVICE_STOP),1
+hb|svcstop_splunkforwarder|1999998900,svcstop_splunkforwarder,NOW-1000,2,1,Splunk agent stopped (SERVICE_STOP + shutdown line),0
+hc|win7036|1999998900,win7036,NOW-1000,2,1,Splunk agent stopped (7036 + shutdown line),1
+hd|win7036|1999998900,win7036,NOW-1000,1,,7036 Windows Event Log stopped,1
+hd|uf_shutdown|1999998900,uf_shutdown,NOW-990,1,,Splunk agent stopped (shutdown line),1
+he|uf_shutdown|1999998900,uf_shutdown,NOW-1000,1,,Splunk agent stopped (shutdown line),1
+he|uf_shutdown|1999999200,uf_shutdown,NOW-600,1,,Splunk agent stopped (shutdown line),1
+hf|svcstop_splunkforwarder|1999998000,svcstop_splunkforwarder,NOW-2000,1,,SERVICE_STOP splunkforwarder,1
+hf|uf_shutdown|1999998900,uf_shutdown,NOW-1000,1,,Splunk agent stopped (shutdown line),1

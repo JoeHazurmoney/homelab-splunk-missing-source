@@ -424,6 +424,8 @@ Used by: *DH Tamper*.
 ### `dh_tamper_fold(now)`
 One service install logs two Windows events: a 7045 (System log) and a 4697 (Security log). This step puts the pair into one finding, "7045+4697 service installed: …". Its detail holds both event IDs. The two events match on the service's key name or its program path. They must be at most `dh_tamper_window_secs` apart. Either event can arrive first. If one half is already stored and alerted, the other half joins that finding. So a service install alerts once. Findings stored before this step existed stay as they are. Used by: `dh_tamper_finish`.
 
+It also folds the Splunk agent stop. The agent can log a shutdown line, a SERVICE_STOP and a 7036 stop for the same stop. If two of those different codes are on one host within `dh_tamper_window_secs`, they make one finding, "Splunk agent stopped (SERVICE_STOP + shutdown line)". The parts are in time order. A 7036 for another service (such as the event log) never folds, and two lines of the same code never fold with each other.
+
 ### `dh_tamper_collect_rows`
 Shapes findings for writing to the index. Used by: *DH Tamper*.
 
