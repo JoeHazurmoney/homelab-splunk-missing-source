@@ -445,11 +445,10 @@ The rules:
 
 Timing:
 
-- Cribl applies a set or a clear about 15–17 s after the role writes it to Cribl. That is the
-  role's own figure for the API write alone.
-- The [fault-injection run](records/2026-11-fault-injection-run.md) timed the whole path. The drop
-  began 28–45 s after the play's time stamp, which adds the API write to Cribl's refresh. So allow
-  up to about 45 s.
+- A set or a clear takes effect in Cribl about 15–17 s after the role's API update. That figure
+  comes from an early spike.
+- The [fault-injection run](records/2026-11-fault-injection-run.md) saw 28–45 s from the play's
+  `until` time to the first dropped event. That includes the API write. So allow up to about 45 s.
 - A block ends exactly at its "until" time, because Cribl checks the expiry on each event.
 - Nothing prunes Cribl's table on a schedule. Expired rows leave it at the next `cribl_block` run.
 

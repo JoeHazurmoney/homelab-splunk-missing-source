@@ -108,6 +108,10 @@ ansible-playbook site.yml --tags start --limit <host>
 
 `<host>` is the host's inventory name, such as `wd2l-recv`.
 
+**If the start fails,** the `start` marker posted before it becomes the host's last marker. The
+cause then moves to a general Splunk agent cause
+([details](running-the-role.md#stop-start-and-restart)).
+
 ### Put back a UF that Ansible uninstalled
 
 First check who removed it. In Splunk Web, in the HL Data Health app:
@@ -128,7 +132,7 @@ pick one:
 - **Retire its rows,** if the host is gone for good. The steps are in
   [Retiring a host](running-the-role.md#retiring-a-host).
 
-**If the start or install fails,** the marker posted before it becomes the host's last marker. The
+**If the install fails,** the `install` marker posted before it becomes the host's last marker. The
 cause then moves to a general Splunk agent cause
 ([details](running-the-role.md#stop-start-and-restart)).
 
