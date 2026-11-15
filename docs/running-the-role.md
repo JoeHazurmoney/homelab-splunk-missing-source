@@ -347,19 +347,27 @@ On HOMEPC, in PowerShell, in the repo folder:
 
 ## 2. Deploy
 
+**Warning: a deploy can restart splunkd and lose UDP syslog for a short time.** The UDM sends
+[UDP syslog](glossary.md#syslog-udp-syslog), and nobody resends a line lost in the gap. See
+[Costs of a run](#costs-of-a-run).
+
 A plain run deploys everything. On pi5, in `~/homelab-splunk-missing-source/ansible`, venv on:
 
 ```bash
 ansible-playbook site.yml
 ```
 
-That is the same as `--tags deploy`. It runs the tags below, in this order. None of them removes
-anything. Each tag can also run alone. On pi5, in `~/homelab-splunk-missing-source/ansible`, venv on:
+That is the same as `--tags deploy`. Every deploy task carries the tag `deploy`. The run goes through
+the tags below, in this order. None of them removes anything. A few restart a service when its config
+changed. Each tag can also run alone. On pi5, in `~/homelab-splunk-missing-source/ansible`, venv on:
 
 ```bash
 ansible-playbook site.yml --tags apps --limit wd2l-recv
 ansible-playbook site.yml --tags install --limit homepc
 ```
+
+In the table, "UF hosts" means the groups `uf_linux` and `uf_windows`. "Linux UF hosts" means
+`uf_linux`. [Hosts in this lab](architecture.md#hosts-in-this-lab) lists the names.
 
 | Tag | Runs on | What it does | Needs first |
 |---|---|---|---|
@@ -368,10 +376,38 @@ ansible-playbook site.yml --tags install --limit homepc
 | `cribl` | homepc | Deploys the `cribl` container and its config. | The image ([step 5](#step-5-pull-the-cribl-image)), `hl-net` and the vault. |
 | `install` | UF hosts | Installs the pinned UF and proves it connects through Cribl. | The UF package on pi5. Cribl up. |
 | `apps` | UF hosts | Deploys the TAs and the role's input apps. | The TA packages on pi5, and `install`. |
-| `audit_rules` | Linux UF hosts | Loads the [hardened audit rules](glossary.md#hardened-audit-rules). | auditd's `audit-rules` package. |
+| `audit_rules` | Linux UF hosts | Loads the [hardened audit rules](glossary.md#hardened-audit-rules). | The [`audit-rules` package](#audit-rules-package). |
 | `audit_policy` | homepc | Turns on a focused set of Windows audit policy. | The elevated SSH session. |
 | `probe` | pi5 | Installs the [device probe](glossary.md#device-probe-hl-devprobe). | `syslog_devices` in the inventory. |
 | `expected` | homepc | Builds and syncs the [expected list](glossary.md#expected-list). | `server`. |
+
+### First deploy: what you should see
+
+1. **The recap.** Each host ends with `failed=0` and `unreachable=0` in the `PLAY RECAP`:
+
+   ```
+   wd2l-recv : ok=... changed=... unreachable=0 failed=0 skipped=... rescued=0 ignored=0
+   ```
+
+   If `failed` isn't 0, read the first red error, then see [Troubleshooting](#6-troubleshooting).
+2. **Run `verify`.** You don't need to wait first. While every row is [PENDING](glossary.md#pending-the-gate),
+   `verify` waits up to 150 s (`hl_verify_status_wait`) and checks every 15 s. A status needs up to
+   about 2 min to show after data arrives ([why](data-health-design.md#how-long-until-late-missing-or-down)).
+   On pi5, in `~/homelab-splunk-missing-source/ansible`, venv on:
+
+   ```bash
+   ansible-playbook site.yml --tags verify
+   ```
+
+3. **A pass** ends with `failed=0`. A debug line lists any LATE rows and any
+   [sporadic](glossary.md#sporadic) rows that are quiet. They don't fail the run.
+4. **"Not evaluated" is a failure.** It means every row was still PENDING after 150 s. Wait 5 min for
+   *DH Evaluate*, then run `verify` again. Repeat until it passes. If it keeps failing, read the
+   Overview's [banner](data-health/dashboards.md#the-banner-is-the-data-current).
+5. **A healthy Overview** shows a green banner that starts "Up to date". The *Needs attention* table is
+   empty. Items that haven't sent anything yet read PENDING for their first hour. That is normal.
+
+[Verify](#verify) says exactly what `verify` fails on.
 
 ### What each deploy tag does
 
@@ -379,23 +415,40 @@ ansible-playbook site.yml --tags install --limit homepc
   restarts splunkd only when `indexes`, `inputs`, `props` or `web` conf changes. Otherwise it reloads.
 - **`server_network`** creates `hl-net` and attaches `wd2l-splunk` to it live. It attaches it again
   if needed.
-- **`cribl`** runs the container with compose, the image by digest and 2 workers. It sets Cribl's
-  admin password and pushes the repo's `cribl/` config. After a change it runs a self-test
-  (`hl_cribl_selftest`, below).
+- **`cribl`** runs the container with Docker Compose, the image by digest and 2
+  [workers](glossary.md#worker). It sets Cribl's admin password and pushes the repo's `cribl/` config.
+  After a change it runs a self-test (`hl_cribl_selftest`, below).
 - **`install`** installs the pinned UF and the app `hl_uf_outputs`. That app sends to Cribl, with the
-  S2S token and `useACK`. On a host whose kernel runs in [FIPS mode](glossary.md#fips-mode), the UF
-  gets FIPS mode too. `install` also sets boot-start and, on Linux, the tamper audit rules.
+  S2S token and `useACK`, which makes the UF resend until Cribl confirms each batch. On a host whose
+  kernel runs in [FIPS mode](glossary.md#fips-mode), the UF gets FIPS mode too. `install` also sets the
+  UF to start at boot. On Linux, it adds the audit rules that watch the UF's own files.
 - **`apps`** deploys the TAs unchanged, plus the role's input apps. It restarts the UF only when
   something changed.
 - **`audit_rules`** writes the hardened audit rules to `/etc/audit/rules.d/zz-hl-zz-stig.rules`. They
   are the `audit-rules` package's sample rules plus privileged-command rules. The file loads last on
-  purpose. The tag rolls back if wd2l's rules would drop.
+  purpose. The tag undoes itself if it would remove any of wd2l's audit rules.
 - **`audit_policy`** backs up `auditpol` once. Then it turns on the focused subset. It only adds
   settings.
-- **`probe`** installs `hl-devprobe`, a systemd timer on pi5. Every 60 s it pings each syslog device.
+- **`probe`** installs `hl-devprobe`, a [systemd timer](glossary.md#systemd-timer) on pi5. Every 60 s it
+  pings each syslog device.
   It writes the result to `/var/log/hl-devprobe/probe.log`, which pi5's UF reads. The devices are
   `syslog_devices` in `inventory/group_vars/splunk_server.yml`.
-- **`expected`** builds the expected list from the whole inventory. Then it runs *DH Sync expected*.
+- **`expected`** builds the expected list from the whole inventory. Then it runs *DH Sync expected*,
+  the saved search that merges that list into the app.
+
+### `audit-rules` package
+
+The `audit_rules` tag reads the sample rules in `/usr/share/audit-rules/`. The role doesn't install
+the `audit-rules` package. It must already be on each Linux UF host. To check, run this on pi5, in
+`~/homelab-splunk-missing-source/ansible`, venv on:
+
+```bash
+ansible uf_linux -m command -a 'rpm -q audit-rules'
+```
+
+Each host should print a package name and version. If one says the package is not installed, install
+`audit-rules` with dnf on that host. Then run `audit_rules` again. Use the same Ansible form to run
+one command on any host ([how to reach a host](runbook-missing-data.md#how-to-reach-a-host)).
 
 **Keep the probe's path.** pi5's UF input watches exactly `/var/log/hl-devprobe/probe.log`. That
 input doesn't follow `hl_probe_dir`. So leave `hl_probe_dir` at its default, or the probe's data stops.
@@ -403,8 +456,11 @@ input doesn't follow `hl_probe_dir`. So leave `hl_probe_dir` at its default, or 
 ### Costs of a run
 
 - A rerun with nothing to change restarts nothing.
-- A `server` run that restarts splunkd pauses Cribl for about 2 min 14 s. UDP syslog (the UDM) sent
+- A `server` run that restarts splunkd pauses Cribl for about 2 min 13 s. UDP syslog (the UDM) sent
   in that time is lost. UF data arrives up to 2.5 min late.
+- A run restarts a service only when that service's config changed. These tags can restart one:
+  `server` (splunkd), `cribl` (Cribl), `install` (a UF, when its outputs changed) and `apps` (a UF,
+  when something changed).
 - A `cribl` run that changes a file does a plain `docker restart cribl`. That costs about 12 s of UDP
   syslog.
 - Both post markers, so the app knows the gap was the role's own work.
@@ -426,14 +482,16 @@ argument check, which runs on every run.
 ### Choosing hosts with `--limit`
 
 - `--limit <host>` or `--limit uf_linux` runs on only those hosts. `<host>` is an inventory name,
-  such as `wd2l-recv`.
+  such as `wd2l-recv`. [Hosts in this lab](architecture.md#hosts-in-this-lab) lists them. On pi5,
+  `ansible-inventory --graph` shows the groups and their hosts.
 - `expected` runs on homepc only. It reads every host's inventory, so use `--limit homepc` or no
   limit. The other hosts don't need to be up.
 
-The Ansible key and the ProxyJump through HOMEPC are set in `inventory/group_vars/uf_linux.yml`.
-How each host is reached, and why nothing is found by IP: [architecture.md](architecture.md#hosts-and-data-paths).
+The Ansible key and the [ProxyJump](glossary.md#ssh-proxyjump) through HOMEPC are set in
+`inventory/group_vars/uf_linux.yml`. How each host is reached, and why nothing is found by IP:
+[architecture.md](architecture.md#hosts-and-data-paths).
 
-## 3. Day-to-day tags (all `never`)
+## 3. Day-to-day and one-time tags (all `never`)
 
 | Tag | Runs on | What it does |
 |---|---|---|
@@ -489,10 +547,16 @@ It only reads. It checks that:
 - each UF runs on the vault's current token and is connected through Cribl;
 - Splunk has each UF's `_internal` data;
 - Cribl is healthy;
-- every item on the expected list has been seen.
+- no expected item is `MISSING` or `NEVER_SEEN`, unless its [profile](glossary.md#profile) is
+  [sporadic](glossary.md#sporadic).
 
-It fails on a `MISSING` or `NEVER_SEEN` row whose profile isn't sporadic. While every row is
-`PENDING`, it waits `hl_verify_status_wait` (150 s). Then it reports "Not evaluated".
+How it treats each status:
+
+- A row that is `MISSING` or `NEVER_SEEN` and not sporadic fails the play.
+- A row that is new and under an hour old is `PENDING`. It passes.
+- A `LATE` row, and a sporadic row that is `MISSING` or `NEVER_SEEN`, are only reported.
+- If every row is still `PENDING` after `hl_verify_status_wait` (150 s), the play **fails** with "Not
+  evaluated". Wait about 5 min for *DH Evaluate*, then run it again.
 
 ### Test blocks
 
@@ -527,12 +591,12 @@ The rules:
 
 Timing:
 
-- A set or a clear takes effect in Cribl about 15–17 s after the role's API update. That figure
-  comes from an early spike.
-- The [fault-injection run](records/2026-11-fault-injection-run.md) saw 28–45 s from the play's
-  `until` time to the first dropped event. That includes the API write. So allow up to about 45 s.
-- A block ends exactly at its "until" time, because Cribl checks the expiry on each event.
-- Nothing prunes Cribl's table on a schedule. Expired rows leave it at the next `cribl_block` run.
+- A set or a clear takes effect in Cribl about 15–17 s after the role's API update.
+- Allow up to 45 s. The [fault-injection run](records/2026-11-fault-injection-run.md) measured 28–45 s
+  before the first dropped event, with the API write included.
+- A block stops dropping data at its "until" time, because Cribl checks the expiry on each event.
+- Nothing removes expired rows from Cribl's table on a schedule. They leave it at the next
+  `cribl_block` run.
 
 Who writes the block table:
 
@@ -572,8 +636,8 @@ ansible-playbook site.yml --tags expected --limit homepc
 ansible-playbook site.yml --tags stop --limit <host>
 ```
 
-**An input's profile, criticality or longest silence.** Set `hl_input_overrides` in the host's
-`host_vars`. For example, in `ansible/inventory/host_vars/<host>.yml` on HOMEPC:
+**An input's [profile](glossary.md#profile), [criticality](glossary.md#criticality) or longest
+silence.** Set `hl_input_overrides` in the host's `host_vars`. For example, in `ansible/inventory/host_vars/<host>.yml` on HOMEPC:
 
 ```yaml
 hl_input_overrides: {"monitor:///var/log/cron": {profile: sporadic, criticality: 4}}
@@ -637,10 +701,11 @@ What each contract checks:
   change, the role restarts the UF and checks it is still connected through Cribl. It skips that
   check when you named `hl_uf_outputs`, because the UF then sends nothing. Use `hl_apps_only` to
   remove only some apps.
-- **`uninstall`**: no rpm or MSI, folders, units, account, mail spool or `~/.splunk` is left.
-  `auditctl -l` equals the install-time baseline, leaving out the hardened audit rules. No new
-  unowned files. On Windows it checks the uninstall key, the service key, group memberships and user
-  rights.
+- **`uninstall`**: nothing of the UF is left. That means no rpm or MSI, folders, units, account, mail
+  spool or `~/.splunk`.
+  - `auditctl -l` equals the install-time baseline, leaving out the hardened audit rules.
+  - There are no new unowned files.
+  - On Windows it also checks the uninstall key, the service key, group memberships and user rights.
 - **`cribl_remove`**: `docker ps -a` and `docker volume ls` show nothing left. The image stays.
 - **`server_remove`**: the apps, collections and network are gone. `wd2l-splunk`'s ports and volumes
   are unchanged, and HEC is healthy. It removes `hl-net` only if the role created it and nothing else
@@ -702,8 +767,9 @@ was about 17,000 duplicate events on wd2l-recv, 596 of them in `wd2l_uf_audit`.
 
 ### Never run `splunk` as root on a UF
 
-`sudo splunk btool …` makes `splunk` run `chown -R` over `/opt/splunkforwarder`. That fires the
-`hl-uf-config` audit rule and raises a false tamper finding. Run the CLI as the UF's own user.
+`sudo splunk btool …` makes `splunk` run `chown -R` (a recursive ownership change) over
+`/opt/splunkforwarder`. That fires the `hl-uf-config` audit rule and raises a false tamper finding.
+Run the CLI as the UF's own user, `splunkfwd`.
 
 On a Linux UF host, any folder:
 
@@ -713,6 +779,10 @@ sudo -u splunkfwd /opt/splunkforwarder/bin/splunk btool inputs list <stanza> --d
 
 `<stanza>` is an `inputs.conf` stanza, such as `monitor:///var/log/secure`. See
 [`btool`](glossary.md#btool).
+
+Don't run this through `ansible <host> -b`. The `-b` flag runs the command as root, so it raises the
+same false finding. On pi5, you are already on the host. For a VM, ask the lab owner (in this lab:
+Taylor) for a shell on it. The role has no tested way to run `btool` as `splunkfwd` through Ansible.
 
 ### The Dashboard risky-command check is off
 
@@ -743,12 +813,25 @@ Its load check, "Check Cribl loaded the role's inputs, outputs, routes, pipeline
 still catch it. It fails if the edit changed the route list or removed one of the role's objects. An
 edit inside a pipeline passes it.
 
-To fix it, undo the edit in Cribl (UI or API). Then run this until it passes. On pi5, in
-`~/homelab-splunk-missing-source/ansible`, venv on:
+To fix it, undo the edit in Cribl:
 
-```bash
-ansible-playbook site.yml --tags cribl --limit homepc
-```
+1. Read Cribl's admin password ([how](#secrets)). The login is the user `admin`.
+2. Open Cribl's UI. In this lab it is `http://127.0.0.1:9000` on HOMEPC.
+3. Find the object the tamper indicator names, such as the pipeline `pl_test_block`.
+4. Compare it with the repo's copy, and put it back as the repo has it. The files are in the repo's
+   `cribl/local/cribl/` folder:
+   - `pipelines/<name>/conf.yml` for a pipeline, and `pipelines/route.yml` for the route list.
+   - `inputs.yml` for sources, `outputs.yml` for destinations and `breakers.yml` for event breakers.
+5. Run this until it passes. On pi5, in `~/homelab-splunk-missing-source/ansible`, venv on:
+
+   ```bash
+   ansible-playbook site.yml --tags cribl --limit homepc
+   ```
+
+A plain `cribl` run doesn't put the edit back. It only checks that the role's objects exist. The role
+adds one syslog source per device to `inputs.yml` and fills in the S2S token, so those two values
+differ from the repo's file. Don't use `cribl_remove` to reset Cribl. It deletes Cribl's volume and
+the evidence of the edit.
 
 An unmarked edit is a tamper finding, and it stays one. The `cribl` run's marker comes after the
 edit, so it doesn't hide it (see the [runbook](runbook-missing-data.md)).
@@ -778,11 +861,34 @@ Rotating `vault_hl_s2s_token` has three phases: expand, migrate, contract. Done 
 loses nothing. `vault_hl_s2s_token_previous` keeps the old token accepted while the senders move.
 Run the steps in order.
 
-1. **Vault.** On pi5, set `vault_hl_s2s_token` to a new `uuid.uuid4()`. Set
-   `vault_hl_s2s_token_previous` to the old value. Follow
-   [spec §14.11](specs/2026-10-30-design.md#1411-retention-and-token-rotation-2026-11-07) row 5:
-   a `umask 077` folder, decrypt, change the lines, encrypt, shred. Keep an encrypted copy of the old
-   vault until the rotation is finished.
+1. **Vault.** Make a new token. Set `vault_hl_s2s_token` to it, and set
+   `vault_hl_s2s_token_previous` to the old value. The method is the one in
+   [spec §14.11](specs/2026-10-30-design.md#1411-retention-and-token-rotation-2026-11-07) row 5. It
+   works in a private folder, so no plain copy of the vault stays on disk. On pi5, in
+   `~/homelab-splunk-missing-source/ansible`, venv on:
+
+   ```bash
+   umask 077
+   work=$(mktemp -d)
+   cp inventory/group_vars/all/vault.yml ~/vault.before-rotation
+   ansible-vault decrypt inventory/group_vars/all/vault.yml --output "$work/vault.yml"
+   python3 -c 'import uuid; print(uuid.uuid4())'
+   ```
+
+   The last command prints the new token. Edit `$work/vault.yml` with an editor. Copy the old
+   `vault_hl_s2s_token` value to a new line, `vault_hl_s2s_token_previous: "<old>"`. Then put the
+   new token in `vault_hl_s2s_token`. Then, in the same shell:
+
+   ```bash
+   ansible-vault encrypt "$work/vault.yml" --output inventory/group_vars/all/vault.yml
+   shred -u "$work/vault.yml"
+   rmdir "$work"
+   ansible-vault view inventory/group_vars/all/vault.yml | grep -c '^vault_hl_'
+   ```
+
+   The last command must print `5`: the four keys plus the previous token. The copy
+   `~/vault.before-rotation` is the old vault, still encrypted. Keep it until the rotation is
+   finished.
 2. **Expand.** On pi5, in `~/homelab-splunk-missing-source/ansible`, venv on:
 
    ```bash
@@ -821,12 +927,14 @@ Run the steps in order.
    ```
 
    **On a Linux UF, this hand edit raises an `hl-uf-config` tamper finding**, unless a marker covers
-   it. A marker covers it only if it came up to 15 min before the edit or up to 60 s after. The
-   `restart` run here comes later, so it doesn't. *DH Alert tamper* fires for the finding. That is
-   expected here. Tell the analysts the host and the time of the edit before you make it. Then they
-   can recognise the finding and don't escalate it
+   it. A marker covers it only if it comes just before the edit or a minute after
+   ([the window](data-health-design.md#tamper-indicators)). The `restart` run here comes later, so it
+   doesn't. *DH Alert tamper* fires for the finding. That is expected here.
+
+   Tell the analysts the host and the time of the edit before you make it. Then they can recognise
+   the finding and don't escalate it
    ([how analysts read tamper findings](data-health/dashboards.md#tamper-findings-24-h)). A marker
-   posted later never hides it ([why](data-health-design.md#tamper-indicators)).
+   posted later never hides it.
 
 5. **Contract.** Remove `vault_hl_s2s_token_previous` from the vault. Then run `cribl` first and
    `server` second. Cribl then stops accepting the old token before Splunk does, and it already
@@ -857,7 +965,8 @@ Run the steps in order.
      the expected number of `authTokens`: 1 now, 2 during a rotation. It reports only that count.
    - `verify` must be green on every UF.
 
-   Finally, on pi5, `shred -u` the encrypted copy of the old vault.
+   Finally, on pi5, run `shred -u ~/vault.before-rotation` to remove the encrypted copy of the old
+   vault.
 
 **What it costs.** Each run of steps 2 and 5 costs what those tags always cost
 ([Costs of a run](#costs-of-a-run)):
@@ -872,8 +981,8 @@ The role refuses a previous value that equals the current one or isn't a UUID.
 
 **`cribl reload` is not a shortcut.** After a reload, the running workers still refused a token that
 was only in the pushed `inputs.yml`. The API still listed the old list
-([spec §14.13](specs/2026-10-30-design.md#1413-loss-free-s2s-token-rotation-2026-11-08) row 5).
-Pushed files need the restart.
+([spec §14.13](specs/2026-10-30-design.md#1413-loss-free-s2s-token-rotation-2026-11-08) row 5). Pushed
+files need the restart.
 
 **Cribl logs a refused token as a 3+4-character mask in `index=cribl`.** So a mistyped token leaks 7
 characters there.
@@ -893,7 +1002,7 @@ The play waits `hl_uf_connect_timeout` (180 s) before it fails. Check these:
    ansible-playbook site.yml --tags verify --limit homepc
    ```
 
-2. Can the host reach port 9997 on HOMEPC?
+2. Can the host reach the [S2S](glossary.md#s2s-splunktcp) port 9997 on HOMEPC?
 3. Is the token wrong? A wrong token looks like an ordinary close. `--tags status` shows
    `last_connect` and `last_close`:
 
@@ -957,8 +1066,10 @@ The inventory groups `uf_linux` and `uf_windows` are empty.
 
 ### `verify` fails naming a row
 
-That row is `MISSING` or `NEVER_SEEN`. See the [runbook](runbook-missing-data.md). When every row is
-`PENDING`, `verify` waits `hl_verify_status_wait`, then reports "Not evaluated".
+That row is `MISSING` or `NEVER_SEEN`, and its profile isn't sporadic. See the
+[runbook](runbook-missing-data.md). When every row is `PENDING`, `verify` waits
+`hl_verify_status_wait`, then fails with "Not evaluated". Wait about 5 min and run it again
+([first deploy](#first-deploy-what-you-should-see)).
 
 ### A search returns nothing for `dh_*` or `punct`
 
@@ -966,17 +1077,17 @@ See [Searching](#searching).
 
 ### No markers in `index=data_health source=dh:marker`
 
-Either HEC port 8088 isn't reachable from pi5, or `vault_hl_markers_token` is wrong. Check HEC's
-health. On pi5, any folder:
+Either [HEC](glossary.md#hec-http-event-collector) port 8088 isn't reachable from pi5, or
+`vault_hl_markers_token` is wrong. Check HEC's health. On pi5, any folder:
 
 ```bash
 curl -k https://192.168.1.27:8088/services/collector/health
 ```
 
-In this lab HOMEPC is `192.168.1.27`.
+In this lab HOMEPC is `192.168.1.27`. A healthy HEC answers `{"text":"HEC is healthy","code":17}`.
 
 A failed marker fails these tags: `cribl`, `cribl_block`, `cribl_remove`, and on Linux `install`,
-`stop`, `start`, `restart` and `uninstall`. Elsewhere it only warns.
+`apps`, `apps_remove`, `stop`, `start`, `restart` and `uninstall`. Elsewhere it only warns.
 
 ### A false `hl-uf-config` tamper finding after a CLI command
 
