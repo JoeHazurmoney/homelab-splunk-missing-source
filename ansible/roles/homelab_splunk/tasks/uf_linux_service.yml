@@ -1,12 +1,30 @@
 # start / stop / restart / status (uf_linux, spec 5.3): service control + marker. main.yml imports
-# this file once per action, with hl_service_action set. A stop posts its marker first (so a
-# finding during the stop is the role's own work); start/restart post theirs once connected.
+# this file once per action, with hl_service_action set. Every action that changes the service
+# posts its marker first, so a finding the change itself causes (SERVICE_STOP of a restart, the
+# UF's own config writes at a start) is the role's own work: DH Tamper decides a finding's
+# suppression once, against the markers already indexed (final review I3, #49). start/restart
+# post a second marker once connected, which Host detail shows as the last action.
 # status = service state, version and build, apps, and the outputs connection (from splunkd.log).
 - name: Marker before the stop
   ansible.builtin.include_tasks: marker.yml
   vars:
     hl_marker_action: stop
   when: hl_service_action == 'stop'
+
+# A start of a running UF changes nothing and posts no marker before it
+- name: Check whether the start or restart changes the service
+  ansible.builtin.systemd_service:
+    name: SplunkForwarder
+    state: "{{ {'start': 'started', 'restart': 'restarted'}[hl_service_action] }}"
+  check_mode: true
+  register: hl_svc_would
+  when: hl_service_action in ['start', 'restart']
+
+- name: Marker before the start or restart
+  ansible.builtin.include_tasks: marker.yml
+  vars:
+    hl_marker_action: "{{ hl_service_action }}"
+  when: hl_service_action in ['start', 'restart'] and hl_svc_would is changed
 
 # "<lines> <epoch>": where splunkd.log ends and the host's clock, just before the (re)start
 - name: Note where splunkd.log ends

@@ -4,7 +4,9 @@
 # every 5 min anyway). Rows retire when the input leaves the inventory or is disabled, and a host's
 # UF rows (host row and input rows) retire once it has hl_expected: false in its host_vars or has left
 # uf_linux/uf_windows and this tag runs: an uninstall alone changes nothing here, because a host that
-# is off must stay expected. dh_extra_expected rows naming the host stay.
+# is off must stay expected. dh_extra_expected rows naming the host stay. The sync's result also
+# counts held rows (retired in Manage while the inventory still lists them: remove them here too)
+# and shadowed ones (an enabled row added in Manage wins over the inventory's).
 - name: Create the controller build directory
   ansible.builtin.tempfile:
     state: directory
@@ -88,7 +90,8 @@
     $rows = Invoke-HlSearch -App hl_data_health -Spl '| savedsearch "DH Sync expected"'
     $r = $rows | Select-Object -First 1
     if ($null -eq $r) { throw 'DH Sync expected returned no result' }
-    @{ written = [int]$r.written; changes = @(@($r.changes) | Where-Object { $_ }) } | ConvertTo-Json -Compress
+    $changes = @(@($r.changes) | Where-Object { $_ })
+    @{ written = [int]$r.written; held = [int]$r.held; shadowed = [int]$r.shadowed; changes = $changes } | ConvertTo-Json -Compress
   register: hl_exp_sync
   changed_when: (hl_exp_sync.stdout | from_json).written > 0
 

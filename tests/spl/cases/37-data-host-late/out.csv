@@ -6,3 +6,6 @@ sourcetype|linux|h37a|syslog|*,LATE,host_late,Everything from this host is late 
 host|*|h37b|*|*,OK,,,DEGRADED
 sourcetype|linux|h37b|syslog|*,OK,,,DEGRADED
 sourcetype|linux|h37b|auth|*,LATE,stream_stopped,This stream stopped while the host still sends others: its program or input stopped,DEGRADED
+host|*|h37c|*|*,LATE,host_late,Everything from this host is late or missing (it has no Splunk agent): the host or its syslog path is slow or stopping,DEGRADED
+sourcetype|linux|h37c|syslog|*,LATE,host_late,Everything from this host is late or missing (it has no Splunk agent): the host or its syslog path is slow or stopping,DEGRADED
+sourcetype|linux|h37c|auth|*,MISSING,host_late,Everything from this host is late or missing (it has no Splunk agent): the host or its syslog path is slow or stopping,DEGRADED

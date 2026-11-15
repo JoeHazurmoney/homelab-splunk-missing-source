@@ -89,11 +89,17 @@ The host that runs the device probe (*hl-devprobe*): `pi5`, the role's `hl_probe
 ### `dh_resume_gap_secs`
 **150 seconds.** A gap this long between two runs of the arrival tracker counts as a pause (and starts the hold above). Raise it if the scheduler is often late; lower it to catch shorter pauses. Used by: `dh_meta_fast`.
 
+### `dh_retire_candidate_secs`
+**604800 seconds (7 days).** How long an expected item must be silent (or never seen though expected) to be listed as a retirement candidate on Manage. Raise it to list only items gone longer. Used by: `dh_ui_retire_candidates`.
+
 ### `dh_never_seen_secs`
 **3600 seconds.** A newly expected entity that has never sent anything is PENDING for this long, then NEVER_SEEN. Raise it for inputs that take long to start; lower it to report missing inputs sooner. Used by: `dh_eval_status`.
 
 ### `dh_tamper_window_secs`
-**900 seconds.** A tamper finding this close to the start of a silence makes the cause "possible deliberate blinding"; a finding this close to an Ansible marker is treated as the role's own work and suppressed. Raise it to link findings further apart (more false links); lower it to link only very close ones. Used by: `dh_eval_cause`, `dh_tamper_finish`.
+**900 seconds.** A tamper finding this close to the start of a silence makes the cause "possible deliberate blinding"; a finding that comes at most this long after an Ansible marker for its host is treated as the role's own work and suppressed. Raise it to link findings further apart (more false links); lower it to link only very close ones. Used by: `dh_eval_cause`, `dh_tamper_finish`.
+
+### `dh_tamper_marker_slack_secs`
+**60 seconds.** A marker up to this long *after* a finding still suppresses it, because markers carry pi5's clock and findings the host's. A marker posted later, such as a restore run's, never hides a finding. Raise it only if the hosts' clocks drift further apart. Used by: `dh_tamper_finish`.
 
 ## Profiles and thresholds
 
@@ -194,7 +200,7 @@ Writes the arrival tracker's run record: this run's time, the previous run, the 
 **300 seconds.** A clock change the operating system reports at least this large is a tamper finding ("big clock step"). Raise it to ignore bigger time corrections; lower it to catch smaller ones (normal NTP corrections may then show). Used by: `dh_tamper_win`, `dh_tamper_linux`.
 
 ### `dh_tamper_lookback_secs`
-**604800 seconds (7 days).** How far back DH Tamper re-checks each finding against Ansible markers on every run. Only findings this recent are written to the index, so an older finding is never alerted again. Raise it to re-check older findings (slower), but not past the indexes' 14-day retention, inside which DH Tamper reads what it already wrote; lower it to stop sooner. Keep it equal to `dh_tamper_finding_earliest`. Used by: `dh_tamper_finish`.
+**604800 seconds (7 days).** How old a finding DH Tamper still writes to the index (when it is new, or its stored suppression isn't there yet). An older finding is never alerted again. Keep it inside the indexes' 14-day retention, inside which DH Tamper reads what it already wrote. Keep it equal to `dh_tamper_finding_earliest`. Used by: `dh_tamper_finish`.
 
 ### `dh_tamper_finding_earliest`
 **`-7d`.** The event-time window DH Tamper reads findings from. Widen it to catch findings that arrive later (slower runs); narrow it to read less. It must match `dh_tamper_lookback_secs` (a test checks this). Used by: *DH Tamper*.
@@ -263,7 +269,7 @@ Writes the daily report rows (`source=dh:soh`). Used by: *DH Daily SoH report*.
 ## Baselines (DH Baseline daily and compute)
 
 ### `dh_daily_from_minutes(fwd, expected)`
-For each entity and completed day: how many events, how many active minutes, the longest and 95th-percentile silence, how late data arrived, and the hourly counts. Only minutes when Splunk (and, for agent hosts, the agent) were up count, so PC sleep never looks like silence; a silence still open at midnight carries into the next day. Arguments: `fwd`, `expected`. Used by: *DH Baseline daily*.
+For each entity and completed day: how many events, how many active minutes, the longest and 95th-percentile silence, how late data arrived, and the hourly counts. Only minutes when Splunk (and, for agent hosts, the agent) were up count, so PC sleep never looks like silence; a silence still open at midnight carries into the next day. Days and hours are UTC, whatever time zone the search runs in. Arguments: `fwd`, `expected`. Used by: *DH Baseline daily*.
 
 ### `dh_daily_todo(now)`
 The completed days of the last 13 that have no daily record yet, so a missed night is caught up on the next run. Not 14: the indexes keep 14 days, so the raw data of the day that began 14 days ago may already be partly gone, and filling it in would record a silence that never happened. Used by: *DH Baseline daily*, `dh_daily_window`.
@@ -291,7 +297,10 @@ Finds Linux tamper indicators: auditd stopped or aborted, audit rules changed, t
 Cribl's audit log: any create, update, delete, reorder or upload of routes, pipelines, outputs, inputs or lookups is a finding on the host *cribl*. The log can't tell a Drop function from any other pipeline edit, so every such change counts. The role's own changes fall inside its *cribl* and *cribl_block* marker windows and are suppressed. Used by: *DH Tamper*.
 
 ### `dh_tamper_finish(tamper, now)`
-Groups indicators into findings (one per host, kind and 5-minute bucket), re-checks each finding of the last 7 days against every Ansible marker (a finding within `dh_tamper_window_secs` of a marker is the role's own work and is suppressed), and marks which ones of the last 7 days still need writing to the index (an older one never does: the index keeps 14 days, the collection 30). Used by: *DH Tamper*.
+Groups indicators into findings (one per host, kind and 5-minute bucket) and decides, once, whether each new finding is the role's own work: suppressed when an Ansible marker for its host came at most `dh_tamper_window_secs` before it (or `dh_tamper_marker_slack_secs` after it). A stored finding keeps its suppression on every later run, so a later marker never hides it; if its `dh_tamper` row is gone, the latest `dh:tamper` record (by index time) gives it. Marks which findings of the last 7 days still need writing to the index (an older one never does: the index keeps 14 days, the collection 30). Used by: *DH Tamper*.
+
+### `dh_tamper_fold(now)`
+One service install logs two Windows events: a 7045 (System log) and a 4697 (Security log). This step puts the pair into one finding, "7045+4697 service installed: …", with both event IDs in its detail. The two events match on the service's key name or its program path, at most `dh_tamper_window_secs` apart. Either event can arrive first. If one half is already stored (and alerted), the other joins that finding, so a service install alerts once. Findings stored before this step existed are left as they are. Used by: `dh_tamper_finish`.
 
 ### `dh_tamper_collect_rows`
 Shapes findings for writing to the index. Used by: *DH Tamper*.
@@ -363,7 +372,7 @@ Admin-log rows older than `dh_admin_retention_secs` that have already been copie
 Each section macro turns its input into report rows (`section`, `item`, `value`, plus a few extras).
 
 ### `dh_soh_outages(status, now)`
-From the transitions of the last 7 days: each outage (a stretch of LATE, MISSING or NEVER_SEEN) that ended in the last 24 hours or is still open, with its duration and how it ended (`end_status`), plus the mean time to recover. An outage counts as open only while `dh_status` still shows the entity bad. Used by: *DH Daily SoH report*, `dh_ui_recovered`.
+From the transitions of the last 7 days: each outage (a stretch of LATE, MISSING or NEVER_SEEN) that ended in the last 24 hours or is still open, with its duration and how it ended (`end_status`), plus the mean time to recover. An outage counts as open only while `dh_status` still shows the entity bad. An entity that went bad more than 7 days ago and is still bad is listed too, as open since its `since` time. Used by: *DH Daily SoH report*, `dh_ui_recovered`.
 
 ### `dh_soh_flapping(now)`
 Entities with 3 or more status changes in the last 24 hours. Used by: *DH Daily SoH report*.
@@ -513,6 +522,18 @@ Writes the expected row when the confirmation matches, and logs it. Used by: Man
 ### `dh_ui_adopt_row(baseline, fwd)`
 Turns an unregistered entity into an expected-row request: agent hosts become `uf`, others `syslog`. An agent host's own row gets the `heartbeat` profile; any other row takes the baseline's suggestion, else continuous. Used by: Manage, Expected list tab (adopt).
 
+### `dh_ui_retire_plan(expected, admin_log, nonce, now)`
+The retire form's preview (Manage > Expected list). It takes one request: an expected item (a whole host takes every row of that host), Retire or Undo, a reason and an optional ticket. Retire: each enabled row gets `enabled=0`, who retired it, when and why, and `retired_hold=1`; every other field stays, including who manages it. Undo: an Ansible row stops being held and *DH Sync expected* adds it back; a row added in Manage is enabled again with a new grace. Nothing is deleted. Needs the dh_admin role. The confirmation token also covers the retire key in `dh_retire_nonce`, which only admin and dh_admin can read, so a Manage link built by someone else can't apply a retirement. Used by: Manage.
+
+### `dh_ui_retire_write(expected, admin_log, nonce, now)`
+Applies a retire preview when its confirmation matches: writes each row whole, changes the retire key, and adds one admin-log row per row. Used by: Manage.
+
+### `dh_ui_retire_choices(expected)`
+The retire form's item list: each host as a whole, then its rows, among the rows the chosen action applies to (expected rows for Retire, retired rows for Undo). Used by: Manage.
+
+### `dh_ui_retire_candidates(status, now)`
+Expected items with no data for at least `dh_retire_candidate_secs`, or never seen though expected that long, muted ones included. Used by: Manage (Retirement candidates).
+
 ### `dh_ui_block_command`
 The test block lives in Cribl, so Manage shows the command to run instead of writing it: the role's *cribl_block* line for a checked request (setting with minutes and reason, or clearing), with the key in plain single quotes and the reason reduced to plain characters. Used by: Manage, Test blocks tab.
 
@@ -535,7 +556,7 @@ The Ansible rows, cleaned up the way a Manage row is: level and host in lowercas
 One fingerprint of the fields Ansible owns (level, index, host, sourcetype, source, collection, via, hypervisor, profile, interval, maximum gap, criticality, owner, site, runbook, description), so an unchanged row is never rewritten. Used by: `dh_sync_plan`.
 
 ### `dh_sync_plan(ansible, expected, now)`
-The rows *DH Sync expected* writes, each with its reason: **add** (new, or disabled before, a disabled Manage row included), **update** (a field Ansible owns changed; the "expected since" time is kept), **retire** (an Ansible row that left the file or that the file marks disabled: switched off, so its status goes and a later re-add starts a fresh grace period). It returns only the rows that change, written as `_key` upserts, so `dh_expected` is never rewritten whole (DH Evaluate drops the status of any entity missing from it). An enabled Manage row is never overwritten, not even when Ansible lists the same entity, and nothing is written while the Ansible file has no valid rows, so an empty or broken file can't retire the list. Arguments: the Ansible file, the expected list, `now`. Used by: *DH Sync expected*.
+The rows *DH Sync expected* writes, each with its reason: **add** (new, or disabled before, a disabled Manage row included), **update** (a field Ansible owns changed; the "expected since" time is kept), **retire** (an Ansible row that left the file or that the file marks disabled: switched off, so its status goes and a later re-add starts a fresh grace period), **release** (a row retired in Manage that the file no longer lists: it stops being held and stays retired). It also returns two kinds of row it never writes, which *DH Sync expected* counts: **held** (the file still lists a row retired in Manage: the retirement holds until the inventory drops it) and **shadowed** (an enabled Manage row wins over the same entity in the file). A write carries the row's retirement fields, which Ansible doesn't own. It returns only the rows that change (and the held and shadowed ones), written as `_key` upserts, so `dh_expected` is never rewritten whole (DH Evaluate drops the status of any entity missing from it). An enabled Manage row is never overwritten, not even when Ansible lists the same entity, and nothing is written while the Ansible file has no valid rows, so an empty or broken file can't retire the list. Arguments: the Ansible file, the expected list, `now`. Used by: *DH Sync expected*.
 
 ### `dh_discover_summary(expected, state_fast, state_slow, baseline, now)`
 One summary row of what arrives without being expected: how many entities, how many hosts, and up to 50 of their ids. The same rows as Manage's "adopt" list and the Daily report's "unregistered" section. Used by: *DH Discover unregistered*.

@@ -2,7 +2,8 @@
 # the role-owned input apps (hl_uf_linux_inputs, hl_uf_wd2l_inputs; stanzas in local/) and
 # hl_uf_outputs; restart the UF only on a real change, then prove the path. The connection check runs
 # on every run (task 4's rule), with task 4's anchors: the proof counts only data from the running
-# splunkd, and an unknown start fails. Markers are best effort.
+# splunkd, and an unknown start fails. A marker goes out before the first write when anything will
+# change (it must reach HEC), and again before a restart (best effort).
 #   -e '{"hl_disabled_inputs":["monitor:///var/log/secure"]}' --tags apps   turns one input off
 - name: Check the TA package is pinned and on the controller
   ansible.builtin.stat:
@@ -24,6 +25,72 @@
     executable: /bin/bash
   register: hl_ta_nix_ver
   changed_when: false
+
+# The tamper rules watch etc/ (key hl-uf-config), and DH Tamper suppresses a finding only when a
+# marker came before it or at most 60 s after it, once (#49). So the marker goes out before the
+# first write whenever something will change (final review N1): a check-mode pass of the writes
+# below says whether it will. It fails the run before anything is written if HEC can't take it
+# (marker.yml): no marker would mean a permanent, alerting finding for the role's own work.
+- name: Check whether the role-owned apps' folders change
+  ansible.builtin.file:
+    path: "{{ hl_uf_home }}/etc/apps/{{ item.0 }}/{{ item.1 }}"
+    state: directory
+    owner: "{{ hl_uf_user }}"
+    group: "{{ hl_uf_user }}"
+    mode: "0755"
+  loop: "{{ hl_uf_input_apps_linux | product(['default', 'local']) | list + [['Splunk_TA_nix', 'local']] }}"
+  check_mode: true
+  register: hl_apps_would_dirs
+
+- name: Check whether the role-owned apps' app.conf change
+  ansible.builtin.template:
+    src: uf/input_app.conf.j2
+    dest: "{{ hl_uf_home }}/etc/apps/{{ hl_app }}/default/app.conf"
+    owner: "{{ hl_uf_user }}"
+    group: "{{ hl_uf_user }}"
+    mode: "0644"
+  loop: "{{ hl_uf_input_apps_linux }}"
+  loop_control:
+    loop_var: hl_app
+  check_mode: true
+  failed_when: false    # a folder that doesn't exist yet is already a change (above)
+  register: hl_apps_would_appconf
+
+- name: Check whether each app's local/inputs.conf changes
+  ansible.builtin.template:
+    src: uf/inputs.conf.j2
+    dest: "{{ hl_uf_home }}/etc/apps/{{ hl_app }}/local/inputs.conf"
+    owner: "{{ hl_uf_user }}"
+    group: "{{ hl_uf_user }}"
+    mode: "0644"
+  loop: "{{ hl_uf_input_apps_linux + ['Splunk_TA_nix'] }}"
+  loop_control:
+    loop_var: hl_app
+  check_mode: true
+  failed_when: false
+  register: hl_apps_would_inputs
+
+- name: Check whether hl_uf_outputs changes
+  ansible.builtin.template:
+    src: "uf/hl_uf_outputs/default/{{ item }}.j2"
+    dest: "{{ hl_uf_home }}/etc/apps/hl_uf_outputs/default/{{ item }}"
+    owner: "{{ hl_uf_user }}"
+    group: "{{ hl_uf_user }}"
+    mode: "0600"
+  loop: "{{ hl_uf_outputs_files }}"
+  check_mode: true
+  failed_when: false
+  register: hl_apps_would_outputs
+  diff: false
+  no_log: true    # outputs.conf holds the token
+
+- name: Marker before the apps change
+  ansible.builtin.include_tasks: marker.yml
+  vars:
+    hl_marker_action: apps
+  when: >-
+    (hl_ta_nix_ver.stdout | trim != hl_tas.Splunk_TA_nix.version) or hl_apps_would_dirs is changed
+    or hl_apps_would_appconf is changed or hl_apps_would_inputs is changed or hl_apps_would_outputs is changed
 
 - name: Install Splunk_TA_nix (unmodified; local/ kept)
   when: hl_ta_nix_ver.stdout | trim != hl_tas.Splunk_TA_nix.version

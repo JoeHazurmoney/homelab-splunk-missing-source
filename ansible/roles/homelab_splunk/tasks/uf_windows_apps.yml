@@ -1,7 +1,7 @@
 # apps (uf_windows, spec 5.3/5.5): Splunk_TA_windows unmodified (its local/inputs.conf is the
 # role's: perfmon CPU/Memory at 60 s), hl_uf_windows_inputs (the event log channels, renderXml, in
 # local/) and hl_uf_outputs; restart only on a real change, prove the path (every run, the rules of
-# uf_windows_connected.yml), marker (best effort). PowerShell blocks use `cmd: |`, Jinja values in
+# uf_windows_connected.yml), markers before the first write and before the restart (best effort). PowerShell blocks use `cmd: |`, Jinja values in
 # single-quoted strings double their quotes, and a read error fails (task 5 review).
 - name: Check the TA package is pinned and on the controller
   ansible.builtin.stat:
@@ -28,6 +28,57 @@
       }
   register: hl_ta_win_ver
   changed_when: false
+
+# As on Linux (final review N1), a marker goes out before the first write when anything will change:
+# a check-mode pass of the writes below says whether it will. Best effort here (ruling R1 for task 5).
+- name: Check whether the role-owned apps' folders change
+  ansible.windows.win_file:
+    path: "{{ hl_uf_win_home }}\\etc\\apps\\{{ item.0 }}\\{{ item.1 }}"
+    state: directory
+  loop: "{{ hl_uf_input_apps_windows | product(['default', 'local']) | list + [['Splunk_TA_windows', 'local']] }}"
+  check_mode: true
+  register: hl_appsw_would_dirs
+
+- name: Check whether the role-owned apps' app.conf change
+  ansible.windows.win_template:
+    src: uf/input_app.conf.j2
+    dest: "{{ hl_uf_win_home }}\\etc\\apps\\{{ hl_app }}\\default\\app.conf"
+  loop: "{{ hl_uf_input_apps_windows }}"
+  loop_control:
+    loop_var: hl_app
+  check_mode: true
+  failed_when: false    # a folder that doesn't exist yet is already a change (above)
+  register: hl_appsw_would_appconf
+
+- name: Check whether each app's local/inputs.conf changes
+  ansible.windows.win_template:
+    src: uf/inputs.conf.j2
+    dest: "{{ hl_uf_win_home }}\\etc\\apps\\{{ hl_app }}\\local\\inputs.conf"
+  loop: "{{ hl_uf_input_apps_windows + ['Splunk_TA_windows'] }}"
+  loop_control:
+    loop_var: hl_app
+  check_mode: true
+  failed_when: false
+  register: hl_appsw_would_inputs
+
+- name: Check whether hl_uf_outputs changes
+  ansible.windows.win_template:
+    src: "uf/hl_uf_outputs/default/{{ item }}.j2"
+    dest: "{{ hl_uf_win_home }}\\etc\\apps\\hl_uf_outputs\\default\\{{ item }}"
+  loop: "{{ hl_uf_outputs_files }}"
+  check_mode: true
+  failed_when: false
+  register: hl_appsw_would_outputs
+  diff: false
+  no_log: true    # outputs.conf holds the token
+
+- name: Marker before the apps change
+  ansible.builtin.include_tasks: marker_best_effort.yml
+  vars:
+    hl_marker_action: apps
+  when: >-
+    (hl_ta_win_ver.stdout | trim != hl_tas.Splunk_TA_windows.version) or hl_appsw_would_dirs is changed
+    or hl_appsw_would_appconf is changed or hl_appsw_would_inputs is changed or hl_appsw_would_outputs is changed
 
 - name: Install Splunk_TA_windows (unmodified; local/ kept)
   when: hl_ta_win_ver.stdout | trim != hl_tas.Splunk_TA_windows.version

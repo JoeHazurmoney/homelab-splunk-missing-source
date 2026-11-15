@@ -1,0 +1,3 @@
+| inputlookup @events@ | eval _time=tonumber(time), _raw=raw | fields _time _raw host | `dh_tamper_win`
+| append [| inputlookup @idx@ | eval dh_kind="index", _time=0, dh_it=tonumber(it) | fields _time dh_kind finding_id suppressed dh_it]
+| `dh_tamper_finish(@tamper@, @NOW@)`

@@ -255,13 +255,21 @@ conf_check() {
 # _audit and the jobs' search.log, 10.6.0.5), so a text that itself starts with the search command
 # runs as "search search index=...", and the second "search" becomes a required term: the Windows
 # stage of DH Tamper matched no event on a schedule (task 14 row 13), while the same text run by
-# hand matched. This dispatches each deployed scheduled search's first stage the scheduler's way
-# and fails if its base lispy (search.log) requires the bare term "search".
+# hand matched. This dispatches each deployed scheduled search's first stage (its text up to the
+# first "|") the scheduler's way and fails if its base lispy (search.log) requires the bare term
+# "search". A first stage that names a writing command is refused, never run (final review M9).
 scheduled_lispy_check() {
   local bad=0 n=0 title base sid log
   while IFS=$'\t' read -r title base; do
     [ -n "$title" ] || continue
     n=$((n + 1))
+    # Only the first stage ever runs here, as admin on the shared live server: a stage that could
+    # write is refused, never dispatched (final review M9).
+    if printf '%s\n' "$base" | grep -qiE '(^|[^a-z_])(outputlookup|outputcsv|collect|mcollect|map|sendemail|delete|sendalert|tscollect)([^a-z_]|$)'; then
+      echo "  '$title': its first stage names a command that writes; not dispatched"
+      bad=1
+      continue
+    fi
     sid=$(dh_curl "$DH_MGMT/servicesNS/admin/$DH_APP/search/jobs" -d "tz=$DH_TZ" -d exec_mode=blocking -d output_mode=json \
       --data-urlencode "search=search $base | head 1" | grep -o '"sid":"[^"]*"' | cut -d'"' -f4)
     if [ -z "$sid" ]; then echo "  '$title': the first stage did not dispatch"; bad=1; continue; fi
@@ -274,7 +282,7 @@ scheduled_lispy_check() {
     fi
   done < <(dh_search "| rest splunk_server=local count=0 /servicesNS/nobody/$DH_APP/saved/searches
     | search eai:acl.app=$DH_APP is_scheduled=1 | where NOT match(search, \"^\\s*\\|\")
-    | eval base=replace(replace(search, \"(?s)\\n\\s*\\|.*\$\", \"\"), \"\\s+\", \" \")
+    | eval base=replace(replace(search, \"(?s)\\|.*\$\", \"\"), \"\\s+\", \" \")
     | eval _raw=title.urldecode(\"%09\").base | fields _raw" raw | tr -d '\r')
   if [ "$n" -eq 0 ]; then echo "  no scheduled search to check (none, or the rest call failed)"; bad=1; fi
   if [ "$bad" -eq 0 ]; then echo "PASS scheduled-lispy ($n searches)"; return 0; fi
@@ -366,7 +374,7 @@ app_conf_check() {
 }
 
 run_cases() {
-  local pattern=${1:-*} pass=0 fail=0 dir name id ok
+  local pattern=${1:-*} pass=0 fail=0 dir name id ok tz0=$DH_TZ
   if [ "$pattern" = "*" ]; then
     if app_conf_check; then pass=$((pass + 1)); else fail=$((fail + 1)); fi
     if names_check; then pass=$((pass + 1)); else fail=$((fail + 1)); fi
@@ -385,6 +393,9 @@ run_cases() {
     id=$(printf '%s' "$name" | tr -c 'a-zA-Z0-9\n' '_')
     upload "$id" "$dir"
     ok=1
+    # A case may pin its own time zone (a tz file): the day and hour keys must not depend on it.
+    DH_TZ=$tz0
+    if [ -f "$dir/tz" ]; then DH_TZ=$(tr -d '\r\n' <"$dir/tz"); fi
     check "$id" "$dir" "$dir/out.csv" "" || ok=0
     if [ -f "$dir/transitions.csv" ]; then
       check "$id" "$dir" "$dir/transitions.csv" '| `dh_transition_rows`' || ok=0
@@ -392,6 +403,7 @@ run_cases() {
     if [ "$ok" -eq 1 ]; then pass=$((pass + 1)); echo "PASS $name"; else fail=$((fail + 1)); echo "FAIL $name"; fi
     dh_docker exec -u root "$DH_CONTAINER" sh -c "rm -f $DH_APP_DIR/lookups/dhtest_${id}_*.csv"
   done
+  DH_TZ=$tz0
   echo "$pass passed, $fail failed"
   [ "$fail" -eq 0 ] && [ "$pass" -gt 0 ]
 }

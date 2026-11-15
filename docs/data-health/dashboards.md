@@ -78,6 +78,7 @@ When something is late or missing, the app picks the most likely reason, checkin
 | Nothing at all from this host (it has no Splunk agent) … | A host without an agent sends nothing at all. | Check the host and its syslog path. |
 | Cribl late: nothing recent from Cribl itself (not yet DOWN) … | The row for Cribl: its own logs are late but not yet missing (the 2 minutes before "Cribl DOWN"). | The same as for Cribl DOWN. |
 | Everything from this host is late (not yet missing; it has no Splunk agent) … | Every stream of a host without an agent is late, none missing yet. | Check the host and its syslog path. |
+| Everything from this host is late or missing (it has no Splunk agent) … | Every stream of a host without an agent is late, and some are already missing. | Check the host and its syslog path. |
 | This stream stopped while the host still sends others … | One stream stopped; the host still sends others. | Check the program or input that sends this stream. |
 
 ## The banner: is the data current?
@@ -169,7 +170,7 @@ Three rows of six tiles: one row for hosts, one for sourcetypes, one for sources
 
 ### Tamper findings (first seen in the last 24 h)
 - **What it shows:** each sign of possible tampering first recorded in the last 24 hours. Columns: **First seen** (when the app first recorded it), **Time** (when it happened), **Host**, **What was seen** (for example "1102 security log cleared" or "SERVICE_STOP auditd"), **Events**, **Code**, **Detail**.
-- **Where it comes from:** the findings of the background search *DH Tamper*, keeping the latest state of each and leaving out those that happened within 15 minutes of Ansible work (the role's own stops and changes).
+- **Where it comes from:** the findings of the background search *DH Tamper*, keeping the latest state of each and leaving out the role's own work: findings up to 15 minutes after an Ansible marker for the host (or up to 60 seconds before it, for clock differences). The role posts its marker before each change it makes.
 - **How to read it:** empty is good. A finding means someone may have tried to switch off logging. Check whether planned work explains it (a reboot also stops services); if not, **escalate**. Click the row to see the host.
 
 ## Host detail
@@ -207,7 +208,7 @@ Everything about one host. Pick the host at the top, or arrive here by clicking 
 
 ### Latest Splunk agent errors and warnings (24 h)
 - **What it shows:** the 25 latest error and warning lines that this host's Splunk agent wrote about itself. Columns: **Time**, **Level**, **Agent component** (the part of the agent that complained, for example the file reader), **Message**.
-- **Where it comes from:** the agent's own log as received by Splunk, for this host only, last 24 hours.
+- **Where it comes from:** the agent's own log as received by Splunk (the `_internal` index), for this host only, last 24 hours. The *dh_analyst* role can read `_internal` for this panel, so analysts can also see Splunk's own logs.
 - **How to read it:** empty is good. Lines about file permissions, a missing file, or a blocked output explain a missing input; read them before changing anything.
 
 ### Tamper findings on this host
@@ -227,7 +228,7 @@ Everything about one host. Pick the host at the top, or arrive here by clicking 
 
 ### Runbooks (click to open)
 - **What it shows:** the how-to pages linked to this host's expected items. Columns: **Runbook**, **Items** (how many use it).
-- **Where it comes from:** the runbook column of the expected list.
+- **Where it comes from:** the runbook column of the expected list. Only web links (`http://` or `https://`) are listed, so a click never opens anything else.
 - **How to read it:** click a row to open the page in a new tab. Empty means no runbook was set.
 
 ## Manage
@@ -345,7 +346,7 @@ If the item is muted when you set or clear its limit, the mute and its reason st
 
 ### Expected list tab
 
-Tell the app about data it should expect, so it alerts when that data stops. Rows that Ansible manages are changed in the Ansible inventory, not here. This tab needs the **dh_admin** role.
+Tell the app about data it should expect, so it alerts when that data stops, and retire what is gone for good. Rows that Ansible manages are changed in the Ansible inventory, not here; the one exception is retiring a row the inventory still lists, which holds until the inventory catches up. This tab needs the **dh_admin** role.
 
 #### Recipe: Add an expected row
 
@@ -371,6 +372,18 @@ Running the form again for an item you added here updates its row (the preview s
 4. Check **Adopt: preview**: the collection and profile the app suggests are in **After the change**.
 5. **Confirm (writes the change)**: choose "Apply: adopt …". **Adopt: result** says "Done: Adopt …". After a reload, the item has left the Unregistered table; it gets a status within a minute.
 
+#### Recipe: Retire a host that is gone for good
+
+Use this when a host or a stream is gone for good and nobody will bring it back. A mute only hides it for 30 days; a retirement stops expecting it.
+
+1. Check **Retirement candidates: expected but silent for 7 d or more**: it lists the items with no data for 7 days or more.
+2. In the third form, **Retire an expected item**: **Retire or undo**: Retire. **Expected item**: choose the host ("pi9: whole host (3 rows)") or one of its rows.
+3. Write a **Reason** (and a **Ticket** if you have one) and press Enter.
+4. Check **Retire: preview**: one line per row that will retire. If **After the change** says the Ansible inventory still lists it, remove the host from the inventory as well (`hl_expected: false` in its host_vars, then `--tags expected --limit homepc`). Until then the retirement holds: *DH Sync expected* leaves the row disabled.
+5. **Confirm (writes the change)**: choose "Apply: retire …". **Retire: result** says "Done: Retire …" for each row. Within a minute the item leaves the Overview and stops alerting. Nothing is deleted: each row stays on the expected list, disabled, with who retired it, when and why.
+
+To bring an item back, choose **Undo a retirement** in the same form. A row added here is expected again at once. A row Ansible manages comes back from the inventory: *DH Sync expected* adds it again within 5 minutes while the inventory still lists it. (Once the inventory has dropped it, add it to the inventory again instead.) Don't use **Add an expected row** for an Ansible row: it would make the row yours instead of Ansible's.
+
 #### Inputs
 
 | Input | What to enter |
@@ -390,6 +403,8 @@ Running the form again for an item you added here updates its row (the preview s
 | Runbook link (optional, - for none) | A link to its how-to page. |
 | Description (optional, - for none) | A short description. |
 | Unregistered item | Adopt form: an item that sends data but isn't expected, from the Unregistered table. |
+| Retire or undo | Retire form: Retire (stop expecting it) or Undo a retirement. |
+| Expected item | Retire form: a whole host (all its rows) or one row. For Retire, the expected items; for Undo, the retired ones. |
 | Reason (required) | Why you make the change (each form has its own). |
 | Ticket (optional, - for none) | A ticket or change number, or `-`. |
 | Confirm (writes the change) | Choose the Apply line to write the change shown in the preview. |
@@ -421,6 +436,21 @@ The adopt form's **Criticality** is the same list as the add form's.
 - **Where it comes from:** the write itself.
 - **How to read it:** the item leaves the Unregistered table and gets a status within a minute.
 
+#### Retirement candidates: expected but silent for 7 d or more
+- **What it shows:** expected items with no data for 7 days or more, or never seen though expected for 7 days. Muted items are included, because a host that is gone is often kept muted. Columns: **Item**, **Host**, **Level**, **Status**, **Last seen**, **Silent for**, **Expected since**, **Item ID**.
+- **Where it comes from:** the current statuses (the 7 days are the tunable `dh_retire_candidate_secs`).
+- **How to read it:** each row is either something that will come back (leave it, or mute it) or something gone for good: retire it with the form below. A long list here often means the Ansible inventory lags behind the real hosts.
+
+#### Retire: preview
+- **What it shows:** one line per row you are about to retire or bring back. Columns as for the add preview; **Check** says why it can't be applied (for example "Needs the dh_admin role" or "Nothing to retire: …").
+- **Where it comes from:** your form checked against the expected list. Nothing is written.
+- **How to read it:** when Check says OK, choose Apply under Confirm. The confirmation fits only this preview and only once.
+
+#### Retire: result
+- **What it shows:** "Done: Retire …" (or "Done: Undo retirement …") for each row, or "Nothing written: …".
+- **Where it comes from:** the write itself, which also adds one admin-log row per row.
+- **How to read it:** a retired item leaves the Overview within a minute. Its row stays on the expected list, disabled.
+
 ### Test blocks (admin) tab
 
 A **test block** throws a host's real data away in **Cribl Stream**, before it reaches Splunk, so you can check that the app notices the data going missing. It applies only to the linux, windows and network indexes and needs the **dh_admin** role. It starts in Cribl about 20 seconds after the command runs, and it ends by itself. The affected items show their real status (late, then missing) with the label "test block until hh:mm". Remove a block as soon as the test is over: in production, a block control is itself a way to blind monitoring.
@@ -449,8 +479,9 @@ A source block needs the **exact raw source** name, as listed in the raw sources
 | Block level | Whole host (all its data), One sourcetype, or One exact raw source. |
 | Sourcetype or raw source | For the lower levels: the sourcetype, or the exact raw source name (listed with its normalized form). Not needed for a whole-host block. |
 | Block for | How long: 5 minutes to 24 hours (the most allowed). |
+| Reason (required: 3 to 120 letters, digits, spaces or _ . : / # ( ) -) | Why you set or remove the block. The role checks the same rule, so a preview that says OK also runs on pi5. |
 
-The form also has its own **Reason (required)** and **Ticket (optional, - for none)**, as above. It has no Confirm: nothing is written from here. The reason goes into the command; the ticket doesn't, and it isn't stored anywhere (the *cribl_block* tag has no ticket).
+It has no Ticket box: the *cribl_block* tag stores no ticket. It has no Confirm: nothing is written from here. The reason goes into the command.
 
 #### Test block: preview
 - **What it shows:** the block you are about to add or remove. Columns: **Change**, **Item** (the block key in words), **Now**, **After the change**, **Check** and **Normalized source** (for reference only).
@@ -495,12 +526,12 @@ Every change made on Manage, newest first.
 
 ## Daily state of health
 
-The engineering view: the report made every day at 07:00, plus the live unregistered list. It doesn't refresh; reopen it the next day.
+The engineering view: the report made every day at 07:00 UTC (the server's time zone; midnight in Denver in winter), plus the live unregistered list. It doesn't refresh; reopen it the next day.
 
 ### Report time
 - **What it shows:** when the report shown was made.
 - **Where it comes from:** the latest daily report.
-- **How to read it:** it should be today at 07:00 (or the morning after the PC was off). "no report yet" means the report search hasn't run.
+- **How to read it:** it should be today at 07:00 UTC, shown in your own time zone (or the morning after the PC was off). "no report yet" means the report search hasn't run.
 
 ### Outages (24 h)
 - **What it shows:** how many outages (stretches of late, missing or never-seen data) ended in the last 24 hours or are still open.

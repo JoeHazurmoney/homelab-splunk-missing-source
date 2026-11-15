@@ -1,2 +1,2 @@
-| inputlookup @rows@ | eval _time=tonumber(time), dh_kind=case(kind=="marker", "marker", kind=="index", "index"), time=if(kind=="marker", null(), tonumber(time))
-| fields - kind | `dh_tamper_finish(@tamper@, @NOW@)`
+| inputlookup @rows@ | eval _time=tonumber(time), dh_kind=case(kind=="marker", "marker", kind=="index", "index"), time=if(kind=="marker" OR kind=="index", null(), tonumber(time)), dh_it=tonumber(it)
+| fields - kind it | `dh_tamper_finish(@tamper@, @NOW@)`

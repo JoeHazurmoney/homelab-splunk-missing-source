@@ -6,3 +6,4 @@ sourcetype|linux|h3|syslog|*,sourcetype|linux|h3|syslog|*,retire,ansible,0,NOW-9
 sourcetype|linux|h10|syslog|*,sourcetype|linux|h10|syslog|*,add,ansible,1,NOW,2,
 sourcetype|linux|h11|syslog|*,sourcetype|linux|h11|syslog|*,retire,ansible,0,NOW-9000,2,
 sourcetype|linux|newh|syslog|*,sourcetype|linux|newh|syslog|*,add,ansible,1,NOW,2,
+sourcetype|linux|h6|cron|*,sourcetype|linux|h6|cron|*,shadowed,,,,3,

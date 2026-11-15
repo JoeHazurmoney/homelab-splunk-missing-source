@@ -1,0 +1,6 @@
+| makeresults count=1440 | streamstats count as k | eval k=k-1, _time=@NOW@-99200+60*k, dh_kind="up" | where k<300 OR k>=420
+| append [| makeresults count=1440 | streamstats count as k | eval k=k-1, _time=@NOW@-99200+60*k, dh_kind="hb", host="H50B.mshome.net" | where k<720]
+| append [| makeresults count=1440 | streamstats count as k | eval k=k-1, _time=@NOW@-99200+60*k | where (k<300 OR k>=420 OR k==350 OR k==351) AND (k<600 OR k>=660) | eval dh_kind="data", index="enclave1", host="H50A.mshome.net", sourcetype="syslog", source="/var/log/messages", count=2, et=_time, it=_time+if(k==350 OR k==351, 3600, 5)]
+| append [| inputlookup @rows@ | eval _time=tonumber(time)]
+| fields - k time
+| `dh_daily_from_minutes(@fwd@, @expected@)`

@@ -1,0 +1,8 @@
+entity_id,level,host,status,last_indextime,expected_since,evaluated_at
+host|*|g1|*|*,host,g1,MISSING,NOW-700000,NOW-9000000,NOW
+sourcetype|linux|g1|syslog|*,sourcetype,g1,MUTED,NOW-605000,NOW-9000000,NOW
+sourcetype|linux|g2|syslog|*,sourcetype,g2,MISSING,NOW-600000,NOW-9000000,NOW
+sourcetype|linux|g3|syslog|*,sourcetype,g3,NEVER_SEEN,,NOW-650000,NOW
+sourcetype|linux|g4|syslog|*,sourcetype,g4,NEVER_SEEN,,NOW-3600,NOW
+sourcetype|linux|g5|syslog|*,sourcetype,g5,OK,NOW-60,NOW-9000000,NOW
+sourcetype|linux|g6|syslog|*,sourcetype,g6,MISSING,NOW-700000,NOW-9000000,NOW-3600

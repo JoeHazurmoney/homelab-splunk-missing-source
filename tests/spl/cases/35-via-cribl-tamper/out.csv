@@ -10,3 +10,5 @@ sourcetype|linux|h35b|cpu|*,OK,,
 host|*|h35c|*|*,OK,,
 sourcetype|linux|h35c|syslog|*,MISSING,hb_ok_input_missing,The Splunk agent works but this input stopped: its file is unreadable or was moved or rotated or auditd or rsyslog stopped or audit rules were removed
 sourcetype|linux|h35c|cpu|*,OK,,
+host|*|h35d|*|*,OK,,
+sourcetype|linux|h35d|syslog|*,MISSING,tamper,Possible deliberate blinding: Cribl routes create (r_drop) by admin at 2033-05-18 02:09 GMT just before the data stopped

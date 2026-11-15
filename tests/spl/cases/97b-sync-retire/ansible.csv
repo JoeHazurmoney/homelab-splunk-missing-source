@@ -1,0 +1,7 @@
+entity_id,level,index,host,sourcetype,source,collection,via,hypervisor,profile,interval_secs,max_gap_secs,criticality,owner,site,runbook,description,enabled
+,sourcetype,linux,x1,syslog,,uf,cribl,,continuous,,,2,taylorb,home,,,1
+,sourcetype,linux,r1,syslog,,uf,cribl,,continuous,,,2,taylorb,home,,,1
+,sourcetype,linux,r3,syslog,,uf,cribl,,continuous,,,2,taylorb,home,,,1
+,sourcetype,linux,r5,syslog,,uf,cribl,,continuous,,,2,taylorb,home,,,1
+,sourcetype,linux,r6,syslog,,uf,cribl,,continuous,,,2,taylorb,home,,,1
+,sourcetype,linux,r9,syslog,,uf,cribl,,continuous,,,2,taylorb,home,,,1

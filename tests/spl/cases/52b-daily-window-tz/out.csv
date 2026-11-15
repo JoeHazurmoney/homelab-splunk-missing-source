@@ -1,0 +1,4 @@
+c,earliest,latest
+partial,NOW-1136000,NOW-99200
+all,NOW-12800,NOW-12800
+none,NOW-1136000,NOW-12800

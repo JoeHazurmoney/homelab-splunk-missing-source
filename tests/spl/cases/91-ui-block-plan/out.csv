@@ -1,7 +1,7 @@
 g,dh_ok,check,k,source_norm,before,after,until,reason,set_by
 plan:b1,1,OK: run the command below on pi5,h1|*|*,,blocked until 2033-05-18 03:43 (old block),test block until 2033-05-18 04:33 (retest),NOW+3600,retest,taylor
-plan:b2,1,OK: run the command below on pi5,h4|linux_secure|*,,not blocked,test block until 2033-05-18 03:48 (r),NOW+900,r,taylor
-plan:b3,1,OK: run the command below on pi5,h5|linux_audit|/var/log/audit/audit.log.1,/var/log/audit/audit.log.*,not blocked,test block until 2033-05-18 03:34 (r),NOW+60,r,taylor
+plan:b2,1,OK: run the command below on pi5,h4|linux_secure|*,,not blocked,test block until 2033-05-18 03:48 (retest),NOW+900,retest,taylor
+plan:b3,1,OK: run the command below on pi5,h5|linux_audit|/var/log/audit/audit.log.1,/var/log/audit/audit.log.*,not blocked,test block until 2033-05-18 03:34 (retest),NOW+60,retest,taylor
 plan:b4,0,This has no active test block: nothing to remove,h2|syslog|*,,not blocked,not blocked,,r,taylor
 plan:b5,1,OK: run the command below on pi5,h3|cpu|cpu,cpu,blocked until 2033-05-18 03:38 (keep),not blocked,,r,taylor
 plan:b6,0,A test block lasts 1 minute to 24 hours,h1|*|*,,blocked until 2033-05-18 03:43 (old block),test block until 2033-05-19 04:33 (r),NOW+90000,r,taylor
@@ -18,3 +18,5 @@ plan:r8,0,This raw source has a character the command can't carry safely: block 
 plan:r9,0,This raw source has a character the command can't carry safely: block its sourcetype instead,-,,not blocked,test block until 2033-05-18 03:34 (r),NOW+60,r,taylor
 plan:r10,0,This raw source has a character the command can't carry safely: block its sourcetype instead,-,,not blocked,test block until 2033-05-18 03:34 (r),NOW+60,r,taylor
 plan:r11,0,This sourcetype has a character the command can't carry safely: block the whole host instead,-,,not blocked,test block until 2033-05-18 03:34 (r),NOW+60,r,taylor
+plan:b9,0,The reason must be 3 to 120 plain characters (letters digits spaces and _ . : / # ( ) -),h6|*|*,,not blocked,test block until 2033-05-18 03:48 (r),NOW+900,r,taylor
+plan:b10,0,The reason must be 3 to 120 plain characters (letters digits spaces and _ . : / # ( ) -),h6|*|*,,not blocked,test block until 2033-05-18 03:48 (bad$x),NOW+900,bad$x,taylor

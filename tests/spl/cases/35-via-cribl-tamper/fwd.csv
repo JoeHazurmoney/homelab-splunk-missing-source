@@ -2,3 +2,4 @@ host,last_heartbeat,last_marker_action,last_marker_time,last_marker_by,last_vm_e
 h35a,NOW-10,,,,,,,,
 h35b,NOW-10,,,,,,,,
 h35c,NOW-10,,,,,,,,
+h35d,NOW-10,apps,NOW-5000,taylorb,,,,,

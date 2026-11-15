@@ -89,7 +89,7 @@ panels() {
     args=()
     case $view in
       dh_host) args=("host=$host") ;;
-      dh_manage) args=("ov_host=$host" "ov_entity=host|*|$host|*|*" "bk_host=$host" "ov_reason=panel check" "ex_reason=panel check" "ad_reason=panel check" "bk_reason=panel check" "ex_host=dhtest-panel" "ad_entity=${unreg:-sourcetype|linux|dhtest-panel|syslog|*}") ;;
+      dh_manage) args=("ov_host=$host" "ov_entity=host|*|$host|*|*" "bk_host=$host" "ov_reason=panel check" "ex_reason=panel check" "ad_reason=panel check" "bk_reason=panel check" "rt_reason=panel check" "rt_entity=host|*|$host|*|*" "ex_host=dhtest-panel" "ad_entity=${unreg:-sourcetype|linux|dhtest-panel|syslog|*}") ;;
     esac
     # Searches run as jobs; chains run as post-process searches on their base's job, as in Studio.
     while IFS=$'\t' read -r ds base spl; do
@@ -190,12 +190,14 @@ w_run() {
   shift
   spl=$(queries dh_manage "$@" | awk -F'\t' -v d="$ds" '$1 == d { print $2 }')
   case $spl in "" | "#"*) echo "w_run: $ds not runnable: $spl" >&2; return 1 ;; esac
-  spl=$(printf '%s' "$spl" | sed 's/\<dh_overrides\>/dhtest_kv_overrides/g; s/\<dh_admin_log\>/dhtest_kv_admin_log/g; s/\<dh_expected\>/dhtest_kv_expected/g; s/\<hl_ingest_block\>/dhtest_w_blocks.csv/g')
+  spl=$(printf '%s' "$spl" | sed 's/\<dh_overrides\>/dhtest_kv_overrides/g; s/\<dh_admin_log\>/dhtest_kv_admin_log/g; s/\<dh_expected\>/dhtest_kv_expected/g; s/\<hl_ingest_block\>/dhtest_w_blocks.csv/g; s/\<dh_retire_nonce\>/dhtest_kv_nonce/g')
   if [ -n "${DH_DEBUG:-}" ]; then dh_search "$spl" xml | grep -o '<msg[^<]*' | sed "s/^/  $ds: /" >&2 || true; fi
   # (actor_roles is multivalued: dropped so that every row stays on one CSV line)
   dh_search "$spl | fields - actor_roles" csv | tr -d '\r'
 }
 col() { awk -F, -v n="$1" 'NR == 1 { for (i = 1; i <= NF; i++) { gsub(/"/, "", $i); c[$i] = i } next } { v = $c[n]; gsub(/"/, "", v); print v }'; }
+# ccol <name>: like col, for CSV whose cells may hold commas (a real CSV reader).
+ccol() { PYTHONIOENCODING=utf-8 python -c 'import csv, sys; [print(r.get(sys.argv[1], "")) for r in csv.DictReader(sys.stdin)]' "$1" | tr -d '\r'; }
 expect() { # expect <label> <got> <want-regex>
   if printf '%s' "$2" | grep -Eq -- "$3"; then echo "PASS $1"; else echo "FAIL $1: got '$2', want /$3/"; WFAIL=1; fi
 }
@@ -207,6 +209,7 @@ writes() {
   kv_make dhtest_kv_overrides dh_overrides
   kv_make dhtest_kv_admin_log dh_admin_log
   kv_make dhtest_kv_expected dh_expected
+  kv_make dhtest_kv_nonce dh_retire_nonce
   ov=("ov_host=dhtest-w1" "ov_entity=host|*|dhtest-w1|*|*" "ov_action=mute" "ov_duration=3600" "ov_reason=writes test" "ov_ticket=CHG-12")
   # Override: preview, then apply with the previewed token.
   tok=$(w_run ds_ov_plan "${ov[@]}" | col dh_token)
@@ -266,7 +269,7 @@ writes() {
   # Test block (task 11b): the block lives in Cribl, so the form writes nothing; it shows the role's
   # cribl_block command. A throwaway block table with one live block on the requested key makes the
   # remove case previewable; it and the admin log stay as they were.
-  bk=("bk_action=add" "bk_host=dhtest-w4" "bk_level=source" "bk_target=linux_secure|/var/log/secure.1" "bk_duration=900" "bk_reason=writes test" "bk_ticket=CHG-B")
+  bk=("bk_action=add" "bk_host=dhtest-w4" "bk_level=source" "bk_target=linux_secure|/var/log/secure.1" "bk_duration=900" "bk_reason=writes test")
   printf 'k,until,reason,set_by
 dhtest-w4|linux_secure|/var/log/secure.1,%s,writes test,admin
 ' "$(($(date +%s) + 3600))" >"$work/dhtest_w_blocks.csv"
@@ -285,11 +288,39 @@ dhtest-w4|linux_secure|/var/log/secure.1,%s,writes test,admin
   bk_sum1=$(dh_docker exec -u root "$DH_CONTAINER" md5sum "$DH_APP_DIR/lookups/dhtest_w_blocks.csv")
   expect "the block form left its table as it was" "$bk_sum1" "^${bk_sum0%% *}"
   # An unknown key cannot be removed: the preview says why and there is no command.
-  bk=("bk_action=remove" "bk_host=dhtest-w4" "bk_level=host" "bk_target=-" "bk_duration=900" "bk_reason=writes test" "bk_ticket=CHG-B")
+  bk=("bk_action=remove" "bk_host=dhtest-w4" "bk_level=host" "bk_target=-" "bk_duration=900" "bk_reason=writes test")
   res=$(w_run ds_bk_command "${bk[@]}" | col Command)
   expect "block command for a key with no active block" "$res" '^Not ready: This has no active test block'
   res=$(kv_get dhtest_kv_admin_log 'stats count')
   expect "admin log: every applied change, nothing for the refused ones (no block rows: task 11b)" "$(printf '%s' "$res" | sed -n 2p)" '^6$'
+  # Retire (#48): a whole host with an Ansible row and a UI row; the retire key; undo.
+  local rt n0 n1
+  res=$(w_run ds_rt_plan "rt_action=retire" "rt_entity=host|*|dhtest-w5|*|*" "rt_reason=writes test" "rt_ticket=-" | ccol check | sort -u)
+  expect "retire preview before the key exists" "$res" '^Not ready yet'
+  dh_search '| makeresults | eval _key="retire", nonce="seed-w", rotated_at=now() | table _key nonce rotated_at | outputlookup append=true key_field=_key dhtest_kv_nonce' csv >/dev/null
+  dh_search '| makeresults count=2 | streamstats count as i | eval st=if(i==1, "syslog", "auth"), entity_id="sourcetype|linux|dhtest-w5|".st."|*", _key=entity_id, level="sourcetype", index="linux", host="dhtest-w5", sourcetype=st, collection="uf", profile="continuous", criticality=2, managed_by=if(i==1, "ansible", "ui"), enabled=1, expected_since=now()-9000 | fields - i st | outputlookup append=true key_field=_key dhtest_kv_expected' csv >/dev/null
+  rt=("rt_action=retire" "rt_entity=host|*|dhtest-w5|*|*" "rt_reason=writes test" "rt_ticket=CHG-R")
+  tok=$(w_run ds_rt_plan "${rt[@]}" | ccol dh_token | sort -u)
+  expect "retire preview gives one token for the host's rows" "$tok" '^[0-9a-f]{32}$'
+  res=$(w_run ds_rt_confirm "${rt[@]}" | ccol label)
+  expect "retire confirmation offers one Apply line" "$res" '^Apply: retire dhtest-w5: whole host \(2 rows\)$'
+  n0=$(kv_get dhtest_kv_nonce 'table nonce' | sed -n 2p)
+  res=$(w_run ds_rt_apply "${rt[@]}" "rt_confirm=$tok" | ccol Result | sort | tr '\n' ';')
+  expect "retire applied to both rows" "$res" '^Done: Retire dhtest-w5 .{1,3} auth \(linux\);Done: Retire dhtest-w5 .{1,3} syslog \(linux\);$'
+  res=$(kv_get dhtest_kv_expected 'search host=dhtest-w5 | sort entity_id | eval e=sourcetype.":".managed_by.":".enabled.":".retired_by.":".retired_hold.":".retired_ticket.":".if(expected_since<now()-8000, "kept", "new") | stats list(e) as e | eval e=mvjoin(e, " ")' | sed -n 2p)
+  expect "retired rows kept, disabled, held, owner kept" "$res" '^"?auth:ui:0:admin:1:CHG-R:kept syslog:ansible:0:admin:1:CHG-R:kept"?$'
+  n1=$(kv_get dhtest_kv_nonce 'table nonce' | sed -n 2p)
+  if [ -n "$n0" ] && [ "$n0" != "$n1" ]; then echo "PASS retire key rotated by the apply"; else echo "FAIL retire key not rotated ('$n0' -> '$n1')"; WFAIL=1; fi
+  res=$(w_run ds_rt_apply "${rt[@]}" "rt_confirm=$tok" | ccol Result)
+  expect "retire repeat applies nothing" "$res" '^Nothing written'
+  rt=("rt_action=unretire" "rt_entity=host|*|dhtest-w5|*|*" "rt_reason=writes test undo" "rt_ticket=-")
+  tok=$(w_run ds_rt_plan "${rt[@]}" | ccol dh_token | sort -u)
+  res=$(w_run ds_rt_apply "${rt[@]}" "rt_confirm=$tok" | ccol Result | sort | tr '\n' ';')
+  expect "undo applied to both rows" "$res" '^Done: Undo retirement dhtest-w5 .{1,3} auth \(linux\);Done: Undo retirement dhtest-w5 .{1,3} syslog \(linux\);$'
+  res=$(kv_get dhtest_kv_expected 'search host=dhtest-w5 | sort entity_id | eval e=sourcetype.":".managed_by.":".enabled.":".coalesce(retired_by, "-").":".retired_hold.":".if(expected_since<now()-8000, "kept", "new") | stats list(e) as e | eval e=mvjoin(e, " ")' | sed -n 2p)
+  expect "undo: the UI row is expected again, the Ansible row waits for the sync" "$res" '^"?auth:ui:1:-:0:new syslog:ansible:0:admin:0:kept"?$'
+  res=$(kv_get dhtest_kv_admin_log 'stats count')
+  expect "admin log: one row per retired and per restored row" "$(printf '%s' "$res" | sed -n 2p)" '^10$'
   [ "$WFAIL" -eq 0 ] && echo "writes: PASS"
   [ "$WFAIL" -eq 0 ]
 }
@@ -305,24 +336,31 @@ entity_id,level,index,host,sourcetype,source,collection,via,hypervisor,profile,i
 ,sourcetype,linux,dhtest-s1,syslog,,uf,cribl,,continuous,,,2,taylorb,home,,,1
 ,sourcetype,linux,dhtest-s2,syslog,,uf,cribl,,continuous,,,1,taylorb,home,,,1
 ,sourcetype,linux,dhtest-new,syslog,,uf,cribl,,continuous,,,2,taylorb,home,,,1
+,sourcetype,linux,dhtest-s5,syslog,,uf,cribl,,continuous,,,2,taylorb,home,,,1
 EOF
   cat >"$src/seed.csv" <<'EOF'
-entity_id,level,index,host,sourcetype,source,collection,via,hypervisor,profile,interval_secs,max_gap_secs,criticality,owner,site,runbook,description,managed_by,enabled,expected_since
+entity_id,level,index,host,sourcetype,source,collection,via,hypervisor,profile,interval_secs,max_gap_secs,criticality,owner,site,runbook,description,managed_by,enabled,expected_since,retired_by,retired_hold
 sourcetype|linux|dhtest-s1|syslog|*,sourcetype,linux,dhtest-s1,syslog,,uf,cribl,,continuous,,,2,taylorb,home,,,ansible,1,NOW-9000
 sourcetype|linux|dhtest-s2|syslog|*,sourcetype,linux,dhtest-s2,syslog,,uf,cribl,,continuous,,,3,taylorb,home,,,ansible,1,NOW-9000
 sourcetype|linux|dhtest-s3|syslog|*,sourcetype,linux,dhtest-s3,syslog,,uf,cribl,,continuous,,,2,taylorb,home,,,ansible,1,NOW-9000
 sourcetype|linux|dhtest-s4|syslog|*,sourcetype,linux,dhtest-s4,syslog,,uf,,,sporadic,,,3,ops,lab,,,ui,1,NOW-5000
+sourcetype|linux|dhtest-s5|syslog|*,sourcetype,linux,dhtest-s5,syslog,,uf,cribl,,continuous,,,2,taylorb,home,,,ansible,0,NOW-9000,admin,1
 EOF
   upload sync "$src"
   kv_make dhtest_kv_expected dh_expected
+  kv_make dhtest_kv_nonce dh_retire_nonce
   dh_search '| inputlookup dhtest_sync_seed.csv | eval _key=entity_id | fields - dh_* | outputlookup append=true key_field=_key dhtest_kv_expected' csv >/dev/null
   spl=$(conf_lines "$here/../../splunk/apps/$DH_APP/default/savedsearches.conf" | grep -F '|[DH Sync expected]|search = ' | sed 's/.*|search = //')
   if [ -z "$spl" ]; then echo "sync: FAIL DH Sync expected not found"; return 1; fi
-  spl=$(printf '%s' "$spl" | sed 's/\<dh_expected_ansible\>/dhtest_sync_ansible.csv/g; s/\<dh_expected\>/dhtest_kv_expected/g')
+  spl=$(printf '%s' "$spl" | sed 's/\<dh_expected_ansible\>/dhtest_sync_ansible.csv/g; s/\<dh_expected\>/dhtest_kv_expected/g; s/\<dh_retire_nonce\>/dhtest_kv_nonce/g')
   res=$(dh_search "$spl" csv | tr -d '\r' | col written)
   expect "first sync writes only the three changes" "$res" '^3$'
   res=$(kv_get dhtest_kv_expected 'stats count')
-  expect "no row left dh_expected" "$(printf '%s' "$res" | sed -n 2p)" '^5$'
+  expect "no row left dh_expected" "$(printf '%s' "$res" | sed -n 2p)" '^6$'
+  res=$(kv_get dhtest_kv_nonce 'stats count')
+  expect "the sync created the retire key" "$(printf '%s' "$res" | sed -n 2p)" '^1$'
+  res=$(kv_get dhtest_kv_expected 'search host=dhtest-s5 | table managed_by enabled retired_by retired_hold')
+  expect "a row retired in Manage stays retired while the file lists it (held)" "$(printf '%s' "$res" | sed -n 2p)" '^ansible,0,admin,1$'
   res=$(kv_get dhtest_kv_expected 'search host=dhtest-s1 | table managed_by enabled criticality expected_since')
   expect "an unchanged row keeps its expected_since" "$(printf '%s' "$res" | sed -n 2p)" '^ansible,1,2,1999991000(\.0)?$'
   res=$(kv_get dhtest_kv_expected 'search host=dhtest-s2 | table enabled criticality expected_since')
@@ -333,8 +371,11 @@ EOF
   expect "a UI row stays" "$(printf '%s' "$res" | sed -n 2p)" '^ui,1,1999995000(\.0)?$'
   res=$(kv_get dhtest_kv_expected 'search host=dhtest-new | eval es=if(abs(expected_since-now())<120, "now", expected_since) | table managed_by enabled es')
   expect "a new row starts its grace now" "$(printf '%s' "$res" | sed -n 2p)" '^ansible,1,now$'
-  res=$(dh_search "$spl" csv | tr -d '\r' | col written)
-  expect "a second sync writes nothing (KV types read back as written)" "$res" '^0$'
+  res=$(dh_search "$spl" csv | tr -d '\r')
+  expect "a second sync writes nothing (KV types read back as written)" "$(printf '%s' "$res" | col written)" '^0$'
+  expect "the second sync still counts the held row" "$(printf '%s' "$res" | col held)" '^1$'
+  res=$(kv_get dhtest_kv_expected 'search host=dhtest-s5 | table enabled retired_hold')
+  expect "the held row is still retired after two syncs" "$(printf '%s' "$res" | sed -n 2p)" '^0,1$'
   [ "$WFAIL" -eq 0 ] && echo "sync: PASS"
   [ "$WFAIL" -eq 0 ]
 }

@@ -1,10 +1,10 @@
 <dashboard version="2" theme="dark">
     <label>Manage</label>
-    <description>Mute data during planned work, change how long an item may stay silent, keep the expected list up to date and run test blocks; every change is previewed first and recorded in the admin log.</description>
+    <description>Mute data during planned work, change how long an item may stay silent, keep the expected list up to date (add, adopt, retire) and run test blocks; every change is previewed first and recorded in the admin log.</description>
     <definition><![CDATA[
 {
     "title": "Manage",
-    "description": "Mute data during planned work, change how long an item may stay silent, keep the expected list up to date and run test blocks; every change is previewed first and recorded in the admin log.",
+    "description": "Mute data during planned work, change how long an item may stay silent, keep the expected list up to date (add, adopt, retire) and run test blocks; every change is previewed first and recorded in the admin log.",
     "expressions": {
         "conditions": {
             "cond_ov_ready": {
@@ -31,9 +31,17 @@
                 "name": "Adopt form confirmed",
                 "value": "isSet($ad_entity$) and isSet($ad_crit$) and isSet($ad_reason$) and isSet($ad_ticket$) and isSet($ad_confirm$)"
             },
+            "cond_rt_ready": {
+                "name": "Retire form filled in",
+                "value": "isSet($rt_action$) and isSet($rt_entity$) and isSet($rt_reason$) and isSet($rt_ticket$)"
+            },
+            "cond_rt_done": {
+                "name": "Retire form confirmed",
+                "value": "isSet($rt_action$) and isSet($rt_entity$) and isSet($rt_reason$) and isSet($rt_ticket$) and isSet($rt_confirm$)"
+            },
             "cond_bk_ready": {
                 "name": "Test-block form filled in",
-                "value": "isSet($bk_action$) and isSet($bk_host$) and isSet($bk_level$) and isSet($bk_target$) and isSet($bk_duration$) and isSet($bk_reason$) and isSet($bk_ticket$)"
+                "value": "isSet($bk_action$) and isSet($bk_host$) and isSet($bk_level$) and isSet($bk_target$) and isSet($bk_duration$) and isSet($bk_reason$)"
             }
         }
     },
@@ -539,6 +547,94 @@
                 }
             }
         },
+        "input_rt_action": {
+            "type": "input.dropdown",
+            "title": "Retire or undo",
+            "options": {
+                "items": [
+                    {
+                        "label": "Retire (stop expecting it)",
+                        "value": "retire"
+                    },
+                    {
+                        "label": "Undo a retirement",
+                        "value": "unretire"
+                    }
+                ],
+                "token": "rt_action",
+                "defaultValue": "retire"
+            }
+        },
+        "input_rt_entity": {
+            "type": "input.dropdown",
+            "title": "Expected item",
+            "options": {
+                "items": ">frame(label, value) | prepend(formattedStatics) | objects()",
+                "token": "rt_entity",
+                "defaultValue": "-",
+                "isCascadingInput": true
+            },
+            "dataSources": {
+                "primary": "ds_rt_entities"
+            },
+            "context": {
+                "formattedConfig": {
+                    "number": {
+                        "prefix": ""
+                    }
+                },
+                "formattedStatics": ">statics | formatByType(formattedConfig)",
+                "statics": [],
+                "label": ">primary | seriesByName(\"label\") | renameSeries(\"label\") | formatByType(formattedConfig)",
+                "value": ">primary | seriesByName(\"value\") | renameSeries(\"value\") | formatByType(formattedConfig)"
+            }
+        },
+        "input_rt_reason": {
+            "type": "input.text",
+            "title": "Reason (required)",
+            "options": {
+                "token": "rt_reason",
+                "placeholder": "Why? For example: host decommissioned, see CHG-123"
+            }
+        },
+        "input_rt_ticket": {
+            "type": "input.text",
+            "title": "Ticket (optional, - for none)",
+            "options": {
+                "token": "rt_ticket",
+                "defaultValue": "-"
+            }
+        },
+        "input_rt_confirm": {
+            "type": "input.dropdown",
+            "title": "Confirm (writes the change)",
+            "options": {
+                "items": ">frame(label, value) | prepend(formattedStatics) | objects()",
+                "token": "rt_confirm",
+                "isCascadingInput": true
+            },
+            "dataSources": {
+                "primary": "ds_rt_confirm"
+            },
+            "context": {
+                "formattedConfig": {
+                    "number": {
+                        "prefix": ""
+                    }
+                },
+                "formattedStatics": ">statics | formatByType(formattedConfig)",
+                "statics": [],
+                "label": ">primary | seriesByName(\"label\") | renameSeries(\"label\") | formatByType(formattedConfig)",
+                "value": ">primary | seriesByName(\"value\") | renameSeries(\"value\") | formatByType(formattedConfig)"
+            },
+            "containerOptions": {
+                "visibility": {
+                    "showConditions": [
+                        "cond_rt_ready"
+                    ]
+                }
+            }
+        },
         "input_bk_action": {
             "type": "input.dropdown",
             "title": "Action",
@@ -658,18 +754,10 @@
         },
         "input_bk_reason": {
             "type": "input.text",
-            "title": "Reason (required)",
+            "title": "Reason (required: 3 to 120 letters, digits, spaces or _ . : / # ( ) -)",
             "options": {
                 "token": "bk_reason",
                 "placeholder": "Why? For example: test that the app sees pi5 go missing"
-            }
-        },
-        "input_bk_ticket": {
-            "type": "input.text",
-            "title": "Ticket (optional, - for none)",
-            "options": {
-                "token": "bk_ticket",
-                "defaultValue": "-"
             }
         },
         "input_lg_text": {
@@ -842,6 +930,50 @@
                 "query": "| makeresults | eval entity_id=$ad_entity|s$ | `dh_ui_adopt_row(dh_baseline, dh_fwd)` | eval criticality=$ad_crit|s$, reason=$ad_reason|s$, ticket=$ad_ticket|s$ | `dh_ui_actor` | `dh_ui_expected_plan(dh_expected, dh_admin_log, now())` | eval dh_confirm=$ad_confirm|s$ | `dh_ui_expected_write(dh_expected, dh_admin_log, now())` | `dh_ui_headers`"
             }
         },
+        "ds_rt_entities": {
+            "type": "ds.search",
+            "name": "Retire choices",
+            "options": {
+                "query": "| makeresults | eval dh_act=$rt_action|s$ | `dh_ui_retire_choices(dh_expected)` | streamstats count as dh_i | appendpipe [| stats count | eval label=if($rt_action|s$==\"unretire\", \"Choose a retired item\", \"Choose an expected item\"), value=\"-\", dh_i=0 | table label value dh_i] | eval dh_o=if(value==\"-\", 0, 1) | sort 0 dh_o dh_i | table label value"
+            }
+        },
+        "ds_rt_plan": {
+            "type": "ds.search",
+            "name": "Retire: plan",
+            "options": {
+                "query": "| makeresults | eval entity_id=$rt_entity|s$, dh_action=$rt_action|s$, reason=$rt_reason|s$, ticket=$rt_ticket|s$ | `dh_ui_actor` | `dh_ui_retire_plan(dh_expected, dh_admin_log, dh_retire_nonce, now())`"
+            }
+        },
+        "ds_rt_preview": {
+            "type": "ds.chain",
+            "name": "Retire: preview",
+            "options": {
+                "extend": "ds_rt_plan",
+                "query": "| table ui_change ui_item ui_now ui_after check | `dh_ui_headers`"
+            }
+        },
+        "ds_rt_confirm": {
+            "type": "ds.chain",
+            "name": "Retire: confirmation choice",
+            "options": {
+                "extend": "ds_rt_plan",
+                "query": "| where dh_ok==1 | stats first(dh_label) as label by dh_token | rename dh_token AS value | table label value"
+            }
+        },
+        "ds_rt_apply": {
+            "type": "ds.search",
+            "name": "Retire: apply",
+            "options": {
+                "query": "| makeresults | eval entity_id=$rt_entity|s$, dh_action=$rt_action|s$, reason=$rt_reason|s$, ticket=$rt_ticket|s$ | `dh_ui_actor` | `dh_ui_retire_plan(dh_expected, dh_admin_log, dh_retire_nonce, now())` | eval dh_confirm=$rt_confirm|s$ | `dh_ui_retire_write(dh_expected, dh_admin_log, dh_retire_nonce, now())` | `dh_ui_headers`"
+            }
+        },
+        "ds_rt_cand": {
+            "type": "ds.search",
+            "name": "Retirement candidates",
+            "options": {
+                "query": "| `dh_ui_retire_candidates(dh_status, now())` | `dh_ui_headers`"
+            }
+        },
         "ds_bk_sources": {
             "type": "ds.search",
             "name": "Raw sources of the host (24 h)",
@@ -869,7 +1001,7 @@
             "type": "ds.search",
             "name": "Test block: plan",
             "options": {
-                "query": "| makeresults | eval dh_action=$bk_action|s$, level=$bk_level|s$, host=$bk_host|s$, target=$bk_target|s$, dh_secs=$bk_duration|s$, reason=$bk_reason|s$, ticket=$bk_ticket|s$ | `dh_ui_actor` | `dh_ui_block_plan(hl_ingest_block, now())`"
+                "query": "| makeresults | eval dh_action=$bk_action|s$, level=$bk_level|s$, host=$bk_host|s$, target=$bk_target|s$, dh_secs=$bk_duration|s$, reason=$bk_reason|s$ | `dh_ui_actor` | `dh_ui_block_plan(hl_ingest_block, now())`"
             }
         },
         "ds_bk_preview": {
@@ -1137,6 +1269,85 @@
                 "visibility": {
                     "showConditions": [
                         "cond_ad_done"
+                    ]
+                }
+            }
+        },
+        "viz_rt_cand": {
+            "type": "splunk.table",
+            "title": "Retirement candidates: expected but silent for 7 d or more",
+            "dataSources": {
+                "primary": "ds_rt_cand"
+            },
+            "options": {
+                "count": 25
+            },
+            "description": "Expected items with no data for 7 days or more, or never seen though expected for 7 days, muted ones included. One that is gone for good can be retired with the form below. Guide (project repo): docs/data-health/dashboards.md > Manage > Retirement candidates: expected but silent for 7 d or more"
+        },
+        "viz_rt_intro": {
+            "type": "splunk.markdown",
+            "options": {
+                "markdown": "**Retire an expected item** (needs the dh_admin role) when a host or a stream is gone for good: it stops being expected, so it stops alerting, and its row stays on the list, disabled, for its history. Nothing is deleted. A whole host retires with all its rows. If the Ansible inventory still lists it, the retirement holds until the inventory drops it, so remove it there too. **Undo a retirement** brings it back. Nothing is written until you choose **Apply** under **Confirm**."
+            }
+        },
+        "viz_rt_steps": {
+            "type": "splunk.markdown",
+            "options": {
+                "markdown": "**Preview: fill in the form above.** Choose **Retire** or **Undo a retirement**, then the **Expected item** (a whole host, or one of its rows), and write a **Reason**. The preview of the change then appears here."
+            },
+            "containerOptions": {
+                "visibility": {
+                    "hideConditions": [
+                        "cond_rt_ready"
+                    ]
+                }
+            }
+        },
+        "viz_rt_preview": {
+            "type": "splunk.table",
+            "title": "Retire: preview",
+            "dataSources": {
+                "primary": "ds_rt_preview"
+            },
+            "options": {
+                "count": 25
+            },
+            "description": "The rows you are about to retire or bring back, and whether it can be applied. Nothing is written yet. Guide (project repo): docs/data-health/dashboards.md > Manage > Retire: preview",
+            "containerOptions": {
+                "visibility": {
+                    "showConditions": [
+                        "cond_rt_ready"
+                    ]
+                }
+            }
+        },
+        "viz_rt_wait": {
+            "type": "splunk.markdown",
+            "options": {
+                "markdown": "**Nothing written yet.** When the Check column of the preview says OK, open **Confirm** and choose the line that starts with **Apply**. That writes the change at once and records it on the Admin log tab."
+            },
+            "containerOptions": {
+                "visibility": {
+                    "hideConditions": [
+                        "cond_rt_done"
+                    ]
+                }
+            }
+        },
+        "viz_rt_result": {
+            "type": "splunk.table",
+            "title": "Retire: result",
+            "dataSources": {
+                "primary": "ds_rt_apply"
+            },
+            "options": {
+                "count": 25
+            },
+            "description": "What was written when you chose Apply. Guide (project repo): docs/data-health/dashboards.md > Manage > Retire: result",
+            "containerOptions": {
+                "visibility": {
+                    "showConditions": [
+                        "cond_rt_done"
                     ]
                 }
             }
@@ -1425,7 +1636,7 @@
                 "type": "grid",
                 "options": {
                     "width": 1440,
-                    "height": 1828
+                    "height": 2826
                 },
                 "structure": [
                     {
@@ -1757,6 +1968,116 @@
                             "w": 1440,
                             "h": 150
                         }
+                    },
+                    {
+                        "item": "viz_rt_cand",
+                        "type": "block",
+                        "position": {
+                            "x": 0,
+                            "y": 1828,
+                            "w": 1440,
+                            "h": 320
+                        }
+                    },
+                    {
+                        "item": "viz_rt_intro",
+                        "type": "block",
+                        "position": {
+                            "x": 0,
+                            "y": 2148,
+                            "w": 1440,
+                            "h": 90
+                        }
+                    },
+                    {
+                        "item": "input_rt_action",
+                        "type": "input",
+                        "position": {
+                            "x": 0,
+                            "y": 2238,
+                            "w": 360,
+                            "h": 96
+                        }
+                    },
+                    {
+                        "item": "input_rt_entity",
+                        "type": "input",
+                        "position": {
+                            "x": 360,
+                            "y": 2238,
+                            "w": 1080,
+                            "h": 96
+                        }
+                    },
+                    {
+                        "item": "input_rt_reason",
+                        "type": "input",
+                        "position": {
+                            "x": 0,
+                            "y": 2334,
+                            "w": 960,
+                            "h": 96
+                        }
+                    },
+                    {
+                        "item": "input_rt_ticket",
+                        "type": "input",
+                        "position": {
+                            "x": 960,
+                            "y": 2334,
+                            "w": 480,
+                            "h": 96
+                        }
+                    },
+                    {
+                        "item": "viz_rt_steps",
+                        "type": "block",
+                        "position": {
+                            "x": 0,
+                            "y": 2430,
+                            "w": 480,
+                            "h": 150
+                        }
+                    },
+                    {
+                        "item": "viz_rt_preview",
+                        "type": "block",
+                        "position": {
+                            "x": 480,
+                            "y": 2430,
+                            "w": 960,
+                            "h": 150
+                        }
+                    },
+                    {
+                        "item": "input_rt_confirm",
+                        "type": "input",
+                        "position": {
+                            "x": 0,
+                            "y": 2580,
+                            "w": 600,
+                            "h": 96
+                        }
+                    },
+                    {
+                        "item": "viz_rt_wait",
+                        "type": "block",
+                        "position": {
+                            "x": 600,
+                            "y": 2580,
+                            "w": 840,
+                            "h": 96
+                        }
+                    },
+                    {
+                        "item": "viz_rt_result",
+                        "type": "block",
+                        "position": {
+                            "x": 0,
+                            "y": 2676,
+                            "w": 1440,
+                            "h": 150
+                        }
                     }
                 ]
             },
@@ -1833,17 +2154,7 @@
                         "position": {
                             "x": 240,
                             "y": 186,
-                            "w": 720,
-                            "h": 96
-                        }
-                    },
-                    {
-                        "item": "input_bk_ticket",
-                        "type": "input",
-                        "position": {
-                            "x": 960,
-                            "y": 186,
-                            "w": 480,
+                            "w": 1200,
                             "h": 96
                         }
                     },

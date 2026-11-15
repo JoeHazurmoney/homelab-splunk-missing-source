@@ -1,0 +1,10 @@
+| makeresults | where 1==0 | append [| makeresults | eval entity_id="host|*|h1|*|*", dh_action="retire", reason="host gone", ticket="CHG-1", actor="taylor", actor_roles="admin" | `dh_ui_retire_plan(@exp@, @log@, @nonce@, @NOW@)` | eval q="q1"]
+| append [| makeresults | eval entity_id="sourcetype|linux|h2|syslog|*", dh_action="retire", reason="x", ticket="-", actor="ana", actor_roles="dh_analyst" | `dh_ui_retire_plan(@exp@, @log@, @nonce@, @NOW@)` | eval q="q2"]
+| append [| makeresults | eval entity_id="sourcetype|linux|h3|syslog|*", dh_action="retire", reason="again", ticket="-", actor="taylor", actor_roles="admin" | `dh_ui_retire_plan(@exp@, @log@, @nonce@, @NOW@)` | eval q="q3"]
+| append [| makeresults | eval entity_id="sourcetype|linux|h3|syslog|*", dh_action="unretire", reason="back", ticket="-", actor="taylor", actor_roles="admin" | `dh_ui_retire_plan(@exp@, @log@, @nonce@, @NOW@)` | eval q="q4"]
+| append [| makeresults | eval entity_id="sourcetype|linux|h4|syslog|*", dh_action="unretire", reason="back", ticket="-", actor="taylor", actor_roles="admin" | `dh_ui_retire_plan(@exp@, @log@, @nonce@, @NOW@)` | eval q="q5"]
+| append [| makeresults | eval entity_id="sourcetype|linux|h5|syslog|*", dh_action="unretire", reason="back", ticket="-", actor="taylor", actor_roles="admin" | `dh_ui_retire_plan(@exp@, @log@, @nonce@, @NOW@)` | eval q="q6"]
+| append [| makeresults | eval entity_id="sourcetype|linux|h2|syslog|*", dh_action="retire", reason="-", ticket="-", actor="taylor", actor_roles="admin" | `dh_ui_retire_plan(@exp@, @log@, @nonce@, @NOW@)` | eval q="q7"]
+| append [| makeresults | eval entity_id="sourcetype|linux|h2|syslog|*", dh_action="retire", reason="gone", ticket="-", actor="taylor", actor_roles="admin" | `dh_ui_retire_plan(@exp@, @log@, @nonce0@, @NOW@)` | eval q="q8"]
+| append [| makeresults | eval entity_id="sourcetype|linux|h2|syslog|*", dh_action="retire", reason="gone", ticket="-", actor="taylor", actor_roles="dh_admin" | `dh_ui_retire_plan(@exp@, @log@, @nonce@, @NOW@)` | eval q="q9"]
+| eventstats dc(dh_token) as ntok by q | eval has_token=if(isnotnull(dh_token), 1, 0)

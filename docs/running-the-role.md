@@ -109,7 +109,7 @@ Desktop's NAT hides source addresses, so nothing here is identified by IP.
 | Tag | Hosts | Example | Notes |
 |---|---|---|---|
 | `status` | UF hosts | `--tags status --limit wd2l-recv` | read-only: service, version (rpm or MSI) and build, `last_connect`, `last_close`, apps, FIPS; on Windows also the service account |
-| `stop` / `start` / `restart` | UF hosts | `--tags stop --limit wd2l-recv` | posts a marker before a stop and after a start or restart, so the Overview says "Stopped with Ansible …" |
+| `stop` / `start` / `restart` | UF hosts | `--tags stop --limit wd2l-recv` | posts a marker before each stop, start or restart that changes the service, and again after a start or restart, so the Overview says "Stopped with Ansible …" and the restart's own events aren't tamper findings |
 | `verify` | all | `--tags verify` | read-only: UFs running on the vault's current token and connected through Cribl, their `_internal` seen in Splunk, Cribl healthy, and every expected row seen. Fails on a `MISSING` or `NEVER_SEEN` row whose profile isn't sporadic |
 | `cribl_block` | homepc | see below | a test block in Cribl |
 | `download` | pi5 (`--limit pi5`) | `--tags download --limit pi5` | the UF packages |
@@ -189,6 +189,11 @@ host's UF-derived rows (its host row and input rows). Any `dh_extra_expected` ro
 stays, because that data doesn't depend on the UF. **Don't pass `-e hl_expected=false`:** an extra
 var overrides every host's value, so that run would retire every UF host's rows.
 
+The inventory is the normal way. When it lags behind a host's real removal, an admin can retire the
+host from the app (Manage → Expected list → *Retire an expected item*); *DH Sync expected* then
+leaves those rows disabled while the inventory still lists them (the run's output counts them as
+`held`) and lets go once the inventory drops them. Nothing is deleted.
+
 To put a host back: `--tags install,apps,audit_rules --limit <host>`, then remove the
 `hl_expected: false` line and run `--tags expected --limit homepc`. Until the install, its rows read
 "Uninstalled with Ansible at … by … and not installed again". **A reinstalled UF re-reads every monitored file from the start** (it has no record of what
@@ -215,8 +220,8 @@ own record of what it pushed, not with Cribl's live config, so after a UI edit i
 and restarts nothing. Its load check ("Check Cribl loaded the role's inputs, outputs, routes,
 pipelines and breakers") then fails if the edit changed the route list or removed one of the role's
 objects; an edit inside a pipeline passes it. Undo the edit in Cribl (UI or API) and rerun `--tags
-cribl --limit homepc` until it passes. An unmarked edit is a tamper finding: note its finding ID
-first, because a `cribl` run within 15 min of the edit marks it as Ansible work (see the
+cribl --limit homepc` until it passes. An unmarked edit is a tamper finding, and it stays one: the
+`cribl` run's marker comes after the edit, so it doesn't hide it (see the
 [runbook](runbook-missing-data.md)).
 
 Every role-made change shows up as an **Ansible marker** (`index=data_health source=dh:marker`,

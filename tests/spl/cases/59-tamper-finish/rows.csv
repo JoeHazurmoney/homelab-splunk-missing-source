@@ -4,7 +4,7 @@ finding,NOW-990,ha,win1102,1102 security log cleared by taylo,channel=Security,,
 finding,NOW-950,ha,win1102,1102 security log cleared by taylo,channel=Security,,,,
 finding,NOW-1101,ha,win1102,1102 security log cleared by taylo,channel=Security,,,,
 finding,NOW-3200,hb,win7036,7036 SplunkForwarder Service stopped,,,,,
-marker,NOW-3000,,,,,hb,stop,taylorb,r1
+marker,NOW-3300,,,,,hb,stop,taylorb,r1
 marker,NOW-100,,,,,hb,start,taylorb,r2
 finding,NOW-5000,hc,svcstop_auditd,SERVICE_STOP auditd,,,,,
 marker,NOW-5900,,,,,HC.mshome.net,apps,ci,r3

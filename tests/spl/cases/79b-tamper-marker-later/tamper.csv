@@ -1,0 +1,3 @@
+finding_id,host,time,code,indicator,detail,events,bucket,suppressed,marker_action,marker_time,marker_by,marker_run_id,updated
+hq|win1102|1999998900,hq,NOW-1000,win1102,1102 security log cleared by taylo,channel=Security,1,NOW-1100,0,,,,,NOW-300
+ht|win1102|1999998900,ht,NOW-1000,win1102,1102 security log cleared by taylo,channel=Security,1,NOW-1100,1,cribl,NOW-280,taylorb,r5,NOW-300

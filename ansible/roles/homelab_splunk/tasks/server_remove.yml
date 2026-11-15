@@ -5,6 +5,13 @@
 # created it and no container is still attached (in a full removal, cribl_remove runs first).
 # The contract check at the end fails the play if anything is left.
 #   -e '{"hl_apps_only":["hl_server_base"]}'   removes only the listed apps and leaves hl-net alone
+- name: Check every app named in hl_apps_only is a server app
+  ansible.builtin.assert:
+    that: hl_apps_only | difference(hl_server_apps | map(attribute='name')) | length == 0
+    fail_msg: "hl_apps_only names no server app: {{ hl_apps_only | difference(hl_server_apps | map(attribute='name')) | join(', ') }}
+      (known: {{ hl_server_apps | map(attribute='name') | join(', ') }})"
+    quiet: true
+
 - name: Select the server apps to remove (reverse deploy order)
   ansible.builtin.set_fact:
     hl_server_apps_run: "{{ (hl_server_apps | selectattr('name', 'in', hl_apps_only) | list

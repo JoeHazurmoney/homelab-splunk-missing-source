@@ -4,3 +4,5 @@ NOW-60,cribl,{'time':'2026-11-11T03:21:00.514Z';'action':'reorder';'type':'route
 NOW-60,cribl,{'time':'2026-11-11T03:21:00.513Z';'action':'reorder';'type':'routes';'user':'admin';'principal':'admin';'id':'r_cribl_self';'name':'cribl_self';'oldIdx':0;'newIdx':1;'requestId':'5d36a0c4'}
 NOW-60,cribl,{'time':'2026-11-11T03:21:00.514Z';'action':'reorder';'type':'routes';'user':'admin';'principal':'admin';'id':'r_default';'name':'default';'oldIdx':3;'newIdx':4;'requestId':'5d36a0c4'}
 NOW-60,cribl,{'time':'2026-11-11T03:21:00.513Z';'action':'create';'type':'routes';'user':'admin';'principal':'admin';'id':'r_e2e';'name':'e2e';'requestId':'5d36a0c4'}
+NOW-1000,cribl,{'time':'2026-11-11T03:05:00.000Z';'action':'delete';'type':'routes';'user':'admin';'principal':'admin';'id':'r_b';'requestId':'5d36a0c5'}
+NOW-1010,cribl,{'time':'2026-11-11T03:04:50.000Z';'action':'create';'type':'routes';'user':'admin';'principal':'admin';'id':'r_a';'requestId':'5d36a0c6'}

@@ -14,6 +14,13 @@ access = read : [ admin, dh_admin, dh_analyst ], write : [ admin, dh_admin, dh_a
 [collections/dh_expected]
 access = read : [ admin, dh_admin, dh_analyst ], write : [ admin, dh_admin ]
 
+# The retire form's key (#48, final review M4): analysts must not read it.
+[collections/dh_retire_nonce]
+access = read : [ admin, dh_admin ], write : [ admin, dh_admin ]
+
+[transforms/dh_retire_nonce]
+access = read : [ admin, dh_admin ], write : [ admin ]
+
 # Scheduled searches run as nobody (splunk-system-user), which can collect and write KV.
 [savedsearches]
 owner = nobody

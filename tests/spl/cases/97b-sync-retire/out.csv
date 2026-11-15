@@ -1,0 +1,9 @@
+entity_id,dh_change,managed_by,enabled,expected_since,retired_by,retired_reason,retired_hold
+sourcetype|linux|r1|syslog|*,held,,,,,,
+sourcetype|linux|r2|syslog|*,release,ansible,0,NOW-9000,taylor,host gone,0
+sourcetype|linux|r3|syslog|*,add,ansible,1,NOW,,,
+sourcetype|linux|r4|syslog|*,release,ui,0,NOW-5000,taylor,host gone,0
+sourcetype|linux|r5|syslog|*,held,,,,,,
+sourcetype|linux|r6|syslog|*,add,ansible,1,NOW,,,
+sourcetype|linux|r8|syslog|*,retire,ansible,0,NOW-9000,,,
+sourcetype|linux|r9|syslog|*,shadowed,,,,,,

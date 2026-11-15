@@ -4,4 +4,5 @@ outage,e2,1800,NOW-1800,,1,,
 outage,e4,50000,NOW-100000,NOW-50000,0,,
 outage,e6,5000,NOW-5000,,1,,
 outage,e7,1000,NOW-4000,NOW-3000,0,,
-mttr,all,18200,,,,5,2
+outage,e10,700000,NOW-700000,,1,,
+mttr,all,18200,,,,6,3

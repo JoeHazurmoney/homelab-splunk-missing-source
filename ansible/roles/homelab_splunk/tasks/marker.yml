@@ -1,7 +1,8 @@
 # Post one Ansible maintenance marker to HEC (spec 5.3 Markers): index=data_health source=dh:marker
 # sourcetype=hl:marker, token hl_markers. hl_data_health reads action, target_host, by and run_id
-# (dh_fwd_from_markers), names the stop/start in its causes, and suppresses tamper findings within
-# dh_tamper_window_secs of any marker for the same host (the role's own work).
+# (dh_fwd_from_markers), names the stop/start in its causes, and suppresses tamper findings that come
+# up to dh_tamper_window_secs after a marker for the same host (the role's own work): post it BEFORE
+# the change it covers (final review I3; DH Tamper decides suppression once, #49).
 #   vars: hl_marker_action (required), hl_marker_target (default: this host, short and lowercase)
 # Posted from the controller (pi5), so it works whatever state the target is in.
 - name: Fix this run's id
