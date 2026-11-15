@@ -52,12 +52,42 @@ flowchart LR
   gateway. So the UDM gets its own port, and Cribl names the host from the port. Forwarders are
   identified by hostname, never by IP. Anything sent to 5514/udp is named `udm`.
 - **Reaching the hosts:**
-  - pi5 is reached only through Windows OpenSSH on HOMEPC (`ssh pi5`).
-  - The VMs are reached only by ProxyJump through HOMEPC's sshd. ProxyJump makes SSH hop through
-    one host to reach another. The settings are in `inventory/group_vars/uf_linux.yml`.
+  - pi5 is reached only through Windows OpenSSH on HOMEPC (`ssh pi5`). From HOMEPC, use
+    `C:\Windows\System32\OpenSSH\ssh.exe pi5`. Git Bash's `ssh` is refused.
+  - HOMEPC can't SSH to the VMs directly. Ansible on pi5 reaches them by ProxyJump through HOMEPC's
+    sshd. ProxyJump makes SSH hop through one host to reach another. The settings are in
+    `inventory/group_vars/uf_linux.yml`. To run one command on a VM, use
+    [Ansible from pi5](runbook-missing-data.md#how-to-reach-a-host).
   - Why: the VMs sit behind Hyper-V's Default Switch NAT. Their `<vm>.mshome.net` names resolve only
     on HOMEPC.
   - More: [SSH and ProxyJump](glossary.md#ssh-proxyjump).
+
+## Hosts in this lab
+
+The role names each host by its inventory name. In this lab they are:
+
+| Inventory name | What it is | Groups |
+|---|---|---|
+| `wd2l-logsrv` | An AlmaLinux 10 VM on HOMEPC. It runs wd2l's sender. | `uf_linux` |
+| `wd2l-recv` | An AlmaLinux 10 VM on HOMEPC. It runs wd2l's receiver. | `uf_linux` |
+| `pi5` | The Raspberry Pi 5 and the Ansible controller. | `uf_linux` |
+| `homepc` | The Windows 11 PC. It runs Docker Desktop (Splunk and Cribl). | `uf_windows`, `splunk_server` |
+
+The groups are in `ansible/inventory/hosts.yml`:
+
+- `uf_linux` holds the hosts that run a Linux UF.
+- `uf_windows` holds the hosts that run a Windows UF.
+- `splunk_server` holds the host that runs `wd2l-splunk`.
+
+The UDM isn't an inventory host, because the role never logs in to it. It is a row of
+`syslog_devices` in `ansible/inventory/group_vars/splunk_server.yml`.
+
+To see the groups, run this on pi5, in `~/homelab-splunk-missing-source/ansible`
+([venv on](running-the-role.md#how-to-run-a-command)):
+
+```bash
+ansible-inventory --graph
+```
 
 ## Inside Cribl
 
@@ -84,6 +114,9 @@ Splunk applies **no** index-time rule to what Cribl delivers. That's why the tes
 breaking live in Cribl.
 
 ## Ports
+
+S2S ([glossary](glossary.md#s2s-splunktcp)) is the UFs' protocol, on 9997. HEC
+([glossary](glossary.md#hec-http-event-collector)) is Splunk's HTTPS event input, on 8088.
 
 | Port | Listener | Who sends | Published on the PC |
 |---|---|---|---|
