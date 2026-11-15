@@ -1,0 +1,7 @@
+host,time,code,indicator,detail,suppressed,state
+h105a,NOW-700,uf_shutdown,Splunk agent shut down,Shutting down splunkd,0,pending
+h105b,NOW-700,uf_shutdown,Splunk agent shut down,Shutting down splunkd,0,judged
+h105c,NOW-700,uf_shutdown,Splunk agent shut down,Shutting down splunkd,0,
+h105d,NOW-700,uf_shutdown,Splunk agent shut down,Shutting down splunkd,1,pending
+cribl,NOW-5010,cribl_routes,Cribl routes create (r_drop) by admin,action=create; type=routes,0,pending
+cribl,NOW-9010,cribl_routes,Cribl routes create (r_drop) by admin,action=create; type=routes,0,judged

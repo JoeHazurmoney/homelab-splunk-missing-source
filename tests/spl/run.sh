@@ -189,6 +189,7 @@ static_names_check() {
   done
   # <saved search>|<+ must contain, - must not contain>|<text>
   for s in "DH Tamper|+|earliest=\`dh_tamper_finding_earliest\`" "DH Tamper|+|earliest=\`dh_tamper_marker_earliest\`" \
+    "DH Tamper|+|dh_tamper_ufstop(dh_fwd)" "DH Tamper|+|dh_tamper_hostdown" \
     "DH Prune daily|-|dh_status"; do
     IFS='|' read -r n m l <<<"$s"
     line=$(conf_lines "$app/savedsearches.conf" | grep -F "|[$n]|search = " || true)

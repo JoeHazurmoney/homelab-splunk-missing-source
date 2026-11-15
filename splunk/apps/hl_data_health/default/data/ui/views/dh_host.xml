@@ -86,7 +86,7 @@
             "type": "ds.search",
             "name": "Tamper findings",
             "options": {
-                "query": "| inputlookup dh_tamper where host=$host|s$ | where coalesce(tonumber(suppressed), 0)==0 | sort 0 -time | eval time=strftime(tonumber(time), \"%Y-%m-%d %H:%M\") | table time indicator events code detail finding_id | `dh_ui_headers`"
+                "query": "| inputlookup dh_tamper where host=$host|s$ | where coalesce(tonumber(suppressed), 0)==0 AND coalesce(state, \"judged\")!=\"pending\" | sort 0 -time | eval time=strftime(tonumber(time), \"%Y-%m-%d %H:%M\") | table time indicator events code detail finding_id | `dh_ui_headers`"
             }
         },
         "ds_transitions": {

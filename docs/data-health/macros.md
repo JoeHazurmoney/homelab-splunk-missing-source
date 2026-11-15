@@ -54,7 +54,7 @@ The expected list, `dh_expected`: every item that should send data. Used by: the
 `hl_ingest_block`: Splunk's copy of Cribl's test-block table. It is a lookup of the `hl_server_base` app. Only the role's *cribl_block* tag adds or removes blocks in it, and nothing in this app writes it. The *cribl* and *cribl_remove* tags only reset it to its header ([who writes it](../running-the-role.md#test-blocks)). Until that app is installed, the table doesn't exist and reads as empty. Used by: the `lookup-names` check in `tests/spl/run.sh`, which keeps it equal to the name `dh_evaluate` uses. `dh_evaluate` and the Manage Test blocks tab name `hl_ingest_block` directly. A macro argument can't hold a macro, so `dh_evaluate` can't call this one.
 
 ### `dh_lookup_tamper`
-`dh_tamper`: the tamper findings, with their suppression. Used by: *DH Tamper*.
+`dh_tamper`: the tamper findings, with their suppression and, for a Splunk agent stop, its state (pending or judged), what explains it and when the agent came back. Used by: *DH Tamper*.
 
 ### `dh_lookup_status`
 `dh_status`: the evaluator's output, one row per expected item. Used by: *DH Evaluate*, *DH Daily SoH report*.
@@ -227,7 +227,7 @@ Adds the facts each row needs:
 - The Splunk agent heartbeat, the last Ansible marker, and the last Hyper-V event and device probe, by host.
 - The item's own override and its host's override.
 - The learned baseline.
-- The tamper findings on the host. A row that arrives through Cribl also gets the findings on host *cribl*, with those that a marker suppresses marked as such.
+- The tamper findings on the host. A row that arrives through Cribl also gets the findings on host *cribl*, with those that a marker suppresses marked as such. A finding that is still pending (a Splunk agent stop that waits for its evidence) is marked the same way, on the host and on *cribl*, so it explains nothing. A finding with an empty or missing state counts as judged.
 - The previous status.
 
 Used by: `dh_eval`.

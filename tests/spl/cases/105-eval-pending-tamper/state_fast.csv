@@ -1,0 +1,4 @@
+index,host,sourcetype,source,first_seen,last_indextime,last_eventtime,last_count,lag
+cribl,cribl,cribl,cribl,NOW-86400,NOW-10,NOW-10,1,0
+linux,h105e,syslog,/var/log/messages,NOW-86400,NOW-5000,NOW-5000,1,0
+linux,h105f,syslog,/var/log/messages,NOW-86400,NOW-9000,NOW-9000,1,0

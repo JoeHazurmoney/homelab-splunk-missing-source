@@ -1,0 +1,11 @@
+entity_id,status,cause_code
+host|*|cribl|*|*,OK,
+sourcetype|cribl|cribl|cribl|*,OK,
+host|*|h105a|*|*,MISSING,hb_missing
+host|*|h105b|*|*,MISSING,tamper
+host|*|h105c|*|*,MISSING,tamper
+host|*|h105d|*|*,MISSING,hb_missing
+host|*|h105e|*|*,OK,
+sourcetype|linux|h105e|syslog|*,MISSING,hb_ok_all_missing
+host|*|h105f|*|*,OK,
+sourcetype|linux|h105f|syslog|*,MISSING,tamper

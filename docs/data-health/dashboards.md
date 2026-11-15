@@ -196,7 +196,7 @@ Everything about one host. Pick the host at the top, or arrive here by clicking 
 - **How to read it:** empty is good. Lines about file permissions, a missing file or a blocked output explain a missing input. Read them before you change anything.
 
 ### Tamper findings on this host
-- **What it shows:** every tamper finding on this host that the app still holds (30 days), newest first. It leaves out findings that Ansible work explains. The columns are **Time**, **What was seen**, **Events**, **Code**, **Detail** and **Finding ID**.
+- **What it shows:** every tamper finding on this host that the app still holds (30 days), newest first. It leaves out findings that Ansible work explains and findings that are still pending, which means a Splunk agent stop that has not been judged yet. The columns are **Time**, **What was seen**, **Events**, **Code**, **Detail** and **Finding ID**.
 - **Where it comes from:** the findings of *DH Tamper* for this host.
 - **How to read it:** empty is good. The Overview's Tamper findings entries say what to do.
 
