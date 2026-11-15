@@ -7,7 +7,7 @@ Run it in a container from the repo root, never on the host's Python:
     (no files)     README.md and every docs/**/*.md
     --target N     the grade a current doc must not exceed (default 8)
     --max-words N  the average words per sentence it must not exceed (default 15, the style guide)
-    --worst N      also print each doc's N hardest sentences (default 0)
+    --worst N      also print each doc's N hardest sentences of 8 words or more (default 0)
     --check        exit 1 when a current doc is over either limit (the default only reports)
 
 Only prose is scored. Fenced code blocks, HTML comments, headings and each table's header row are
@@ -159,7 +159,9 @@ def main(argv):
         else:
             result, over = "OVER", over + 1
         print(f"{grade:6.1f} {words:6d} {n:6d} {words / n:6.1f}  {result:<6}  {rel}")
-        for s in sorted(sents, key=sentence_grade, reverse=True)[:a.worst]:
+        # Short cells and labels score oddly on their own, so only sentences of 8+ words are listed.
+        long_ones = [s for s in sents if len(WORD.findall(s)) >= 8]
+        for s in sorted(long_ones, key=sentence_grade, reverse=True)[:a.worst]:
             print(f"{'':>8}{sentence_grade(s):5.1f}  {s[:160]}")
     print(f"target: grade {a.target:g} or below and {a.max_words:g} words a sentence or fewer;"
           f" {over} current doc(s) over")
