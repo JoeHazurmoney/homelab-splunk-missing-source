@@ -1,8 +1,8 @@
-// Generates the Manage dashboard, splunk/apps/hl_data_health/default/data/ui/views/dh_manage.xml
-// (task 12e). The view is written by this script: edit this file, not the XML, then run
+// Generates the Manage dashboard, splunk/apps/hl_data_health/default/data/ui/views/dh_manage.xml.
+// This script writes the view. Edit this file, not the XML, then run
 //   node tools/gen_dh_manage.js            (rewrites the view)
 //   node tools/gen_dh_manage.js <file>     (writes to <file> instead; tests/spl/run.sh compares)
-// and deploy with tests/spl/dev-deploy.sh. docs/data-health/dashboards.md describes the result.
+// Deploy with tests/spl/dev-deploy.sh. docs/data-health/dashboards.md describes the result.
 const fs = require("fs");
 const path = require("path");
 const out = process.argv[2] || path.join(__dirname, "..", "splunk", "apps", "hl_data_health", "default", "data", "ui", "views", "dh_manage.xml");
@@ -111,7 +111,7 @@ const NAMES = { ov: 'Mute form', ex: 'Add-row form', ad: 'Adopt form', rt: 'Reti
 const conditions = {};
 for (const p of Object.keys(R)) {
   conditions[`cond_${p}_ready`] = { name: `${NAMES[p]} filled in`, value: isSet(R[p]) };
-  // The test block is set by the Ansible role (task 11b): its form ends in a command, not a write
+  // The Ansible role sets the test block: its form ends in a command, not a write
   if (p !== 'bk') conditions[`cond_${p}_done`] = { name: `${NAMES[p]} confirmed`, value: isSet([...R[p], `${p}_confirm`]) };
 }
 
@@ -162,7 +162,7 @@ C('ds_bk_targets', 'Block target choices', 'ds_bk_sources', '| eval lvl=$bk_leve
 const bkReq = '| makeresults | eval dh_action=$bk_action|s$, level=$bk_level|s$, host=$bk_host|s$, target=$bk_target|s$, dh_secs=$bk_duration|s$, reason=$bk_reason|s$ | `dh_ui_actor` | `dh_ui_block_plan(hl_ingest_block, now())`';
 S('ds_bk_plan', 'Test block: plan', bkReq);
 C('ds_bk_preview', 'Test block: preview', 'ds_bk_plan', '| table ui_change ui_item ui_now ui_after check source_norm | `dh_ui_headers`');
-// The block lives in Cribl (spec 7.7, 7.8; task 11b): the form checks the request and shows the
+// The block lives in Cribl (spec 7.7, 7.8): the form checks the request and shows the
 // role's cribl_block command; it writes nothing itself.
 C('ds_bk_command', 'Test block: command', 'ds_bk_plan', '| `dh_ui_block_command` | eval Command=coalesce(command, "Not ready: ".check) | table Command');
 S('ds_blocks', 'Current test blocks', '| `dh_ui_blocks(hl_ingest_block, now())` | `dh_ui_headers`');
@@ -177,39 +177,39 @@ const table = (id, title, dsId, desc, extra = {}) => {
 const md = (id, text, extra = {}) => { viz[id] = Object.assign({ type: 'splunk.markdown', options: { markdown: text } }, extra); };
 const WAIT = '**Nothing written yet.** When the Check column of the preview says OK, open **Confirm** and choose the line that starts with **Apply**. That writes the change at once and records it on the Admin log tab.';
 
-md('viz_mute_intro', '**Mute** an item during planned work, so it does not alert, or change how long it may stay silent before it counts as late (its **limit**). Fill in the form; the preview shows the change; nothing is written until you choose **Apply** under **Confirm**. Analysts may mute; every change is recorded on the Admin log tab. Times are in your Splunk time zone.');
-md('viz_ov_steps', '**Preview: fill in the form above.** Choose the **Host**, then the **Item** (the host\'s own row, *whole host*, mutes everything it sends). Choose the **Action**, how long, and write a **Reason**. The preview of the change then appears here.', { containerOptions: vis(null, ['cond_ov_ready']) });
-table('viz_ov_preview', 'Mute or limit: preview', 'ds_ov_preview', 'The change you are about to make, before and after, and whether it can be applied. Nothing is written yet.', { containerOptions: vis(['cond_ov_ready']) });
+md('viz_mute_intro', '**Mute** an item during planned work, so it does not alert. You can also change its **limit**: how long it may stay silent before it counts as late. Fill in the form. The preview shows the change. Nothing is written until you choose **Apply** under **Confirm**. Analysts may mute. Every change goes to the Admin log tab. Times use your Splunk time zone.');
+md('viz_ov_steps', '**Preview: fill in the form above.** Choose the **Host**, then the **Item**. The host\'s own row, *whole host*, covers everything it sends. Choose the **Action**. For a mute, choose how long. For a limit, type the new limit. Write a **Reason**. The preview then appears here.', { containerOptions: vis(null, ['cond_ov_ready']) });
+table('viz_ov_preview', 'Mute or limit: preview', 'ds_ov_preview', 'The change you are about to make, before and after. It also says whether you can apply it. Nothing is written yet.', { containerOptions: vis(['cond_ov_ready']) });
 md('viz_ov_wait', WAIT, { containerOptions: vis(null, ['cond_ov_done']) });
 table('viz_ov_result', 'Mute or limit: result', 'ds_ov_apply', 'What was written when you chose Apply.', { containerOptions: vis(['cond_ov_done']) });
 table('viz_overrides', 'Current mutes and limit overrides', 'ds_overrides', 'Every mute and limit override in force.');
 table('viz_thresholds', 'Thresholds: how long each item may stay silent', 'ds_thresholds', 'Each item\'s limit, where it comes from, and what the app has learned.');
 
-md('viz_ex_intro', '**Add an expected row** (needs the dh_admin role): tell the app about data it should expect, so it alerts when that data stops. Rows that Ansible manages are changed in the Ansible inventory, not here. Nothing is written until you choose **Apply** under **Confirm**.');
-md('viz_ex_steps', '**Preview: fill in the form above.** Choose the **Level**, enter the **Host name** (and the sourcetype or source for those levels), pick a **Profile**, and write a **Reason**. Optional boxes keep "-" for none. The preview of the change then appears here.', { containerOptions: vis(null, ['cond_ex_ready']) });
-table('viz_ex_preview', 'Add an expected row: preview', 'ds_ex_preview', 'The expected-list row you are about to add or change, and whether it can be applied. Nothing is written yet.', { containerOptions: vis(['cond_ex_ready']) });
+md('viz_ex_intro', '**Add an expected row** (needs the dh_admin role) to tell the app what data to expect. The app then alerts when that data stops. Ansible manages some rows. Change those in the Ansible inventory, not here. Nothing is written until you choose **Apply** under **Confirm**.');
+md('viz_ex_steps', '**Preview: fill in the form above.** Choose the **Level**. Enter the **Host name**. For a sourcetype or source row, fill in that box too. Pick a **Profile** and write a **Reason**. Optional boxes keep `-`, which means none. The preview then appears here.', { containerOptions: vis(null, ['cond_ex_ready']) });
+table('viz_ex_preview', 'Add an expected row: preview', 'ds_ex_preview', 'The expected-list row you are about to add or change. It also says whether you can apply it. Nothing is written yet.', { containerOptions: vis(['cond_ex_ready']) });
 md('viz_ex_wait', WAIT, { containerOptions: vis(null, ['cond_ex_done']) });
 table('viz_ex_result', 'Add an expected row: result', 'ds_ex_apply', 'What was written when you chose Apply.', { containerOptions: vis(['cond_ex_done']) });
-table('viz_unreg', 'Unregistered: seen in the last 7 d but not expected', 'ds_unreg_view', 'Data that arrives but that nobody listed as expected. Adopt it below if it should be watched.');
-md('viz_ad_intro', '**Adopt an unregistered item** (needs the dh_admin role): add a row of the table above to the expected list, with the collection and profile the app suggests. Nothing is written until you choose **Apply** under **Confirm**.');
-md('viz_ad_steps', '**Preview: fill in the form above.** Choose the **Unregistered item**, its **Criticality**, and write a **Reason**. The preview of the change then appears here.', { containerOptions: vis(null, ['cond_ad_ready']) });
-table('viz_ad_preview', 'Adopt: preview', 'ds_ad_preview', 'The expected row that adopting this item would add, and whether it can be applied. Nothing is written yet.', { containerOptions: vis(['cond_ad_ready']) });
+table('viz_unreg', 'Unregistered: seen in the last 7 d but not expected', 'ds_unreg_view', 'Data that arrives but is not on the expected list. Adopt it below if it should be watched.');
+md('viz_ad_intro', '**Adopt an unregistered item** (needs the dh_admin role) to add a row of the table above to the expected list. The app suggests the collection and profile. Nothing is written until you choose **Apply** under **Confirm**.');
+md('viz_ad_steps', '**Preview: fill in the form above.** Choose the **Unregistered item** and its **Criticality**. Write a **Reason**. The preview then appears here.', { containerOptions: vis(null, ['cond_ad_ready']) });
+table('viz_ad_preview', 'Adopt: preview', 'ds_ad_preview', 'The expected row that adopting this item would add. It also says whether you can apply it. Nothing is written yet.', { containerOptions: vis(['cond_ad_ready']) });
 md('viz_ad_wait', WAIT, { containerOptions: vis(null, ['cond_ad_done']) });
 table('viz_ad_result', 'Adopt: result', 'ds_ad_apply', 'What was written when you chose Apply.', { containerOptions: vis(['cond_ad_done']) });
 
-table('viz_rt_cand', 'Retirement candidates: expected but silent for 7 d or more', 'ds_rt_cand', 'Expected items with no data for 7 days or more, or never seen though expected for 7 days, muted ones included. One that is gone for good can be retired with the form below.');
-md('viz_rt_intro', '**Retire an expected item** (needs the dh_admin role) when a host or a stream is gone for good: it stops being expected, so it stops alerting, and its row stays on the list, disabled, for its history. Nothing is deleted. A whole host retires with all its rows. If the Ansible inventory still lists it, the retirement holds until the inventory drops it, so remove it there too. **Undo a retirement** brings it back. Nothing is written until you choose **Apply** under **Confirm**.');
-md('viz_rt_steps', '**Preview: fill in the form above.** Choose **Retire** or **Undo a retirement**, then the **Expected item** (a whole host, or one of its rows), and write a **Reason**. The preview of the change then appears here.', { containerOptions: vis(null, ['cond_rt_ready']) });
-table('viz_rt_preview', 'Retire: preview', 'ds_rt_preview', 'The rows you are about to retire or bring back, and whether it can be applied. Nothing is written yet.', { containerOptions: vis(['cond_rt_ready']) });
+table('viz_rt_cand', 'Retirement candidates: expected but silent for 7 d or more', 'ds_rt_cand', 'Expected items with no data for 7 days or more. It also lists items never seen in the 7 days they were expected. Muted items are included. Retire one that is gone for good with the form below.');
+md('viz_rt_intro', '**Retire an expected item** (needs the dh_admin role) when a host or a stream is gone for good. The app stops expecting it, so it stops alerting. Its row stays on the list, disabled, for its history. Nothing is deleted. A whole host retires with all its rows. If the Ansible inventory still lists the item, the retirement holds until the inventory drops it. Remove it there too. **Undo a retirement** brings it back. Nothing is written until you choose **Apply** under **Confirm**.');
+md('viz_rt_steps', '**Preview: fill in the form above.** Choose **Retire** or **Undo a retirement**. Then choose the **Expected item**: a whole host, or one of its rows. Write a **Reason**. The preview then appears here.', { containerOptions: vis(null, ['cond_rt_ready']) });
+table('viz_rt_preview', 'Retire: preview', 'ds_rt_preview', 'The rows you are about to retire or bring back. It also says whether you can apply it. Nothing is written yet.', { containerOptions: vis(['cond_rt_ready']) });
 md('viz_rt_wait', WAIT, { containerOptions: vis(null, ['cond_rt_done']) });
 table('viz_rt_result', 'Retire: result', 'ds_rt_apply', 'What was written when you chose Apply.', { containerOptions: vis(['cond_rt_done']) });
 
-md('viz_bk_intro', 'A **test block** throws a host\'s real data away in Cribl Stream, before it reaches Splunk (linux, windows and network indexes only), so you can check that the app notices the data going missing. The Ansible role sets it: fill in the form, check the preview, then run the **command** it shows on pi5, in the repository\'s ansible folder. The block starts in Cribl about 20 seconds later and ends by itself; the table below lists it once the command has run. It needs the dh_admin role. Remove it as soon as the test is over: in production, a block is a way to blind monitoring.');
-md('viz_bk_steps', '**Preview: fill in the form above.** Choose **Add** or **Remove**, the **Host** and the **Block level**; for one sourcetype or source, choose it in the next list (it fills from the host\'s data of the last 24 h, shown below). Write a **Reason**. The preview of the change then appears here.', { containerOptions: vis(null, ['cond_bk_ready']) });
-table('viz_bk_preview', 'Test block: preview', 'ds_bk_preview', 'The block you are about to add or remove, and whether it can be applied. Nothing is written yet.', { containerOptions: vis(['cond_bk_ready']) });
-table('viz_bk_command', 'Test block: command', 'ds_bk_command', 'The command that sets or removes this block, once the preview says OK. Run it on pi5; nothing is written from here.', { containerOptions: vis(['cond_bk_ready']) });
-table('viz_bk_sources', 'Raw sources of the host (24 h)', 'ds_bk_sources_view', 'The exact source names the chosen host sent in the last 24 h; a source block must use one of them.');
-table('viz_blocks', 'Current test blocks', 'ds_blocks', 'Data that is being thrown away on purpose for a test.');
+md('viz_bk_intro', 'A **test block** throws a host\'s real data away in Cribl Stream, before it reaches Splunk. It works for the linux, windows and network indexes only. Use it to check that the app notices missing data. This form writes nothing. Check the preview, then run the **command** it shows on pi5, in the repository\'s ansible folder. The block takes effect within about a minute and ends by itself. **Current test blocks** lists it once the command has run. It needs the dh_admin role. Remove a block as soon as the test is over. In production, a block is a way to blind monitoring.');
+md('viz_bk_steps', '**Preview: fill in the form above.** Choose the **Action** (add or remove), the **Host** and the **Block level**. For one sourcetype or source, choose it in the next list. That list fills from the host\'s data of the last 24 h, shown below. Write a **Reason**. The preview then appears here.', { containerOptions: vis(null, ['cond_bk_ready']) });
+table('viz_bk_preview', 'Test block: preview', 'ds_bk_preview', 'The block you are about to add or remove. It also says whether the command below is ready. This form never writes anything.', { containerOptions: vis(['cond_bk_ready']) });
+table('viz_bk_command', 'Test block: command', 'ds_bk_command', 'The command that sets or removes this block, once the preview says OK. Run it on pi5. Nothing is written from here.', { containerOptions: vis(['cond_bk_ready']) });
+table('viz_bk_sources', 'Raw sources of the host (24 h)', 'ds_bk_sources_view', 'The exact source names the chosen host sent in the last 24 h. A source block must use one of them.');
+table('viz_blocks', 'Current test blocks', 'ds_blocks', 'Test blocks in force, and any that ended but are not cleared yet. A block throws data away on purpose.');
 
 table('viz_log', 'Admin log (every change made on Manage)', 'ds_log', 'Who changed what, when and why, newest first.');
 
