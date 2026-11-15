@@ -247,7 +247,7 @@ The output's `last_connect` shows when the agent last connected.
   ```
 
   The person's `auid` is on sudo's `USER_CMD` record. On Windows, look for event 7036 in
-  `source="XmlWinEventLog:System"`. Some Windows hosts don't log 7036 (in this lab: HOMEPC). There,
+  `source="XmlWinEventLog:System"`. Desktop Windows doesn't log 7036 (in this lab: HOMEPC). There,
   search `index=_internal host=<host> "Shutting down splunkd"`. The line often arrives only when
   the UF starts again.
 

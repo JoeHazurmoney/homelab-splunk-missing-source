@@ -426,7 +426,7 @@ On pi5, in `~/homelab-splunk-missing-source/ansible`, venv on:
 ```bash
 # Set a 30-minute block
 ansible-playbook site.yml --tags cribl_block --limit homepc -e hl_block_key='wd2l-recv|linux_secure|*' \
-  -e hl_block_minutes=30 -e "hl_block_reason='E2E row 4'"
+  -e hl_block_minutes=30 -e "hl_block_reason='Test the missing data alert'"
 
 # Clear it before it ends
 ansible-playbook site.yml --tags cribl_block --limit homepc -e hl_block_key='wd2l-recv|linux_secure|*' -e hl_block_clear=true
