@@ -67,6 +67,8 @@ The first cause that fits wins. `<…>` marks the parts the app fills in.
   they keep the role's own changes from counting as tampering.
 - A host that is gone for good: `uninstall`, then retire its rows with `hl_expected: false` and
   `--tags expected --limit homepc` ([running-the-role.md §4](running-the-role.md#4-removing-things-all-never)).
+  If the inventory can't be fixed at once, retire the host from Manage → Expected list (*Retire an
+  expected item*): it stops alerting now, and the retirement holds until the inventory catches up.
 
 ## After an incident
 

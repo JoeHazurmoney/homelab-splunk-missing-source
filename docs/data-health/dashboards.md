@@ -346,7 +346,7 @@ If the item is muted when you set or clear its limit, the mute and its reason st
 
 ### Expected list tab
 
-Tell the app about data it should expect, so it alerts when that data stops. Rows that Ansible manages are changed in the Ansible inventory, not here. This tab needs the **dh_admin** role.
+Tell the app about data it should expect, so it alerts when that data stops, and retire what is gone for good. Rows that Ansible manages are changed in the Ansible inventory, not here; the one exception is retiring a row the inventory still lists, which holds until the inventory catches up. This tab needs the **dh_admin** role.
 
 #### Recipe: Add an expected row
 
@@ -372,6 +372,18 @@ Running the form again for an item you added here updates its row (the preview s
 4. Check **Adopt: preview**: the collection and profile the app suggests are in **After the change**.
 5. **Confirm (writes the change)**: choose "Apply: adopt …". **Adopt: result** says "Done: Adopt …". After a reload, the item has left the Unregistered table; it gets a status within a minute.
 
+#### Recipe: Retire a host that is gone for good
+
+Use this when a host or a stream is gone for good and nobody will bring it back. A mute only hides it for 30 days; a retirement stops expecting it.
+
+1. Check **Retirement candidates: expected but silent for 7 d or more**: it lists the items with no data for 7 days or more.
+2. In the third form, **Retire an expected item**: **Retire or undo**: Retire. **Expected item**: choose the host ("pi9: whole host (3 rows)") or one of its rows.
+3. Write a **Reason** (and a **Ticket** if you have one) and press Enter.
+4. Check **Retire: preview**: one line per row that will retire. If **After the change** says the Ansible inventory still lists it, remove the host from the inventory as well (`hl_expected: false` in its host_vars, then `--tags expected --limit homepc`). Until then the retirement holds: *DH Sync expected* leaves the row disabled.
+5. **Confirm (writes the change)**: choose "Apply: retire …". **Retire: result** says "Done: Retire …" for each row. Within a minute the item leaves the Overview and stops alerting. Nothing is deleted: each row stays on the expected list, disabled, with who retired it, when and why.
+
+To bring an item back, choose **Undo a retirement** in the same form. A row added here is expected again at once. A row Ansible manages comes back from the inventory: *DH Sync expected* adds it again within 5 minutes while the inventory still lists it. (Once the inventory has dropped it, add it to the inventory again instead.) Don't use **Add an expected row** for an Ansible row: it would make the row yours instead of Ansible's.
+
 #### Inputs
 
 | Input | What to enter |
@@ -391,6 +403,8 @@ Running the form again for an item you added here updates its row (the preview s
 | Runbook link (optional, - for none) | A link to its how-to page. |
 | Description (optional, - for none) | A short description. |
 | Unregistered item | Adopt form: an item that sends data but isn't expected, from the Unregistered table. |
+| Retire or undo | Retire form: Retire (stop expecting it) or Undo a retirement. |
+| Expected item | Retire form: a whole host (all its rows) or one row. For Retire, the expected items; for Undo, the retired ones. |
 | Reason (required) | Why you make the change (each form has its own). |
 | Ticket (optional, - for none) | A ticket or change number, or `-`. |
 | Confirm (writes the change) | Choose the Apply line to write the change shown in the preview. |
@@ -421,6 +435,21 @@ The adopt form's **Criticality** is the same list as the add form's.
 - **What it shows:** "Done: Adopt …" or "Nothing written: …".
 - **Where it comes from:** the write itself.
 - **How to read it:** the item leaves the Unregistered table and gets a status within a minute.
+
+#### Retirement candidates: expected but silent for 7 d or more
+- **What it shows:** expected items with no data for 7 days or more, or never seen though expected for 7 days. Muted items are included, because a host that is gone is often kept muted. Columns: **Item**, **Host**, **Level**, **Status**, **Last seen**, **Silent for**, **Expected since**, **Item ID**.
+- **Where it comes from:** the current statuses (the 7 days are the tunable `dh_retire_candidate_secs`).
+- **How to read it:** each row is either something that will come back (leave it, or mute it) or something gone for good: retire it with the form below. A long list here often means the Ansible inventory lags behind the real hosts.
+
+#### Retire: preview
+- **What it shows:** one line per row you are about to retire or bring back. Columns as for the add preview; **Check** says why it can't be applied (for example "Needs the dh_admin role" or "Nothing to retire: …").
+- **Where it comes from:** your form checked against the expected list. Nothing is written.
+- **How to read it:** when Check says OK, choose Apply under Confirm. The confirmation fits only this preview and only once.
+
+#### Retire: result
+- **What it shows:** "Done: Retire …" (or "Done: Undo retirement …") for each row, or "Nothing written: …".
+- **Where it comes from:** the write itself, which also adds one admin-log row per row.
+- **How to read it:** a retired item leaves the Overview within a minute. Its row stays on the expected list, disabled.
 
 ### Test blocks (admin) tab
 

@@ -89,6 +89,9 @@ The host that runs the device probe (*hl-devprobe*): `pi5`, the role's `hl_probe
 ### `dh_resume_gap_secs`
 **150 seconds.** A gap this long between two runs of the arrival tracker counts as a pause (and starts the hold above). Raise it if the scheduler is often late; lower it to catch shorter pauses. Used by: `dh_meta_fast`.
 
+### `dh_retire_candidate_secs`
+**604800 seconds (7 days).** How long an expected item must be silent (or never seen though expected) to be listed as a retirement candidate on Manage. Raise it to list only items gone longer. Used by: `dh_ui_retire_candidates`.
+
 ### `dh_never_seen_secs`
 **3600 seconds.** A newly expected entity that has never sent anything is PENDING for this long, then NEVER_SEEN. Raise it for inputs that take long to start; lower it to report missing inputs sooner. Used by: `dh_eval_status`.
 
@@ -519,6 +522,18 @@ Writes the expected row when the confirmation matches, and logs it. Used by: Man
 ### `dh_ui_adopt_row(baseline, fwd)`
 Turns an unregistered entity into an expected-row request: agent hosts become `uf`, others `syslog`. An agent host's own row gets the `heartbeat` profile; any other row takes the baseline's suggestion, else continuous. Used by: Manage, Expected list tab (adopt).
 
+### `dh_ui_retire_plan(expected, admin_log, nonce, now)`
+The retire form's preview (Manage > Expected list). It takes one request: an expected item (a whole host takes every row of that host), Retire or Undo, a reason and an optional ticket. Retire: each enabled row gets `enabled=0`, who retired it, when and why, and `retired_hold=1`; every other field stays, including who manages it. Undo: an Ansible row stops being held and *DH Sync expected* adds it back; a row added in Manage is enabled again with a new grace. Nothing is deleted. Needs the dh_admin role. The confirmation token also covers the retire key in `dh_retire_nonce`, which only admin and dh_admin can read, so a Manage link built by someone else can't apply a retirement. Used by: Manage.
+
+### `dh_ui_retire_write(expected, admin_log, nonce, now)`
+Applies a retire preview when its confirmation matches: writes each row whole, changes the retire key, and adds one admin-log row per row. Used by: Manage.
+
+### `dh_ui_retire_choices(expected)`
+The retire form's item list: each host as a whole, then its rows, among the rows the chosen action applies to (expected rows for Retire, retired rows for Undo). Used by: Manage.
+
+### `dh_ui_retire_candidates(status, now)`
+Expected items with no data for at least `dh_retire_candidate_secs`, or never seen though expected that long, muted ones included. Used by: Manage (Retirement candidates).
+
 ### `dh_ui_block_command`
 The test block lives in Cribl, so Manage shows the command to run instead of writing it: the role's *cribl_block* line for a checked request (setting with minutes and reason, or clearing), with the key in plain single quotes and the reason reduced to plain characters. Used by: Manage, Test blocks tab.
 
@@ -541,7 +556,7 @@ The Ansible rows, cleaned up the way a Manage row is: level and host in lowercas
 One fingerprint of the fields Ansible owns (level, index, host, sourcetype, source, collection, via, hypervisor, profile, interval, maximum gap, criticality, owner, site, runbook, description), so an unchanged row is never rewritten. Used by: `dh_sync_plan`.
 
 ### `dh_sync_plan(ansible, expected, now)`
-The rows *DH Sync expected* writes, each with its reason: **add** (new, or disabled before, a disabled Manage row included), **update** (a field Ansible owns changed; the "expected since" time is kept), **retire** (an Ansible row that left the file or that the file marks disabled: switched off, so its status goes and a later re-add starts a fresh grace period). It returns only the rows that change, written as `_key` upserts, so `dh_expected` is never rewritten whole (DH Evaluate drops the status of any entity missing from it). An enabled Manage row is never overwritten, not even when Ansible lists the same entity, and nothing is written while the Ansible file has no valid rows, so an empty or broken file can't retire the list. Arguments: the Ansible file, the expected list, `now`. Used by: *DH Sync expected*.
+The rows *DH Sync expected* writes, each with its reason: **add** (new, or disabled before, a disabled Manage row included), **update** (a field Ansible owns changed; the "expected since" time is kept), **retire** (an Ansible row that left the file or that the file marks disabled: switched off, so its status goes and a later re-add starts a fresh grace period), **release** (a row retired in Manage that the file no longer lists: it stops being held and stays retired). It also returns two kinds of row it never writes, which *DH Sync expected* counts: **held** (the file still lists a row retired in Manage: the retirement holds until the inventory drops it) and **shadowed** (an enabled Manage row wins over the same entity in the file). A write carries the row's retirement fields, which Ansible doesn't own. It returns only the rows that change (and the held and shadowed ones), written as `_key` upserts, so `dh_expected` is never rewritten whole (DH Evaluate drops the status of any entity missing from it). An enabled Manage row is never overwritten, not even when Ansible lists the same entity, and nothing is written while the Ansible file has no valid rows, so an empty or broken file can't retire the list. Arguments: the Ansible file, the expected list, `now`. Used by: *DH Sync expected*.
 
 ### `dh_discover_summary(expected, state_fast, state_slow, baseline, now)`
 One summary row of what arrives without being expected: how many entities, how many hosts, and up to 50 of their ids. The same rows as Manage's "adopt" list and the Daily report's "unregistered" section. Used by: *DH Discover unregistered*.

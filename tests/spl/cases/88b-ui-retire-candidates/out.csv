@@ -1,0 +1,4 @@
+ui_item,status,last_seen,silent_for,entity_id
+g1: whole host,MISSING,2033-05-10 01:06 GMT,8+02:26:40,host|*|g1|*|*
+g3 › syslog (linux),NEVER_SEEN,never,7+12:33:20,sourcetype|linux|g3|syslog|*
+g1 › syslog (linux),MUTED,2033-05-11 03:30 GMT,7+00:03:20,sourcetype|linux|g1|syslog|*

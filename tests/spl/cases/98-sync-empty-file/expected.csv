@@ -1,2 +1,3 @@
-_key,entity_id,level,index,host,sourcetype,source,collection,via,hypervisor,profile,interval_secs,max_gap_secs,criticality,owner,site,runbook,description,managed_by,enabled,expected_since
-sourcetype|linux|h1|syslog|*,sourcetype|linux|h1|syslog|*,sourcetype,linux,h1,syslog,,uf,cribl,,continuous,,,2,taylorb,home,,,ansible,1,NOW-9000
+_key,entity_id,level,index,host,sourcetype,source,collection,via,hypervisor,profile,interval_secs,max_gap_secs,criticality,owner,site,runbook,description,managed_by,enabled,expected_since,retired_by,retired_at,retired_reason,retired_ticket,retired_hold
+sourcetype|linux|h1|syslog|*,sourcetype|linux|h1|syslog|*,sourcetype,linux,h1,syslog,,uf,cribl,,continuous,,,2,taylorb,home,,,ansible,1,NOW-9000,,,,,
+sourcetype|linux|h2|syslog|*,sourcetype|linux|h2|syslog|*,sourcetype,linux,h2,syslog,,uf,cribl,,continuous,,,2,taylorb,home,,,ansible,0,NOW-9000,taylor,NOW-600,host gone,,1

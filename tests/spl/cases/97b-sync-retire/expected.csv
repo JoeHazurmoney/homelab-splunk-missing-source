@@ -1,0 +1,11 @@
+_key,entity_id,level,index,host,sourcetype,source,collection,via,hypervisor,profile,interval_secs,max_gap_secs,criticality,owner,site,runbook,description,managed_by,enabled,expected_since,retired_by,retired_at,retired_reason,retired_ticket,retired_hold
+sourcetype|linux|x1|syslog|*,sourcetype|linux|x1|syslog|*,sourcetype,linux,x1,syslog,,uf,cribl,,continuous,,,2,taylorb,home,,,ansible,1,NOW-9000,,,,,
+sourcetype|linux|r1|syslog|*,sourcetype|linux|r1|syslog|*,sourcetype,linux,r1,syslog,,uf,cribl,,continuous,,,2,taylorb,home,,,ansible,0,NOW-9000,taylor,NOW-600,host gone,CHG-9,1
+sourcetype|linux|r2|syslog|*,sourcetype|linux|r2|syslog|*,sourcetype,linux,r2,syslog,,uf,cribl,,continuous,,,2,taylorb,home,,,ansible,0,NOW-9000,taylor,NOW-600,host gone,CHG-9,1
+sourcetype|linux|r3|syslog|*,sourcetype|linux|r3|syslog|*,sourcetype,linux,r3,syslog,,uf,cribl,,continuous,,,2,taylorb,home,,,ansible,0,NOW-9000,taylor,NOW-6000,host gone,CHG-9,0
+sourcetype|linux|r4|syslog|*,sourcetype|linux|r4|syslog|*,sourcetype,linux,r4,syslog,,uf,cribl,,continuous,,,2,taylorb,home,,,ui,0,NOW-5000,taylor,NOW-600,host gone,CHG-9,1
+sourcetype|linux|r5|syslog|*,sourcetype|linux|r5|syslog|*,sourcetype,linux,r5,syslog,,uf,cribl,,continuous,,,2,taylorb,home,,,ui,0,NOW-5000,taylor,NOW-600,host gone,CHG-9,1
+sourcetype|linux|r6|syslog|*,sourcetype|linux|r6|syslog|*,sourcetype,linux,r6,syslog,,uf,cribl,,continuous,,,2,taylorb,home,,,ansible,0,NOW-9000,taylor,NOW-6000,host gone,CHG-9,0
+sourcetype|linux|r8|syslog|*,sourcetype|linux|r8|syslog|*,sourcetype,linux,r8,syslog,,uf,cribl,,continuous,,,2,taylorb,home,,,ansible,1,NOW-9000,,,,,
+sourcetype|linux|r9|syslog|*,sourcetype|linux|r9|syslog|*,sourcetype,linux,r9,syslog,,uf,cribl,,continuous,,,2,taylorb,home,,,ui,1,NOW-5000,,,,,
+sourcetype|linux|r10|syslog|*,sourcetype|linux|r10|syslog|*,sourcetype,linux,r10,syslog,,uf,cribl,,continuous,,,2,taylorb,home,,,ansible,0,NOW-9000,taylor,NOW-6000,host gone,CHG-9,0

@@ -189,6 +189,11 @@ host's UF-derived rows (its host row and input rows). Any `dh_extra_expected` ro
 stays, because that data doesn't depend on the UF. **Don't pass `-e hl_expected=false`:** an extra
 var overrides every host's value, so that run would retire every UF host's rows.
 
+The inventory is the normal way. When it lags behind a host's real removal, an admin can retire the
+host from the app (Manage → Expected list → *Retire an expected item*); *DH Sync expected* then
+leaves those rows disabled while the inventory still lists them (the run's output counts them as
+`held`) and lets go once the inventory drops them. Nothing is deleted.
+
 To put a host back: `--tags install,apps,audit_rules --limit <host>`, then remove the
 `hl_expected: false` line and run `--tags expected --limit homepc`. Until the install, its rows read
 "Uninstalled with Ansible at … by … and not installed again". **A reinstalled UF re-reads every monitored file from the start** (it has no record of what

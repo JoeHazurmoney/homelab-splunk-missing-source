@@ -1,0 +1,12 @@
+q,entity_id,dh_ok,check,managed_by,enabled,expected_since,retired_by,retired_reason,retired_ticket,retired_hold,ui_change,ui_item,has_token,ntok
+q1,host|*|h1|*|*,1,OK: choose Apply under Confirm to write this change,ansible,0,NOW-9000,taylor,host gone,CHG-1,1,Retire,h1: whole host,1,1
+q1,sourcetype|linux|h1|syslog|*,1,OK: choose Apply under Confirm to write this change,ansible,0,NOW-9000,taylor,host gone,CHG-1,1,Retire,h1 › syslog (linux),1,1
+q1,sourcetype|linux|h1|auth|*,1,OK: choose Apply under Confirm to write this change,ui,0,NOW-5000,taylor,host gone,CHG-1,1,Retire,h1 › auth (linux),1,1
+q2,sourcetype|linux|h2|syslog|*,0,Needs the dh_admin role,ui,0,NOW-5000,ana,x,,1,Retire,h2 › syslog (linux),0,0
+q3,,0,Nothing to retire: this item is not on the expected list or is already retired,,,,,,,,Retire,h3 › syslog (linux),0,0
+q4,sourcetype|linux|h3|syslog|*,1,OK: choose Apply under Confirm to write this change,ansible,0,NOW-9000,ana,gone,,0,Undo retirement,h3 › syslog (linux),1,1
+q5,sourcetype|linux|h4|syslog|*,1,OK: choose Apply under Confirm to write this change,ui,1,NOW,,,,0,Undo retirement,h4 › syslog (linux),1,1
+q6,,0,Nothing to undo: this item is not retired here or the inventory no longer lists it (add it there to bring it back),,,,,,,,Undo retirement,h5 › syslog (linux),0,0
+q7,sourcetype|linux|h2|syslog|*,0,Write a reason,ui,0,NOW-5000,taylor,,,1,Retire,h2 › syslog (linux),0,0
+q8,sourcetype|linux|h2|syslog|*,0,Not ready yet: DH Sync expected sets up the retire key within 5 min,ui,0,NOW-5000,taylor,gone,,1,Retire,h2 › syslog (linux),0,0
+q9,sourcetype|linux|h2|syslog|*,1,OK: choose Apply under Confirm to write this change,ui,0,NOW-5000,taylor,gone,,1,Retire,h2 › syslog (linux),1,1

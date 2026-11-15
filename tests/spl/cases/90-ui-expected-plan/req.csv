@@ -10,3 +10,4 @@ x8,add,source,linux,h8,app,/var/log/app-2026-10-30.log,uf,-,sporadic,-,2,ops,lab
 x9,add,host,-,h9,-,-,syslog,pi5,continuous,-,1,ops,lab,-,-,add device,-,taylor,admin
 x10,add,sourcetype,linux,h10,syslog,-,uf,-,continuous,-,5,ops,lab,-,-,add,-,taylor,admin
 x11,add,sourcetype,linux,h11,syslog,-,uf,-,continuous,-,2,ops,lab,-,-,-,-,taylor,admin
+x12,add,sourcetype,linux,h12,syslog,-,uf,-,continuous,-,2,ops,lab,-,-,re-add,-,taylor,admin

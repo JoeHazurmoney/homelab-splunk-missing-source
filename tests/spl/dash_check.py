@@ -329,7 +329,8 @@ GROUP_HEADINGS = {
     "Mute & thresholds tab", "Expected list tab", "Test blocks (admin) tab", "Admin log tab",
     "Recipe: Mute a host for maintenance", "Recipe: Silence one noisy sourcetype",
     "Recipe: Change how long an item may stay silent", "Recipe: Add an expected row",
-    "Recipe: Adopt something unregistered", "Recipe: Run a test block", "Recipe: Find who muted something",
+    "Recipe: Adopt something unregistered", "Recipe: Retire a host that is gone for good", "Recipe: Run a test block",
+    "Recipe: Find who muted something",
 }
 # Each panel's description ends with its guide pointer (task 12e: worded so that a reader in Splunk
 # sees that the guide is a file in the project repository).

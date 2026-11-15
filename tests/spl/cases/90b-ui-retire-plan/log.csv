@@ -1,0 +1,2 @@
+time,actor,action,entity_id,detail,reason,ticket
+NOW-600,ana,expected_retire,sourcetype|linux|h3|syslog|*,x,gone,

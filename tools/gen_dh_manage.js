@@ -80,6 +80,13 @@ text('input_ad_reason', 'Reason (required)', 'ad_reason', { ph: 'Why? For exampl
 text('input_ad_ticket', 'Ticket (optional, - for none)', 'ad_ticket', { def: '-' });
 ddSearch('input_ad_confirm', 'Confirm (writes the change)', 'ad_confirm', 'ds_ad_confirm', { cascade: true, show: ['cond_ad_ready'] });
 
+// ---------- inputs: Expected list (retire, #48)
+dd('input_rt_action', 'Retire or undo', 'rt_action', [it('Retire (stop expecting it)', 'retire'), it('Undo a retirement', 'unretire')], 'retire');
+ddSearch('input_rt_entity', 'Expected item', 'rt_entity', 'ds_rt_entities', { def: '-', cascade: true });
+text('input_rt_reason', 'Reason (required)', 'rt_reason', { ph: 'Why? For example: host decommissioned, see CHG-123' });
+text('input_rt_ticket', 'Ticket (optional, - for none)', 'rt_ticket', { def: '-' });
+ddSearch('input_rt_confirm', 'Confirm (writes the change)', 'rt_confirm', 'ds_rt_confirm', { cascade: true, show: ['cond_rt_ready'] });
+
 // ---------- inputs: Test blocks
 dd('input_bk_action', 'Action', 'bk_action', [it('Add a test block', 'add'), it('Remove a test block', 'remove')], 'add');
 ddSearch('input_bk_host', 'Host', 'bk_host', 'ds_hosts', { def: '-' });
@@ -97,9 +104,10 @@ const R = {
   ov: ['ov_entity', 'ov_action', 'ov_duration', 'ov_threshold', 'ov_reason', 'ov_ticket'],
   ex: ['ex_level', 'ex_index', 'ex_host', 'ex_sourcetype', 'ex_source', 'ex_collection', 'ex_via', 'ex_profile', 'ex_interval', 'ex_crit', 'ex_owner', 'ex_site', 'ex_runbook', 'ex_description', 'ex_reason', 'ex_ticket'],
   ad: ['ad_entity', 'ad_crit', 'ad_reason', 'ad_ticket'],
+  rt: ['rt_action', 'rt_entity', 'rt_reason', 'rt_ticket'],
   bk: ['bk_action', 'bk_host', 'bk_level', 'bk_target', 'bk_duration', 'bk_reason'],
 };
-const NAMES = { ov: 'Mute form', ex: 'Add-row form', ad: 'Adopt form', bk: 'Test-block form' };
+const NAMES = { ov: 'Mute form', ex: 'Add-row form', ad: 'Adopt form', rt: 'Retire form', bk: 'Test-block form' };
 const conditions = {};
 for (const p of Object.keys(R)) {
   conditions[`cond_${p}_ready`] = { name: `${NAMES[p]} filled in`, value: isSet(R[p]) };
@@ -138,6 +146,15 @@ S('ds_ad_plan', 'Adopt: plan', adReq);
 C('ds_ad_preview', 'Adopt: preview', 'ds_ad_plan', PREVIEW);
 C('ds_ad_confirm', 'Adopt: confirmation choice', 'ds_ad_plan', CONFIRM);
 S('ds_ad_apply', 'Adopt: apply', adReq + ' | eval dh_confirm=$ad_confirm|s$ | `dh_ui_expected_write(dh_expected, dh_admin_log, now())` | `dh_ui_headers`');
+
+// Retire (#48): the plan expands a host to all its rows, so its confirmation offers one line per token.
+S('ds_rt_entities', 'Retire choices', '| makeresults | eval dh_act=$rt_action|s$ | `dh_ui_retire_choices(dh_expected)` | streamstats count as dh_i | appendpipe [| stats count | eval label=if($rt_action|s$=="unretire", "Choose a retired item", "Choose an expected item"), value="-", dh_i=0 | table label value dh_i] | eval dh_o=if(value=="-", 0, 1) | sort 0 dh_o dh_i | table label value');
+const rtReq = '| makeresults | eval entity_id=$rt_entity|s$, dh_action=$rt_action|s$, reason=$rt_reason|s$, ticket=$rt_ticket|s$ | `dh_ui_actor` | `dh_ui_retire_plan(dh_expected, dh_admin_log, dh_retire_nonce, now())`';
+S('ds_rt_plan', 'Retire: plan', rtReq);
+C('ds_rt_preview', 'Retire: preview', 'ds_rt_plan', PREVIEW);
+C('ds_rt_confirm', 'Retire: confirmation choice', 'ds_rt_plan', '| where dh_ok==1 | stats first(dh_label) as label by dh_token | rename dh_token AS value | table label value');
+S('ds_rt_apply', 'Retire: apply', rtReq + ' | eval dh_confirm=$rt_confirm|s$ | `dh_ui_retire_write(dh_expected, dh_admin_log, dh_retire_nonce, now())` | `dh_ui_headers`');
+S('ds_rt_cand', 'Retirement candidates', '| `dh_ui_retire_candidates(dh_status, now())` | `dh_ui_headers`');
 
 S('ds_bk_sources', 'Raw sources of the host (24 h)', '| tstats count as events max(_indextime) as it where index IN (linux, windows, network) [| makeresults | eval host=$bk_host|s$ | `dh_ui_host_terms`] earliest=-24h latest=+1d by index sourcetype source | eval source_norm=`dh_source_norm(source)`, last_seen=strftime(it, `dh_ui_time_fmt_tz`) | sort 0 sourcetype source | table index sourcetype source source_norm events last_seen');
 C('ds_bk_sources_view', 'Raw sources of the host (24 h) (shown)', 'ds_bk_sources', '| `dh_ui_headers`');
@@ -179,6 +196,13 @@ md('viz_ad_steps', '**Preview: fill in the form above.** Choose the **Unregister
 table('viz_ad_preview', 'Adopt: preview', 'ds_ad_preview', 'The expected row that adopting this item would add, and whether it can be applied. Nothing is written yet.', { containerOptions: vis(['cond_ad_ready']) });
 md('viz_ad_wait', WAIT, { containerOptions: vis(null, ['cond_ad_done']) });
 table('viz_ad_result', 'Adopt: result', 'ds_ad_apply', 'What was written when you chose Apply.', { containerOptions: vis(['cond_ad_done']) });
+
+table('viz_rt_cand', 'Retirement candidates: expected but silent for 7 d or more', 'ds_rt_cand', 'Expected items with no data for 7 days or more, or never seen though expected for 7 days, muted ones included. One that is gone for good can be retired with the form below.');
+md('viz_rt_intro', '**Retire an expected item** (needs the dh_admin role) when a host or a stream is gone for good: it stops being expected, so it stops alerting, and its row stays on the list, disabled, for its history. Nothing is deleted. A whole host retires with all its rows. If the Ansible inventory still lists it, the retirement holds until the inventory drops it, so remove it there too. **Undo a retirement** brings it back. Nothing is written until you choose **Apply** under **Confirm**.');
+md('viz_rt_steps', '**Preview: fill in the form above.** Choose **Retire** or **Undo a retirement**, then the **Expected item** (a whole host, or one of its rows), and write a **Reason**. The preview of the change then appears here.', { containerOptions: vis(null, ['cond_rt_ready']) });
+table('viz_rt_preview', 'Retire: preview', 'ds_rt_preview', 'The rows you are about to retire or bring back, and whether it can be applied. Nothing is written yet.', { containerOptions: vis(['cond_rt_ready']) });
+md('viz_rt_wait', WAIT, { containerOptions: vis(null, ['cond_rt_done']) });
+table('viz_rt_result', 'Retire: result', 'ds_rt_apply', 'What was written when you chose Apply.', { containerOptions: vis(['cond_rt_done']) });
 
 md('viz_bk_intro', 'A **test block** throws a host\'s real data away in Cribl Stream, before it reaches Splunk (linux, windows and network indexes only), so you can check that the app notices the data going missing. The Ansible role sets it: fill in the form, check the preview, then run the **command** it shows on pi5, in the repository\'s ansible folder. The block starts in Cribl about 20 seconds later and ends by itself; the table below lists it once the command has run. It needs the dh_admin role. Remove it as soon as the test is over: in production, a block is a way to blind monitoring.');
 md('viz_bk_steps', '**Preview: fill in the form above.** Choose **Add** or **Remove**, the **Host** and the **Block level**; for one sourcetype or source, choose it in the next list (it fills from the host\'s data of the last 24 h, shown below). Write a **Reason**. The preview of the change then appears here.', { containerOptions: vis(null, ['cond_bk_ready']) });
@@ -235,6 +259,11 @@ const expected = rows([
   [IH, [["input_ad_entity", 960], ["input_ad_crit", 480]]],
   [IH, [["input_ad_reason", 960], ["input_ad_ticket", 480]]],
   ...form("ad"),
+  [320, [["viz_rt_cand", 1440]]],
+  [90, [["viz_rt_intro", 1440]]],
+  [IH, [["input_rt_action", 360], ["input_rt_entity", 1080]]],
+  [IH, [["input_rt_reason", 960], ["input_rt_ticket", 480]]],
+  ...form("rt"),
 ]);
 const blocks = rows([
   [90, [["viz_bk_intro", 1440]]],
@@ -253,7 +282,7 @@ const L = (s) => ({ type: "grid", options: { width: 1440, height: height(s) }, s
 
 const definition = {
   title: 'Manage',
-  description: 'Mute data during planned work, change how long an item may stay silent, keep the expected list up to date and run test blocks; every change is previewed first and recorded in the admin log.',
+  description: 'Mute data during planned work, change how long an item may stay silent, keep the expected list up to date (add, adopt, retire) and run test blocks; every change is previewed first and recorded in the admin log.',
   expressions: { conditions },
   inputs,
   defaults: { dataSources: { 'ds.search': { options: { queryParameters: { earliest: '-24h', latest: 'now' } } } } },
