@@ -38,16 +38,75 @@ commands, no index-time config.
 
 ## Statuses and roll-up
 
-`OK` · `LATE` (over the threshold) · `MISSING` (over 2 × the threshold) · `NEVER_SEEN` (expected for
-more than 1 h, never arrived) · `MUTED` · `PENDING` · `INFO`.
+Each item on the expected list has one status. Its limit is how long it may stay silent: its
+threshold, from the profile table above.
 
-A host is **DOWN** when its liveness is missing (or, without a heartbeat or probe, when every stream
-is missing), **DEGRADED** when some child is late or missing, otherwise **OK**. A host mute covers its
-children.
+| Status | What it means | What to do |
+|---|---|---|
+| OK | Data arrived within its limit. | Nothing. |
+| LATE | Silent longer than its limit, but not yet twice as long. | Look at the cause. Often it recovers by itself. |
+| MISSING | Silent more than twice its limit. This is what alerts (for criticality 1 and 2). | Follow the action in the Action column. |
+| NEVER_SEEN | On the expected list for more than an hour and has never sent anything. | Check that the input is deployed and sending; the Action column says where. |
+| MUTED | Muted on purpose on Manage, with a reason and an end time. A host mute covers everything it sends. | Nothing while muted. Unmute on Manage when the work is done. |
+| PENDING | No trusted status right now: either the app itself is on hold (the gate, below), or the item was added less than an hour ago and hasn't sent anything yet. No alerts fire. | If the banner says "On hold", fix what it says. Otherwise wait. |
+| INFO | Tracked for reference only; it never alerts. | Nothing. |
+
+**Host roll-up.** A host also gets an overall state from its items:
+
+| Roll-up | What it means |
+|---|---|
+| DOWN | The host itself looks dead: its Splunk agent's heartbeat (or, for a network device, its probe) is missing; or, for a host without an agent, every item it should send is missing. |
+| DEGRADED | The host is alive, but some of its items are late, missing or never seen. |
+| OK | Everything the host should send is arriving. |
+| MUTED | The host is muted. |
+| PENDING | The app is on hold (see the [banner](data-health/dashboards.md#the-banner-is-the-data-current)). |
 
 **PENDING (the gate):** when the fast tracker hasn't run for 2 min, when Splunk has received nothing
 for 2 min, or within 5 min of a resume (PC sleep, restart), everything is held as PENDING and no alert
 fires. A pause in the lab doesn't page anyone.
+
+## How long until LATE, MISSING or DOWN
+
+A status changes a little after its limit is crossed, not at once. Two searches, each run once a
+minute, add the delay:
+
+1. *DH Tracker fast* records when each item last arrived. A silence can wait up to 1 min for its
+   next run.
+2. *DH Evaluate* turns those times into statuses. It measures each age at the tracker's last run,
+   which can be up to 1 min old.
+
+So a status shows up to about 2 min after its limit is crossed.
+
+| What stops | Its limit | LATE after about | MISSING or DOWN after about | Measured in the fault-injection run |
+|---|---|---|---|---|
+| A UF (its host row) | 90 s | 2.5–3.5 min | DOWN: 4–5 min | LATE 2 min 25 s to 3 min 24 s; DOWN 4 min 4 s to 4 min 28 s |
+| Cribl (the `cribl` row) | 120 s | 3–4 min | DOWN: 5–6 min | LATE 3 min 6 s; DOWN 5 min 6 s |
+| Any other item | *t* | *t* + 2 min | MISSING: 2 × *t* + 2 min | `cpu` (120 s): LATE 3 min 4 s; MISSING 5 min 4 s |
+| An item that never arrives | — | — | NEVER_SEEN: 1 h after it was added | — |
+
+Why these times:
+- **A UF: 4–5 min to DOWN.** DOWN needs 3 min without a heartbeat (2 × 90 s). The tracker and the
+  evaluator add up to 2 min. The UF sends a heartbeat every 30 s, so its last one can come up to
+  30 s before the stop, which takes a little off.
+- **Cribl: 5–6 min to DOWN.** Cribl has no UF. Its heartbeat is its own logs, which each worker
+  writes once a minute. So its limit is 120 s, and DOWN needs 4 min of silence (2 × 120 s), plus the
+  same 2 min.
+- **Until Cribl is DOWN,** the UF host rows read "The Splunk agent stopped reporting". Their
+  heartbeats also pass through Cribl, and their shorter limit runs out first. Once `cribl` is DOWN,
+  every `via=cribl` row reads "Cribl DOWN" instead.
+
+The [fault-injection record](records/2026-11-fault-injection-run.md) has every measurement.
+
+## Alerts
+
+| Alert | Fires when | Throttle |
+|---|---|---|
+| *DH Alert missing* | an item with criticality 1 or 2 (unset counts as 2) goes MISSING. It runs every minute. | 1 h per item, so one item alerts at most once an hour |
+| *DH Alert tamper* | *DH Tamper* stores a new tamper finding that isn't the role's own work. *DH Tamper* runs every 5 min and the alert 1 min later. | 1 h per host and indicator code, so a reboot finding can't hide a later log clear |
+
+LATE, NEVER_SEEN and criticality 3 and 4 never alert. A tamper finding shows at the next *DH Tamper*
+run, up to 5 min after its event is indexed, and its alert about 1 min later. Measured: findings 3 min
+39 s to 4 min 52 s after the event, alerts 4 min 57 s to 5 min 50 s.
 
 ## Cribl as the relay
 
@@ -61,8 +120,8 @@ Because Splunk sees only Cribl's connection, a forwarder's version, OS and last 
 lookup `dh_uf_builds` maps build to version; add a row with each new pinned UF.
 
 **Known limits:**
-- "Cribl DOWN" appears about 5–6 min after Cribl stops (2 × 120 s plus an evaluator minute). Until
-  then the UF host rows read "The Splunk agent stopped reporting".
+- "Cribl DOWN" takes about 5–6 min to appear after Cribl stops; the UF host rows show their own
+  cause first ([why](#how-long-until-late-missing-or-down)).
 - On a `via=cribl` row, a tamper finding within 15 min of a Cribl outage takes precedence: the row
   reads "Possible deliberate blinding", not "Cribl DOWN".
 - A `via=cribl` row also takes host `cribl`'s tamper findings, so a Drop added in Cribl explains the
@@ -80,7 +139,8 @@ The indicators:
   installed), 7036/7040 (SplunkForwarder or EventLog stopped or its start type changed).
 - **Linux:** auditd `DAEMON_END`/`DAEMON_ABORT`, `CONFIG_CHANGE`, `SERVICE_STOP` of SplunkForwarder,
   auditd or rsyslog, and audit keys `hl-*` and `wd2l-*` (writes to the UF's config, rsyslog or
-  `/etc/audit`). On EL10, `service auditd stop` writes `DAEMON_END` and no `SERVICE_STOP`.
+  `/etc/audit`). On EL10, `systemctl stop auditd` is refused; `service auditd stop` works and writes `DAEMON_END`
+  (with the auid), not `SERVICE_STOP`.
 - **Cribl:** any create, update, delete, reorder or upload of routes, pipelines, outputs, inputs or
   lookups in Cribl's audit log (`sourcetype=cribl:audit`). The log can't tell a Drop route from
   another edit, so every change outside a `cribl` marker window counts. Cribl's free licence has no
@@ -92,12 +152,8 @@ The volume check flags an hour below 20 % of the same hour's 14-day median (wher
 
 ## Test block
 
-A test block drops real data in Cribl (`pl_test_block`) so you can test the alerting end to end. The
-status stays real, and the row is labelled "test block until hh:mm". The role's `cribl_block` tag sets
-it in Cribl and writes the same table into Splunk (`hl_ingest_block`) for the label; the Manage form
-only shows that command. Only `linux`, `windows` and `network` can be blocked. Expiry is checked per
-event; nothing removes expired rows on a schedule. Every change is in Cribl's audit log and counts as
-tampering outside a marker window.
+A test block drops real data in Cribl so you can test the alerting end to end. How it works and how
+to set one: [running-the-role.md](running-the-role.md#3-day-to-day-tags-all-never).
 
 ## Porting to production
 

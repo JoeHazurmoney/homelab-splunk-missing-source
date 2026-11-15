@@ -135,7 +135,7 @@ Rolls a host's rows up to DOWN (its liveness is missing, or, for agentless hosts
 Picks the most likely cause of an entity that is not OK, in a fixed order: the hold, a mute, "just added" (newly expected and not yet seen), a test block, an Ansible stop, the VM being off, a tamper finding, a relay down, the device probe, a silent *hl:devprobe* row while its host's heartbeat is OK, the heartbeat, and finally "this stream stopped". Used by: `dh_eval`.
 
 ### `dh_eval_cause_text`
-Turns each cause code into the plain sentence shown in the Cause column and the next step shown in the Action column (for example "Start it again with the role: ansible-playbook site.yml --tags start --limit wd2l-recv"). The texts use the names the panels use ("Splunk agent", not UF or splunkd) and say what any command does. The full list is in [dashboards.md](dashboards.md#causes-what-the-cause-column-can-say). Used by: `dh_eval`.
+Turns each cause code into the plain sentence shown in the Cause column and the next step shown in the Action column (for example "Start it again with the role: ansible-playbook site.yml --tags start --limit wd2l-recv"). The texts use the names the panels use ("Splunk agent", not UF or splunkd) and say what any command does. The full list, with what to do for each, is in [the runbook](../runbook-missing-data.md#causes-in-the-order-the-app-checks-them). Used by: `dh_eval`.
 
 ## Evaluator steps over lookups
 

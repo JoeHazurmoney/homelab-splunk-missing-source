@@ -65,7 +65,7 @@ and run `sync-to-pi.ps1 -IncludePackages`, or copy them straight to pi5. Their s
 | the Splunk Developer licence file | `C:\Users\taylo\wd2l-splunk\secrets\` on HOMEPC; never commit it |
 
 `vault_hl_s2s_token_previous` exists only during a token rotation. Rotating the S2S token has a fixed
-order (expand, migrate, contract): follow [spec §13](specs/2026-10-30-design.md#13-risks).
+order (expand, migrate, contract): follow [Rotating the S2S token](#rotating-the-s2s-token).
 
 After changing anything in the repo, run `.\scripts\sync-to-pi.ps1` again: pi5 holds a copy, not a
 git clone.
@@ -101,8 +101,8 @@ one 30-s sample (about 10–25 s of UF data) on three of the four UFs that way.
 homepc only and reads every host's inventory, so it needs `--limit homepc` (or no limit) and never
 needs the other hosts to be up.
 
-The Ansible key and the ProxyJump through HOMEPC are in `inventory/group_vars/uf_linux.yml`. Docker
-Desktop's NAT hides source addresses, so nothing here is identified by IP.
+The Ansible key and the ProxyJump through HOMEPC are in `inventory/group_vars/uf_linux.yml`. How
+each host is reached, and why nothing is identified by IP: [architecture.md](architecture.md#hosts-and-data-paths).
 
 ## 3. Day-to-day tags (all `never`)
 
@@ -114,8 +114,9 @@ Desktop's NAT hides source addresses, so nothing here is identified by IP.
 | `cribl_block` | homepc | see below | a test block in Cribl |
 | `download` | pi5 (`--limit pi5`) | `--tags download --limit pi5` | the UF packages |
 
-**Test blocks** are set with `cribl_block`, from the command the Manage dashboard shows (Test blocks
-tab), or by hand:
+**Test blocks** drop real data in Cribl (the pipeline `pl_test_block`) so you can test the alerting
+end to end. The status stays real, and the row is labelled "test block until hh:mm". They are set
+with `cribl_block`, from the command the Manage dashboard shows (Test blocks tab), or by hand:
 
 ```bash
 ansible-playbook site.yml --tags cribl_block --limit homepc -e hl_block_key='wd2l-recv|linux_secure|*' \
@@ -131,7 +132,8 @@ in about 15–17 s. Expiry is checked per event, so a block stops exactly at its
 Cribl's table on a schedule, and expired rows leave it at the next `cribl_block` run. `cribl_block`
 is the only tag that adds or removes blocks in Splunk's mirror (`hl_server_base/lookups/hl_ingest_block.csv`);
 `cribl` (when it seeds an empty Cribl table) and `cribl_remove` only reset it to its header. The
-Manage form writes nothing.
+Manage form writes nothing. Every block change is in Cribl's audit log. `cribl_block` posts markers,
+so its own changes aren't tamper findings; a change made any other way is one.
 
 **Turning things off:**
 - One input, on every host that has it: `-e '{"hl_disabled_inputs":["monitor:///var/log/secure"]}' --tags apps,expected`.
@@ -235,6 +237,29 @@ from tampering.
 - `dh_*` objects (saved searches, macros, KV lookups) are visible only in the `hl_data_health` app
   context: use the HL Data Health app in Splunk Web, or
   `/servicesNS/nobody/hl_data_health/` over REST. A `/services/` search reads 0 rows with no error.
+
+### Rotating the S2S token
+
+Rotating `vault_hl_s2s_token` is expand, migrate, contract, and loses nothing when done in this order.
+`vault_hl_s2s_token_previous` keeps the old token accepted while the senders move. Run the steps in
+order:
+
+1. **Vault** (on pi5): set `vault_hl_s2s_token` to a new `uuid.uuid4()` and `vault_hl_s2s_token_previous` to the old value, as in [spec §14.11](specs/2026-10-30-design.md#1411-retention-and-token-rotation-2026-11-07) row 5 (`umask 077` folder, decrypt, change the lines, encrypt, shred; keep an encrypted copy of the old vault until the rotation is finished).
+2. **Expand:** `ansible-playbook site.yml --tags server --limit homepc`, then `--tags cribl --limit homepc`. Splunk accepts both tokens through `[splunktcptoken://hl_cribl_previous]`, Cribl's `in_splunk_tcp` lists both, and `out_splunk` presents the new one. `server` must come first, or Splunk refuses Cribl's new token.
+3. **Migrate:** `--tags install --limit uf_linux:uf_windows`. Each UF presents the new token and restarts; Cribl still accepts any that haven't.
+4. **Straggler check:** `--tags verify --limit uf_linux:uf_windows` must be green on every UF. It fails on a UF whose `default/outputs.conf` isn't on the vault's current token (`HL_TOKEN=stale`), and on one whose file is right but whose running splunkd isn't using it (`HL_TOKEN=not_applied`: it started before the file was written, or a local token is older than the file), which is the loss this procedure exists to prevent. `install` can't heal `not_applied`, because the template reports no change: delete the `token` line from `hl_uf_outputs/local/outputs.conf` and run `--tags restart --limit <host>`.
+5. **Contract:** remove `vault_hl_s2s_token_previous` from the vault, then `--tags cribl --limit homepc` first and `--tags server --limit homepc` second, so Cribl stops accepting the old token before Splunk does and is already presenting the new one.
+6. **Check the end state.** These print counts only. Never run `btool inputs list` without the `grep -c`, because it prints the `token` lines. On HOMEPC, each of these must print `0`:
+   - `docker exec -u 0 wd2l-splunk sh -c "grep -c hl_cribl_previous /opt/splunk/etc/apps/hl_server_base/local/inputs.conf"`
+   - `docker exec -u splunk wd2l-splunk sh -c "/opt/splunk/bin/splunk btool inputs list | grep -c hl_cribl_previous"`
+
+   From pi5, `ansible-playbook site.yml --tags cribl --limit homepc` must end `changed=0`; its load check fails unless Cribl's API has loaded exactly the expected number of `authTokens` (1 now, 2 during a rotation), and it reports only that count. Then `--tags verify --limit uf_linux:uf_windows` must be green on every UF. Finally `shred -u` the encrypted copy of the old vault.
+
+Each run of steps 2 and 5 costs what those tags always cost: a `server` run restarts splunkd with the Cribl hold (≈ 2 min of UDP syslog lost per run, UF data delayed up to ≈ 2.5 min), and a `cribl` run restarts Cribl (≈ 12 s without its UDP listeners, measured 14:47:16.5–14:47:28.2). **Never edit the vault's previous value by hand mid-rotation and never skip a step's order.** The role refuses a previous value equal to the current one or not a UUID.
+
+**`cribl reload` is not a shortcut:** after a reload the running workers still refused a token that was only in the pushed `inputs.yml` and the API still listed the old list ([spec §14.13](specs/2026-10-30-design.md#1413-loss-free-s2s-token-rotation-2026-11-08) row 5). Pushed files need the restart.
+
+**A refused token is logged by Cribl as a 3+4-character mask into `index=cribl`,** so a mistyped token leaks 7 characters there.
 
 ## 6. Troubleshooting
 

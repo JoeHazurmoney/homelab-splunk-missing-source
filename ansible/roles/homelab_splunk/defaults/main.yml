@@ -79,7 +79,7 @@ hl_apps_only: []
 # A change to one of these files restarts splunkd; anything else is reloaded over REST.
 # web.conf has no REST reload (hl_server_base's dashboard risky-command setting, spec 7.8).
 hl_server_restart_confs: [indexes.conf, inputs.conf, props.conf, web.conf]
-# Restart splunkd even when nothing changed (the restart-loss test, docs/handoff/task-3b-cribl.md)
+# Restart splunkd even when nothing changed (the restart-loss test, spec §14.10 check 15)
 hl_server_force_restart: false
 hl_server_reload_endpoints:
   - apps/local

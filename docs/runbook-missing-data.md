@@ -6,11 +6,9 @@ cause: what it means, what to check first, and what to do.
 
 - `--tags …` commands are `ansible-playbook site.yml --tags …`, run from `ansible/` on pi5
   ([running-the-role.md](running-the-role.md)).
-- Run searches in the HL Data Health app. `dh_*` lookups are invisible from other apps and read as
-  empty, without an error. Cribl-delivered events have no `punct` field, so don't `dedup punct`.
-- **Never run the `splunk` CLI as root on a UF.** `sudo splunk …` runs `chown -R` over
-  `/opt/splunkforwarder` and raises a false `hl-uf-config` tamper finding. Use
-  `sudo -u splunkfwd /opt/splunkforwarder/bin/splunk …`.
+- Before you search, read [Searching](running-the-role.md#searching): run searches in the HL Data
+  Health app, and don't use `punct`.
+- **Never run the `splunk` CLI as root on a UF** ([why](running-the-role.md#5-things-to-know)).
 
 **Read the banner first.** If it says *On hold*, every status is PENDING on purpose, and no alert
 fires. Fix what the banner names before looking at single rows.
@@ -22,7 +20,7 @@ The first cause that fits wins. `<…>` marks the parts the app fills in.
 | Cause (as shown) | What it means | Check first | Do |
 |---|---|---|---|
 | **On hold: the arrival tracker (DH Tracker fast) has not run for `<n>` s**, or **On hold: the arrival tracker (DH Tracker fast) has never run** | the tracker that records arrivals isn't running, so nothing can be judged | `index=_internal sourcetype=scheduler savedsearch_name="DH Tracker fast" earliest=-15m \| stats count by status` | enable the search, or find why it is skipped (WSL2 short of CPU) |
-| **On hold: Splunk has indexed nothing for `<n>` s**, or **On hold: Splunk has indexed nothing yet** | everything went quiet at once: a Splunk problem, not a host problem | `docker ps --filter name=wd2l-splunk` on HOMEPC; HEC: `curl -sk https://127.0.0.1:8088/services/collector/health` | get the container running and receiving |
+| **On hold: Splunk has indexed nothing for `<n>` s**, or **On hold: Splunk has indexed nothing yet** | everything went quiet at once: a Splunk problem, not a host problem | `docker ps --filter name=wd2l-splunk` on HOMEPC; HEC: `curl -sk https://127.0.0.1:8088/services/collector/health`; port 9997 on the `hl-net` Docker network, where Cribl delivers everything collected | get the container running and receiving |
 | **On hold: catching up after a pause (sleep or restart) at `<time>`; statuses held for 5 min** | the PC slept or Splunk restarted | — | wait 5 min |
 | **Muted until `<time>`: `<reason>`** (or "no reason given") | muted on Manage | Manage → Mute & thresholds | nothing while muted |
 | **Added less than 1 h ago: waiting for its first data** | newly expected, not yet seen | — | wait up to 1 h |
@@ -43,7 +41,7 @@ The first cause that fits wins. `<…>` marks the parts the app fills in.
 | **The Splunk agent works but this input stopped: its file is unreadable or was moved or rotated or auditd or rsyslog stopped or audit rules were removed** | one stream stopped while the host still sends others | Host detail → latest agent errors for that path; on the host: `sudo auditctl -s`, `systemctl status auditd rsyslog` | fix the input; `--tags apps --limit <host>` or `--tags audit_rules --limit <host>` |
 | **Cribl DOWN: nothing from Cribl itself so every collected stream is unknown** | the `cribl` row: its workers' own logs stopped | as for "Cribl DOWN" above | as for "Cribl DOWN" above |
 | **Nothing at all from this host (it has no Splunk agent): the host is down or its syslog path is broken** | an agentless host sends nothing | the host and its syslog path | — |
-| **Never arrived since it was added: the input is not deployed or not sending** | an expected entity has never arrived | is it deployed? | deploy it, or retire the row (`hl_disabled_inputs`, or Manage for a row added there) |
+| **Never arrived since it was added: the input is not deployed or not sending** | an expected entity on a host without a Splunk agent has never arrived | is it deployed? | deploy it, or retire the row (`hl_disabled_inputs`, or Manage for a row added there) |
 | **Cribl late: nothing recent from Cribl itself (not yet DOWN) so collected streams may soon be unknown** | the `cribl` row while its own logs are late but not yet missing: the 2 minutes before "Cribl DOWN" | as for "Cribl DOWN" above | as for "Cribl DOWN" above |
 | **Everything from this host is late (not yet missing; it has no Splunk agent): the host or its syslog path is slow or stopping** | every stream of an agentless host is late, none missing yet | the host and its syslog path | — |
 | **Everything from this host is late or missing (it has no Splunk agent): the host or its syslog path is slow or stopping** | every stream of an agentless host is late, and some are already missing | the host and its syslog path | — |
@@ -51,15 +49,10 @@ The first cause that fits wins. `<…>` marks the parts the app fills in.
 
 ## Known limits
 
-- "Cribl DOWN" appears about 5–6 min after Cribl stops. Until then the UF host rows read "The Splunk
-  agent stopped reporting".
-- On a `via=cribl` row, a tamper finding within 15 min of a Cribl outage reads as tamper, not
-  "Cribl DOWN".
-- A marker never hides a finding that came before it (more than 60 s before). Only a marker up to
-  15 min before a finding marks it as the role's own work, and that is decided once, when DH Tamper
-  first stores the finding.
-- On EL10, `systemctl stop auditd` is refused; `service auditd stop` works and logs `DAEMON_END`
-  (with the auid), not `SERVICE_STOP`.
+They are in data-health-design.md:
+- [How long each status takes to show](data-health-design.md#how-long-until-late-missing-or-down).
+- [The limits of the Cribl causes](data-health-design.md#cribl-as-the-relay).
+- [Which tamper findings count, and when a marker hides one](data-health-design.md#tamper-indicators).
 
 ## Planned work
 
@@ -67,10 +60,7 @@ The first cause that fits wins. `<…>` marks the parts the app fills in.
   mute covers its children.
 - Use the role for stops and starts. Its markers make the Overview say "Stopped with Ansible", and
   they keep the role's own changes from counting as tampering.
-- A host that is gone for good: `uninstall`, then retire its rows with `hl_expected: false` and
-  `--tags expected --limit homepc` ([running-the-role.md §4](running-the-role.md#4-removing-things-all-never)).
-  If the inventory can't be fixed at once, retire the host from Manage → Expected list (*Retire an
-  expected item*): it stops alerting now, and the retirement holds until the inventory catches up.
+- A host that is gone for good: retire it ([running-the-role.md §4](running-the-role.md#4-removing-things-all-never)).
 
 ## After an incident
 

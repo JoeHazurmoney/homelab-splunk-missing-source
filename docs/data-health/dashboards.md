@@ -9,77 +9,15 @@ The macros behind the panels are explained in [macros.md](macros.md).
 ## The idea in four lines
 
 - The app keeps an **expected list**: every host, and every kind of data (sourcetype) or file (source) on a host, that should be sending data.
-- Every minute it checks when each of them last sent something, and gives each a **status** (below).
+- Every minute it checks when each of them last sent something, and gives each a **status** ([what each means](../data-health-design.md#statuses-and-roll-up)).
 - The dashboards show those statuses, from the app's own records. Only four panels read the raw events themselves, each for one host and only when you open it: on Host detail the events chart, the Splunk agent errors and the Hyper-V VM events, and on Manage the list of a host's raw sources.
 - When everything on the expected list is arriving, the Overview says so in plain words; when something isn't, it says what, since when, the likely cause and what to do.
 
-## Words used here
+## Statuses, causes and words
 
-| Word | Meaning |
-|---|---|
-| Splunk agent | The Splunk Universal Forwarder: the program on a host that sends its logs to Splunk. |
-| Ansible marker | A short note the Ansible role sends to Splunk whenever it stops, starts or changes a host's Splunk agent, saying what it did, who ran it and when. The app uses it to tell planned work from a real problem. |
-| Normalized form (of a source) | The source name with its date, time or rotation number replaced by `*`, so `audit-2026-10-30.jsonl` and `audit-2026-10-31.jsonl` count as one source, `audit-*.jsonl`. |
-| hec | HTTP Event Collector: data sent straight to Splunk over HTTPS (port 8088) instead of through an agent or syslog. |
-| Limit (threshold) | How long an item may stay silent before it is late. |
-
-## Statuses
-
-Each expected item has one status. "Limit" means how long it may stay silent: its *threshold*. It comes from the item's profile (heartbeat 90 s; periodic twice its interval plus a minute; continuous 15 min; sporadic 24 h), from what the app has learned about it after 3 days, or from an override set on Manage. Host detail shows which.
-
-| Status | What it means | What to do |
-|---|---|---|
-| OK | Data arrived within its limit. | Nothing. |
-| LATE | Silent longer than its limit, but not yet twice as long. | Look at the cause. Often it recovers by itself. |
-| MISSING | Silent more than twice its limit. This is what alerts (for criticality 1 and 2). | Follow the action in the Action column. |
-| NEVER_SEEN | On the expected list for more than an hour and has never sent anything. | Check that the input is deployed and sending; the Action column says where. |
-| MUTED | Muted on purpose on Manage, with a reason and an end time. A host mute covers everything it sends. | Nothing while muted. Unmute on Manage when the work is done. |
-| PENDING | No trusted status right now: either the app itself is on hold (see the banner), or the item was added less than an hour ago and hasn't sent anything yet. No alerts fire. | If the banner says "On hold", fix what it says. Otherwise wait. |
-| INFO | Tracked for reference only; it never alerts. | Nothing. |
-
-**Host roll-up.** A host also gets an overall state from its items:
-
-| Roll-up | What it means |
-|---|---|
-| DOWN | The host itself looks dead: its Splunk agent's heartbeat (or, for a network device, its probe) is missing; or, for a host without an agent, every item it should send is missing. |
-| DEGRADED | The host is alive, but some of its items are late, missing or never seen. |
-| OK | Everything the host should send is arriving. |
-| MUTED | The host is muted. |
-| PENDING | The app is on hold (see the banner). |
-
-## Causes: what the Cause column can say
-
-When something is late or missing, the app picks the most likely reason, checking them in this order. The Action column gives the next step, with the host name filled in.
-
-| Cause shown (start of the text) | What it means | Action shown |
-|---|---|---|
-| On hold: the arrival tracker (DH Tracker fast) has not run for … (or has never run) | The background search that records arrivals hasn't run, so nothing can be judged. | Check that the scheduled search DH Tracker fast is enabled and not skipped. |
-| On hold: Splunk has indexed nothing … | Splunk indexed nothing for 2 minutes; everything went quiet at once, which is Splunk's problem, not each host's. | Check that the Splunk container runs and receives: HEC on 8088 (wd2l and the Ansible markers) and port 9997 on the *hl-net* Docker network, where Cribl delivers everything collected. |
-| On hold: catching up after a pause (sleep or restart) at … | Splunk or the PC paused; statuses are held for 5 minutes while data catches up. | None: wait 5 min. |
-| Muted until …: *reason* | Muted on Manage. | None while muted. |
-| Added less than 1 h ago: waiting for its first data | Just added to the expected list; no data yet. | None yet: wait up to 1 h for its first data. |
-| Test block until … (data dropped on purpose): *reason* | A test is deliberately dropping this data in Cribl. | Remove the test block when the test ends (Manage, Test blocks tab, gives the command). |
-| Stopped with Ansible at … by … and not started again | Someone ran the role's `stop` and no `start` followed. | Start it again with the role: *ansible-playbook site.yml --tags start --limit host* (this starts the Splunk agent on that host). |
-| Uninstalled with Ansible at … by … and not installed again | Someone ran the role's `uninstall` and no `install` followed; the host stays expected until its rows are retired. | Install it again with the role, or retire its rows (*hl_expected: false*, then *--tags expected*). |
-| The VM is off: Hyper-V event … | Hyper-V reports the VM was turned off, shut down or saved. | Start the VM in Hyper-V, or mute it if it is meant to be off. |
-| Possible deliberate blinding: … just before the data stopped | A tamper sign (a log cleared, auditd stopped, the agent stopped, a big clock step, or for data that passes through Cribl a change to Cribl's routes, pipelines, inputs, outputs or lookups) appeared close to when the data stopped, and not during Ansible work. | Escalate: someone may be hiding activity. |
-| Cribl DOWN: the real state is unknown … | Everything collected (the agents and the UDM) passes through Cribl Stream, and Cribl itself has stopped reporting. So nobody can tell whether this data stopped or just can't get through. HEC data (wd2l, the markers) doesn't use Cribl, so Splunk itself still looks fine. | Check the *cribl* container on HOMEPC (`docker ps --filter name=cribl`), then run the role's *--tags verify --limit homepc*. |
-| Cribl DOWN: nothing from Cribl itself … | The row for Cribl: its own logs (each worker logs every minute) stopped arriving. | The same as above. |
-| The relay … is DOWN: this data comes through it … | This data comes through another relay host that is itself down, so its real state is unknown. | Fix the relay first. |
-| The device does not answer the network probe … | The device doesn't answer the regular ping from *hl-devprobe* on pi5. | Check the power and network of the device. |
-| The device probe (hl-devprobe on pi5) stopped reporting on this device | The probe service on pi5 (*hl-devprobe*, which pings each device every minute into a file pi5's agent forwards) has gone quiet. It shows on pi5's *hl:devprobe* row while pi5's agent is healthy; a network device's own row stays OK for its much longer limit. | Check *hl-devprobe* on pi5 (`systemctl status hl-devprobe.timer`), or rerun the role's *--tags probe --limit pi5*. |
-| The device answers the network probe but sends no logs … | The device is up but sends no logs; its logging settings probably changed. | Check the remote syslog settings on the device. |
-| The Splunk agent reports late (not yet missing) … | The Splunk agent on the host is slow to report: busy, stopping, or its network path to Cribl (port 9997 on HOMEPC, where agents deliver data) is slow. | Check the agent with the role (*--tags status* shows whether the agent runs and is connected); then check the network path from the host to Cribl. |
-| The Splunk agent stopped reporting … | The host is down or cut off from Cribl, the agent crashed, or someone stopped it outside Ansible. | Ping or SSH to the host; then check the agent with the role (*--tags status*). |
-| The Splunk agent works but this input has never sent anything … | The agent works, but this input has never sent anything: not enabled, wrong index or sourcetype, or no permission to read the file. | Check the input on the host: its settings (*splunk btool inputs list* on the host prints the inputs the agent really uses; on Linux run it as the agent's own user, *sudo -u splunkfwd /opt/splunkforwarder/bin/splunk btool inputs list*, never as root, which raises a false tamper finding) and the agent errors on Host detail. |
-| The Splunk agent works but sends no data at all … | Its apps or inputs were removed, it cannot forward, or a test block drops everything. | Re-deploy the agent's apps with the role (*--tags apps*) and check Manage for test blocks. |
-| The Splunk agent works but this input stopped … | The file is unreadable, moved or rotated; or auditd or rsyslog stopped; or audit rules were removed. | Read the Splunk agent errors about this sourcetype on Host detail. |
-| Never arrived since it was added … | A host without an agent never sent this. | Check that this input is deployed and sending. |
-| Nothing at all from this host (it has no Splunk agent) … | A host without an agent sends nothing at all. | Check the host and its syslog path. |
-| Cribl late: nothing recent from Cribl itself (not yet DOWN) … | The row for Cribl: its own logs are late but not yet missing (the 2 minutes before "Cribl DOWN"). | The same as for Cribl DOWN. |
-| Everything from this host is late (not yet missing; it has no Splunk agent) … | Every stream of a host without an agent is late, none missing yet. | Check the host and its syslog path. |
-| Everything from this host is late or missing (it has no Splunk agent) … | Every stream of a host without an agent is late, and some are already missing. | Check the host and its syslog path. |
-| This stream stopped while the host still sends others … | One stream stopped; the host still sends others. | Check the program or input that sends this stream. |
+- What each status and host roll-up means, and how long each status takes to show: [data-health-design.md](../data-health-design.md#statuses-and-roll-up).
+- Each cause the Cause column can show, and what to do about it: [the runbook](../runbook-missing-data.md#causes-in-the-order-the-app-checks-them).
+- Words this guide uses, such as Splunk agent, Ansible marker and normalized source: [the glossary](../glossary.md).
 
 ## The banner: is the data current?
 
@@ -161,7 +99,7 @@ Three rows of six tiles: one row for hosts, one for sourcetypes, one for sources
 ### Needs attention
 - **What it shows:** one row per host with something late, missing or never seen. Columns: **Host**; **State** (DOWN or DEGRADED); **Worst status**; **Bad items** (how many, and the first five); **Since** and **For** (when the oldest problem began, and how long ago); **Criticality**; **Cause**; **Action**; **Runbook**.
 - **Where it comes from:** the current statuses of the expected list, grouped by host.
-- **How to read it:** the worst row is on top: DOWN before DEGRADED, then the worst status, then criticality (1 first), then the oldest. Empty means nothing needs attention (the line above says so). For each row, read the **cause** (see [Causes](#causes-what-the-cause-column-can-say)) and do the **action**; open the runbook if there is one; click the row for the full picture on Host detail.
+- **How to read it:** the worst row is on top: DOWN before DEGRADED, then the worst status, then criticality (1 first), then the oldest. Empty means nothing needs attention (the line above says so). For each row, read the **cause** (see [the runbook](../runbook-missing-data.md#causes-in-the-order-the-app-checks-them)) and do the **action**; open the runbook if there is one; click the row for the full picture on Host detail.
 
 ### Recently recovered (back to OK in the last 24 h)
 - **What it shows:** items whose data stopped and has come back to OK in the last 24 hours. Columns: **Back to OK at**, **Host**, **Item ID**, **Down since**, **Down for**.
@@ -328,7 +266,7 @@ If the item is muted when you set or clear its limit, the mute and its reason st
   | Column | Meaning |
   |---|---|
   | Item | The item in words. |
-  | Profile | heartbeat, periodic, continuous, sporadic or info (see [Statuses](#statuses)). |
+  | Profile | heartbeat, periodic, continuous, sporadic or info (see [profiles](../data-health-design.md#the-five-ideas)). |
   | Limit applied (s) | The limit in force now. |
   | Applied from | Where it comes from: Override (set on Manage), Fixed limit on its expected row, Learned from its history, Profile default, Profile default (the row's profile is unknown), or None (INFO: never alerts). |
   | About the applied limit | The same in a sentence. |
@@ -356,7 +294,7 @@ Tell the app about data it should expect, so it alerts when that data stops, and
 4. **Host name**: type the host, for example `pi5`, and press Enter. A domain (`.mshome.net`) is cut off.
 5. **Sourcetype (not for a host row)** and, for a source row, **Source (source rows only)**: replace `-` with the name.
 6. **Collection (how it arrives)**: uf (Splunk agent), syslog or hec. For data that comes through a relay, put the relay in **Via relay**.
-7. **Profile**: how the data arrives (see [Statuses](#statuses)); for **periodic**, also fill in **Interval in seconds (periodic only)**. **Criticality**: 1 and 2 alert when the data goes missing; 3 and 4 don't.
+7. **Profile**: how the data arrives (see [profiles](../data-health-design.md#the-five-ideas)); for **periodic**, also fill in **Interval in seconds (periodic only)**. **Criticality**: 1 and 2 alert when the data goes missing; 3 and 4 don't.
 8. **Owner**, **Site**, **Runbook link** and **Description** are optional (keep `-`). Write a **Reason** and press Enter.
 9. Check **Add an expected row: preview**: **Now** "Not on the expected list" (or how the row is now, for a change), **After the change**, and **Check** "OK: …".
 10. **Confirm (writes the change)**: choose "Apply: add pi5 › syslog (enclave1) to the expected list (profile continuous, criticality 2)". **Add an expected row: result** says "Done: Add expected row …".

@@ -44,5 +44,7 @@ Then open the **HL Data Health** app in Splunk (`http://127.0.0.1:8000` on HOMEP
 | [docs/data-health/dashboards.md](docs/data-health/dashboards.md) | the analyst's guide to the four dashboards |
 | [docs/data-health/macros.md](docs/data-health/macros.md) | what each macro does |
 | [docs/runbook-missing-data.md](docs/runbook-missing-data.md) | what to do for each cause the Overview shows |
-| [docs/testing.md](docs/testing.md) | how to run each test suite, and the fault-injection matrix |
+| [docs/testing.md](docs/testing.md) | how to run each test suite |
+| [docs/glossary.md](docs/glossary.md) | the words the docs use, for a reader new to this lab |
 | [docs/specs/](docs/specs/) | the approved design and its Cribl addendum (the record of every decision) |
+| [docs/records/](docs/records/) | records of test runs on the real hosts, such as the fault-injection run |
