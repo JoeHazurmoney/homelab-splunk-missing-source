@@ -78,6 +78,7 @@ When something is late or missing, the app picks the most likely reason, checkin
 | Nothing at all from this host (it has no Splunk agent) … | A host without an agent sends nothing at all. | Check the host and its syslog path. |
 | Cribl late: nothing recent from Cribl itself (not yet DOWN) … | The row for Cribl: its own logs are late but not yet missing (the 2 minutes before "Cribl DOWN"). | The same as for Cribl DOWN. |
 | Everything from this host is late (not yet missing; it has no Splunk agent) … | Every stream of a host without an agent is late, none missing yet. | Check the host and its syslog path. |
+| Everything from this host is late or missing (it has no Splunk agent) … | Every stream of a host without an agent is late, and some are already missing. | Check the host and its syslog path. |
 | This stream stopped while the host still sends others … | One stream stopped; the host still sends others. | Check the program or input that sends this stream. |
 
 ## The banner: is the data current?

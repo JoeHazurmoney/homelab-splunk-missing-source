@@ -3,3 +3,5 @@ cribl,cribl,cribl,cribl,NOW-86400,NOW-200,NOW-200,10,0
 linux,h37a,syslog,tcp:10514,NOW-86400,NOW-900,NOW-900,1,0
 linux,h37b,syslog,tcp:10515,NOW-86400,NOW-60,NOW-60,1,0
 linux,h37b,auth,tcp:10515,NOW-86400,NOW-900,NOW-900,1,0
+linux,h37c,syslog,tcp:10516,NOW-86400,NOW-900,NOW-900,1,0
+linux,h37c,auth,tcp:10516,NOW-86400,NOW-1500,NOW-1500,1,0
