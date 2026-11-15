@@ -266,7 +266,7 @@ Writes the daily report rows (`source=dh:soh`). Used by: *DH Daily SoH report*.
 ## Baselines (DH Baseline daily and compute)
 
 ### `dh_daily_from_minutes(fwd, expected)`
-For each entity and completed day: how many events, how many active minutes, the longest and 95th-percentile silence, how late data arrived, and the hourly counts. Only minutes when Splunk (and, for agent hosts, the agent) were up count, so PC sleep never looks like silence; a silence still open at midnight carries into the next day. Arguments: `fwd`, `expected`. Used by: *DH Baseline daily*.
+For each entity and completed day: how many events, how many active minutes, the longest and 95th-percentile silence, how late data arrived, and the hourly counts. Only minutes when Splunk (and, for agent hosts, the agent) were up count, so PC sleep never looks like silence; a silence still open at midnight carries into the next day. Days and hours are UTC, whatever time zone the search runs in. Arguments: `fwd`, `expected`. Used by: *DH Baseline daily*.
 
 ### `dh_daily_todo(now)`
 The completed days of the last 13 that have no daily record yet, so a missed night is caught up on the next run. Not 14: the indexes keep 14 days, so the raw data of the day that began 14 days ago may already be partly gone, and filling it in would record a silence that never happened. Used by: *DH Baseline daily*, `dh_daily_window`.

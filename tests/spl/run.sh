@@ -374,7 +374,7 @@ app_conf_check() {
 }
 
 run_cases() {
-  local pattern=${1:-*} pass=0 fail=0 dir name id ok
+  local pattern=${1:-*} pass=0 fail=0 dir name id ok tz0=$DH_TZ
   if [ "$pattern" = "*" ]; then
     if app_conf_check; then pass=$((pass + 1)); else fail=$((fail + 1)); fi
     if names_check; then pass=$((pass + 1)); else fail=$((fail + 1)); fi
@@ -393,6 +393,9 @@ run_cases() {
     id=$(printf '%s' "$name" | tr -c 'a-zA-Z0-9\n' '_')
     upload "$id" "$dir"
     ok=1
+    # A case may pin its own time zone (a tz file): the day and hour keys must not depend on it.
+    DH_TZ=$tz0
+    if [ -f "$dir/tz" ]; then DH_TZ=$(tr -d '\r\n' <"$dir/tz"); fi
     check "$id" "$dir" "$dir/out.csv" "" || ok=0
     if [ -f "$dir/transitions.csv" ]; then
       check "$id" "$dir" "$dir/transitions.csv" '| `dh_transition_rows`' || ok=0
@@ -400,6 +403,7 @@ run_cases() {
     if [ "$ok" -eq 1 ]; then pass=$((pass + 1)); echo "PASS $name"; else fail=$((fail + 1)); echo "FAIL $name"; fi
     dh_docker exec -u root "$DH_CONTAINER" sh -c "rm -f $DH_APP_DIR/lookups/dhtest_${id}_*.csv"
   done
+  DH_TZ=$tz0
   echo "$pass passed, $fail failed"
   [ "$fail" -eq 0 ] && [ "$pass" -gt 0 ]
 }

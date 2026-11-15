@@ -1,0 +1,8 @@
+dh_kind,index,host,sourcetype,source,count,up_minutes,hour_start
+up,,,,,,60,NOW-3600
+data,linux,v1,syslog,/var/log/messages,150,
+data,linux,v2,syslog,/var/log/messages,250,
+data,linux,v5,syslog,/var/log/messages,19,
+data,linux,V6.mshome.net,syslog,/var/log/messages.1,30,
+data,linux,v8,syslog,/var/log/messages,5,
+data,linux,v9,syslog,/var/log/messages,10,,

@@ -1,0 +1,1 @@
+| inputlookup @daily@ | `dh_baseline_compute(14, @NOW@)`

@@ -496,12 +496,12 @@ Every change made on Manage, newest first.
 
 ## Daily state of health
 
-The engineering view: the report made every day at 07:00, plus the live unregistered list. It doesn't refresh; reopen it the next day.
+The engineering view: the report made every day at 07:00 UTC (the server's time zone; midnight in Denver in winter), plus the live unregistered list. It doesn't refresh; reopen it the next day.
 
 ### Report time
 - **What it shows:** when the report shown was made.
 - **Where it comes from:** the latest daily report.
-- **How to read it:** it should be today at 07:00 (or the morning after the PC was off). "no report yet" means the report search hasn't run.
+- **How to read it:** it should be today at 07:00 UTC, shown in your own time zone (or the morning after the PC was off). "no report yet" means the report search hasn't run.
 
 ### Outages (24 h)
 - **What it shows:** how many outages (stretches of late, missing or never-seen data) ended in the last 24 hours or are still open.

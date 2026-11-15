@@ -1,0 +1,6 @@
+dh_kind,time,index,host,sourcetype,source,count,it,et,day
+data,NOW-93200,linux,h50b,linux_secure,/var/log/secure,3,NOW-93198,NOW-93200,
+data,NOW-87200,linux,h50b,linux_secure,/var/log/secure,3,NOW-87198,NOW-87200,
+data,NOW-185540,enclave1,h50a,syslog,/var/log/messages,7,NOW-185540,NOW-185540,
+todo,,,,,,,,,NOW-99200
+todo,,,,,,,,,NOW-272000
