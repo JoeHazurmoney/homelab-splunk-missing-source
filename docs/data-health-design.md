@@ -11,7 +11,7 @@ plus what changes in production. The `hl_data_health` app is search-time SPL plu
    CSV into the KV collection `dh_expected`.
    - It upserts by `_key`: it adds new rows and updates changed ones.
    - It switches off rows whose input left the inventory.
-   - It never overwrites a row added on Manage (`managed_by=ui`), even for the same item.
+   - It never overwrites an enabled row added on Manage (`managed_by=ui`), even for the same item.
    - An empty file changes nothing.
 2. **Cadence profiles, not one threshold.** A [profile](glossary.md#profile) says how an item
    usually sends data. Each profile has a default limit, called its maximum silence.
@@ -199,7 +199,7 @@ end. How it works and how to set one: [running-the-role.md](running-the-role.md#
 | Index-time parsing. | Splunk applies no index-time rule to Cribl-delivered data. Redo a TA's line breaking, timestamps and `source`/`sourcetype` rewrites in Cribl's event breakers or on the UF stanza. |
 | UF identity. | Read it from the UF's own `_internal`, never from `tcpin_connections`, which shows only the relay. Identify hosts by name, never by IP. |
 | The test block in Cribl. | It ports with Cribl, not with Splunk. Treat block changes as privileged, because a block control is itself a way to blind monitoring. |
-| The Dashboard risky-command check is off. | Keep it on in production and accept "Run Query" on Manage's writes. Or move those writes out of dashboards. With it off, a crafted link can run an add or adopt write as the admin who opens it ([why it is off here](running-the-role.md#the-dashboard-risky-command-check-is-off)). |
+| The Dashboard risky-command check is off. | Keep it on in production and accept "Run Query" on Manage's writes. Or move those writes out of dashboards. With it off, a crafted link can run a mute, limit, add or adopt write as whoever opens it ([why it is off here](running-the-role.md#the-dashboard-risky-command-check-is-off)). |
 | 14-day retention. | Every lookback must stay within the shortest retention. The `retention-windows` test in `tests/spl/run.sh` checks it. |
 | Splunk Cloud. | Everything here is search-time SPL plus KV, so it works. The block stays in Cribl. |
 | TrackMe. | This app is a yardstick. It answers the same questions (expected, cadence, liveness, cause) in plain SPL. |

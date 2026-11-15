@@ -51,7 +51,7 @@ The expected list, `dh_expected`: every item that should send data. Used by: the
 `dh_meta`: the run times of the trackers and of the admin-log copy. The banner and the evaluator's gate read it. Used by: *DH Tracker fast*, *DH Tracker slow*, *DH Admin log copy*.
 
 ### `dh_lookup_blocks`
-`hl_ingest_block`: Splunk's copy of Cribl's test-block table. It is a lookup of the `hl_server_base` app. Only the role's *cribl_block* tag writes it, and nothing in this app does. Until that app is installed, the table doesn't exist and reads as empty. Used by: the `lookup-names` check in `tests/spl/run.sh`, which keeps it equal to the name `dh_evaluate` uses. `dh_evaluate` and the Manage Test blocks tab name `hl_ingest_block` directly. A macro argument can't hold a macro, so `dh_evaluate` can't call this one.
+`hl_ingest_block`: Splunk's copy of Cribl's test-block table. It is a lookup of the `hl_server_base` app. Only the role's *cribl_block* tag adds or removes blocks in it, and nothing in this app writes it. The *cribl* and *cribl_remove* tags only reset it to its header ([who writes it](../running-the-role.md#test-blocks)). Until that app is installed, the table doesn't exist and reads as empty. Used by: the `lookup-names` check in `tests/spl/run.sh`, which keeps it equal to the name `dh_evaluate` uses. `dh_evaluate` and the Manage Test blocks tab name `hl_ingest_block` directly. A macro argument can't hold a macro, so `dh_evaluate` can't call this one.
 
 ### `dh_lookup_tamper`
 `dh_tamper`: the tamper findings, with their suppression. Used by: *DH Tamper*.
@@ -685,7 +685,7 @@ The retire form's preview (Manage > Expected list). It takes one request: an exp
 - **Undo:** an Ansible row stops being held, and *DH Sync expected* adds it back. A row added in Manage is enabled again with a new grace period.
 - Nothing is deleted.
 
-It needs the dh_admin role. The confirmation token also covers the retire key in `dh_retire_nonce`. Only admin and dh_admin can read that key. So a Manage link built by someone else can't apply a retirement. Used by: Manage.
+It needs the dh_admin role (or Splunk's admin). The confirmation token also covers the retire key in `dh_retire_nonce`. Only admin and dh_admin can read that key. So a Manage link built by someone else can't apply a retirement. Used by: Manage.
 
 ### `dh_ui_retire_write(expected, admin_log, nonce, now)`
 Applies a retire preview when its confirmation matches. It writes each row whole, changes the retire key, and adds one admin-log row per row. Used by: Manage.
@@ -701,7 +701,7 @@ The test block lives in Cribl, so Manage shows the command to run instead of wri
 
 ### `dh_ui_block_plan(blocks, now)`
 Checks a test-block request against Splunk's copy of the block table. It shows the block before and after, in words for the preview and as logged. It also shows the normalized source, for reference. These rules apply:
-- It needs the dh_admin role.
+- It needs the dh_admin role (or Splunk's admin).
 - A block lasts 1 minute to 24 hours.
 - A source block needs an exact raw source.
 - A sourcetype or source with a character the command can't carry is refused. Examples are a quote, `$`, a comma, a space or `{`.

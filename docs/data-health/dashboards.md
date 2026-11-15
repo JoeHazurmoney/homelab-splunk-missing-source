@@ -6,10 +6,10 @@ Every panel's description on screen ends with "Guide (project repo): docs/data-h
 
 The macros behind the panels are in [macros.md](macros.md).
 
-**Keeping this guide current.** Any change that adds, renames or removes a panel or a filter must update this file in the same pull request. `tests/spl/run.sh` fails (check `docs-coverage`) when a panel has no entry here. It also fails when an entry names a panel that no longer exists. The Manage view is generated. Edit `tools/gen_dh_manage.js`, never `dh_manage.xml`. Then regenerate the view. In the repository root on your PC:
+**Keeping this guide current.** Any change that adds, renames or removes a panel or a filter must update this file in the same pull request. `tests/spl/run.sh` fails (check `docs-coverage`) when a panel has no entry here. It also fails when an entry names a panel that no longer exists. The Manage view is generated. Edit `tools/gen_dh_manage.js`, never `dh_manage.xml`. Then regenerate the view. The generator needs Node, so run it in a container. On HOMEPC, in PowerShell, in the repository root:
 
-```bash
-node tools/gen_dh_manage.js
+```powershell
+docker run --rm -v "${PWD}:/repo" -w /repo node:22-slim node tools/gen_dh_manage.js
 ```
 
 The `manage-generated` check in `tests/spl/run.sh` fails when the two files differ.
@@ -237,7 +237,7 @@ The page has four tabs: **Mute & thresholds**, **Expected list**, **Test blocks 
 
 ### Before you start
 
-- **Who may do what.** Anyone who can open the app may mute, unmute, and set or clear a limit. Adding or adopting expected rows, retiring them, and test blocks need the **dh_admin** role. Without it, the preview says "Needs the dh_admin role" and nothing can be applied.
+- **Who may do what.** Anyone who can open the app may mute, unmute, and set or clear a limit. Adding or adopting expected rows, retiring them, and test blocks need the **dh_admin** role (or Splunk's `admin`). Without one of them, the preview says "Needs the dh_admin role" and nothing can be applied.
 - **Nothing is written until you choose Apply.** A form shows a preview of the change as you fill it in. To write the change, open that form's **Confirm (writes the change)** list. Then choose the line that starts with **Apply**. There is no other button. That choice writes the change at once and records it on the Admin log tab.
 - **Each form stands alone.** Every form that writes has its own Reason, Ticket and Confirm. A choice under one form's Confirm writes only that form's change. The test-block form has no Confirm, because it writes nothing.
 - **Boxes apply as you go.** There is no Submit button on Manage. A list applies as soon as you pick from it. A text box applies when you press Enter or click outside it. Lists that depend on a host fill as soon as you pick the host. Those are the items of a host, and a host's sourcetypes and raw sources.
@@ -247,7 +247,7 @@ The page has four tabs: **Mute & thresholds**, **Expected list**, **Test blocks 
 - **A confirmation fits only once.** It fits only the state you previewed. It never fits again after its change was applied, even if that change has since expired and been cleaned up. After a reload, or when you come back to a tab, the result may say "Nothing written: this confirmation fits only the state you previewed, …". That is expected, because the change was applied the first time. Check the tables or the Admin log tab.
 - **The tables don't refresh by themselves.** After you apply a change, reload the page to see it in the tables of the tab.
 - **Times** use the time zone of your Splunk account (Settings > your name > Preferences). They always end with the zone, for example `2026-10-31 17:46 MDT`. That may differ from your PC clock.
-- **Open Manage links only from people you trust.** An add or adopt link can carry a ready-made Confirm choice in its URL. Opening it applies that change as you. This works because Dashboard Studio's risky-command check is off on this Splunk (see the next point). A retire link can't do this. Its confirmation also needs a key that only admins can read.
+- **Open Manage links only from people you trust.** A mute, limit, add or adopt link can carry a ready-made Confirm choice in its URL. Opening it applies that change as you, even if you are only an analyst. A mute or a limit can hide a real outage. This works because Dashboard Studio's risky-command check is off on this Splunk (see the next point). A retire link can't do this. Its confirmation also needs a key that only admins can read. The test-block form writes nothing.
 - **If "This visualization has a potential security risk" appears after Apply,** the check is on again. The result stays empty with a red icon, and nothing is written until you click the icon and then **Run Query**. Apply writes with `outputlookup`, which is on Studio's risky list. So the server app `hl_server_base` turns the check off (`enable_risky_command_check_dashboard = false` in its `default/web.conf`). Why it is off, and its cost, are in [the risky-command check](../running-the-role.md#the-dashboard-risky-command-check-is-off). To see which value Splunk uses, run this on HOMEPC, in PowerShell. In this lab the Splunk container is `wd2l-splunk`:
 
   ```powershell
@@ -358,7 +358,7 @@ Suppose the item is muted when you set or clear its limit. The mute and its reas
 
 ### Expected list tab
 
-Use this tab to tell the app about data it should expect, so that it alerts when that data stops. You can also retire what is gone for good. This tab needs the **dh_admin** role.
+Use this tab to tell the app about data it should expect, so that it alerts when that data stops. You can also retire what is gone for good. This tab needs the **dh_admin** role (or Splunk's `admin`).
 
 Ansible manages some rows. You change those in the Ansible inventory, not here. The one exception is retiring a row the inventory still lists. That retirement holds until the inventory catches up.
 
@@ -473,7 +473,7 @@ The adopt form's **Criticality** is the same list as the add form's.
 
 A **test block** throws a host's real data away in [Cribl Stream](../glossary.md#cribl-stream), before the data reaches Splunk. Use it to check that the app notices data going missing. See [test blocks](../glossary.md#test-block).
 - It applies only to the linux, windows and network indexes.
-- It needs the **dh_admin** role.
+- It needs the **dh_admin** role (or Splunk's `admin`).
 - It ends by itself.
 - The affected items show their real status, first late and then missing. They carry the label "test block until hh:mm".
 - Cribl takes a short time to start dropping data after the command runs. [Test blocks](../running-the-role.md#test-blocks) gives the timing.
