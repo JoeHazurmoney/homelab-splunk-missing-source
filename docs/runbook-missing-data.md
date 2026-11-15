@@ -45,10 +45,10 @@ are in [Steps for each cause](#steps-for-each-cause).
 | **The Splunk agent works but this input has never sent anything: input not enabled or wrong index or sourcetype or no permission to read it** | The agent works, but this input never delivered. | Check the input's settings, then redeploy the apps. [Steps](#the-agent-works-but-an-input-is-missing). |
 | **The Splunk agent works but sends no data at all: its apps or inputs were removed or it cannot forward or a test block drops it** | The heartbeat is fine, but every stream stopped. | Check for test blocks, then redeploy the apps. [Steps](#the-agent-works-but-an-input-is-missing). |
 | **The Splunk agent works but this input stopped: its file is unreadable or was moved or rotated or auditd or rsyslog stopped or audit rules were removed** | One stream stopped while the host still sends others. | Find out why the input stopped, then fix it. [Steps](#the-agent-works-but-an-input-is-missing). |
-| **Cribl DOWN: nothing from Cribl itself so every collected stream is unknown** | This is the `cribl` row. Its workers' own logs stopped. | As for *Cribl DOWN* above. |
+| **Cribl DOWN: nothing from Cribl itself so every collected stream is unknown** | This is the `cribl` row. Its workers' own logs stopped. | As for [*Cribl DOWN*](#cribl-is-down) above. |
 | **Nothing at all from this host (it has no Splunk agent): the host is down or its syslog path is broken** | A host without an agent sends nothing. | Check the host and its syslog path. |
 | **Never arrived since it was added: the input is not deployed or not sending** | An expected item on a host without an agent has never arrived. | Check that it is deployed. Deploy it, or [retire the row](#retire-a-row-that-never-arrived). |
-| **Cribl late: nothing recent from Cribl itself (not yet DOWN) so collected streams may soon be unknown** | This is the `cribl` row while its own logs are late. It lasts about 2 min before *Cribl DOWN*. | As for *Cribl DOWN* above. |
+| **Cribl late: nothing recent from Cribl itself (not yet DOWN) so collected streams may soon be unknown** | This is the `cribl` row while its own logs are late. It lasts about 2 min before *Cribl DOWN*. | As for [*Cribl DOWN*](#cribl-is-down) above. |
 | **Everything from this host is late (not yet missing; it has no Splunk agent): the host or its syslog path is slow or stopping** | Every stream of a host without an agent is late. None is missing yet. | Check the host and its syslog path. |
 | **Everything from this host is late or missing (it has no Splunk agent): the host or its syslog path is slow or stopping** | Every stream of a host without an agent is late. Some are already missing. | Check the host and its syslog path. |
 | **This stream stopped while the host still sends others: its program or input stopped** | Only this stream stopped. For `enclave1` rows, that means wd2l's delivery. | Check the program behind the stream. |
@@ -247,7 +247,9 @@ The output's `last_connect` shows when the agent last connected.
   ```
 
   The person's `auid` is on sudo's `USER_CMD` record. On Windows, look for event 7036 in
-  `source="XmlWinEventLog:System"`.
+  `source="XmlWinEventLog:System"`. Some Windows hosts don't log 7036 (in this lab: HOMEPC). There,
+  search `index=_internal host=<host> "Shutting down splunkd"`. The line often arrives only when
+  the UF starts again.
 
 ### The agent works but an input is missing
 

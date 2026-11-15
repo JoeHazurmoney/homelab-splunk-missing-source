@@ -168,7 +168,9 @@ finding that already alerted. An example is a marker from a restore run.
 The indicators:
 - **Windows:** event IDs 1102 (log cleared), 104, 1100, 4719 (audit policy changed) and 4697 or 7045
   (service installed). Also 7036 and 7040 (SplunkForwarder or EventLog stopped, or its start type
-  changed).
+  changed). Windows hosts should log 7036. A hardened Windows host normally does. In this lab:
+  HOMEPC isn't hardened and logs no 7036. So a stopped UF there shows only as LATE, then MISSING,
+  then DOWN.
 - **Linux:** auditd `DAEMON_END` or `DAEMON_ABORT`, `CONFIG_CHANGE`, and `SERVICE_STOP` of
   SplunkForwarder, auditd or rsyslog. Also audit keys `hl-*` and `wd2l-*`, which cover writes to the
   UF's config, to rsyslog and to `/etc/audit`. On EL10, `systemctl stop auditd` is refused.
