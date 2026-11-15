@@ -1,28 +1,45 @@
 # Testing
 
-Two kinds of tests: suites you run from a checkout, and the fault-injection matrix (spec §12) run on
-the real hosts. Results from each task's own checks are in [spec §14](specs/2026-10-30-design.md#14-spike-findings-2026-10-30).
-The record of the fault-injection run, with every measured time and the defects it found, is
+There are two kinds of tests. You run the suites from a checkout of this repo. The fault-injection
+matrix (§12 of [the spec](specs/2026-10-30-design.md)) ran once on the real hosts. Results from each
+build step's own checks are in [spec §14](specs/2026-10-30-design.md#14-spike-findings-2026-10-30).
+The record of the fault-injection run has every measured time and the defects it found:
 [records/2026-11-fault-injection-run.md](records/2026-11-fault-injection-run.md).
 
 ## CI
 
-Two required checks run on every pull request (`.github/workflows/`). GitHub can't protect `main` on
-this private repo, so the rule is kept by convention: merge only when both are green, and
-`.githooks/pre-push` blocks direct pushes to `main` (enable it once per clone with
-`git config core.hooksPath .githooks`).
+Two required checks run on every pull request. Their files are in `.github/workflows/`.
 
-| Workflow | Runs | Proves |
-|---|---|---|
-| `lint.yml` | `yamllint --strict .`; `ansible-lint --strict` (profile `production`) from `ansible/` after installing `requirements.yml`; `shellcheck` on every tracked `*.sh`; PSScriptAnalyzer (errors and warnings) on every `*.ps1` / `*.psm1` | the YAML, the role, the shell and PowerShell scripts are clean |
-| `pr-issue-link.yml` | the PR title is a Conventional Commit, and the body says `Closes #<n>` for an open issue | every change is tied to an issue |
+| Workflow | Proves |
+|---|---|
+| `lint.yml` | The YAML, the role, the shell scripts and the PowerShell scripts are clean. |
+| `pr-issue-link.yml` | Every change is tied to an issue. |
 
-No CI job reaches Splunk, Cribl or the hosts; the suites below need them.
+What each one runs:
+- **`lint.yml`:**
+  - `yamllint --strict .`
+  - `ansible-lint --strict` (profile `production`), from `ansible/`, after it installs
+    `requirements.yml`.
+  - `shellcheck` on every tracked `*.sh` file.
+  - PSScriptAnalyzer (errors and warnings) on every `*.ps1` and `*.psm1` file.
+- **`pr-issue-link.yml`:** the PR title must be a Conventional Commit. The body must say
+  `Closes #<n>` for an open issue.
+
+GitHub can't protect `main` on this private repo, so a convention keeps the rule. Merge only when
+both checks are green. The `.githooks/pre-push` hook blocks direct pushes to `main`. Turn it on once
+for each clone. In that clone's root folder, in any shell:
+
+```bash
+git config core.hooksPath .githooks
+```
+
+No CI job reaches Splunk, Cribl or the hosts. The suites below need them.
 
 ## The same lint on pi5
 
-`scripts/bootstrap-pi.sh` installs yamllint and ansible-lint (`~/.venvs/ansible-lint`, linked into
-`~/.local/bin`):
+`scripts/bootstrap-pi.sh` installs yamllint and ansible-lint. It puts them in `~/.venvs/ansible-lint`
+and links them into `~/.local/bin`. On pi5, with the Ansible venv on
+([How to run a command](running-the-role.md#how-to-run-a-command)):
 
 ```bash
 cd ~/homelab-splunk-missing-source && yamllint --strict .
@@ -31,23 +48,90 @@ cd ansible && ansible-lint --strict && ansible-playbook site.yml --syntax-check
 
 ## Test suites
 
-| Suite | Where and how | Proves |
-|---|---|---|
-| `tests/spl/run.sh` | Git Bash on HOMEPC, with `hl_data_health` deployed (`--tags server`, or `tests/spl/dev-deploy.sh`, which swaps the app in without restarting splunkd). `tests/spl/run.sh` runs everything; `tests/spl/run.sh '1*'` some cases; `--scale [hosts]` the generated scale case (300 hosts by default). It reads the admin password from `DH_PASS_FILE` and never prints it. A full run needs `node`: it checks that the committed Manage view is the output of `tools/gen_dh_manage.js` (edit the generator, never `dh_manage.xml`) | every evaluator and macro fixture case under `tests/spl/cases/` gives the expected status, cause and transitions (run at a fixed clock). A full run also checks that lookup names resolve (`lookup-names`, `lookup-names-static`), that no search looks back past the indexes' retention (`retention-windows`), the saved searches' settings against `savedsearches.expect.csv`, the views statically (`dash_check.py`), and that every macro, panel and input is documented in `docs/data-health/` and nothing documented is gone. It uploads `dhtest_*` lookups and removes them; it writes nothing to KV or an index |
-| `tests/spl/dash.sh panels` | as above | every read-only data source of every view runs without errors, and each drilldown returns the field it passes on |
-| `tests/spl/dash.sh load [hosts]` | as above | the Overview's searches over the 300-host fixture load in under 3 s and match the generated mix |
-| `tests/spl/dash.sh writes` | as above | Manage's writes end to end on throwaway collections: preview, confirm, apply, the admin log, that a repeated or stale confirmation writes nothing, and the test-block command |
-| `tests/spl/dash.sh sync` | as above | *DH Sync expected*, as written, upserts by `_key`, so rows it doesn't change stay as they were |
-| `tests/server/hl_server_app_test.sh` | on Linux: `sh tests/server/hl_server_app_test.sh ansible/roles/homelab_splunk/files/hl_server_app.sh` (Git Bash's `sha256sum` output breaks it) | the `server` helper's handling of `local/inputs.conf` across a token rotation: stale encrypted token copies dropped, a retired `splunktcptoken` stanza removed, stanzas the role never shipped left alone, no change when nothing changed |
-| `tests/cribl/hl_cribl_config_test.sh` | anywhere with a POSIX sh, for example in the Cribl container: `docker cp` the helper and the test to `cribl:/tmp/`, then `docker exec cribl sh /tmp/hl_cribl_config_test.sh /tmp/hl_cribl_config.sh` | the `cribl` helper's file swap: changes reported and copied, the pushed-files record left pending until committed, dropped files deleted, files the role never pushed kept, a retry after a revert copies the file back. It uses a throwaway volume folder |
+| Suite | What it proves |
+|---|---|
+| `tests/spl/run.sh` | Every evaluator and macro case gives the expected status, cause and transitions. A full run adds more checks (below). |
+| `tests/spl/dash.sh panels` | Every read-only data source of every view runs without errors. Each drilldown returns the field it passes on. |
+| `tests/spl/dash.sh load [hosts]` | The Overview's searches load in under 3 s over a 300-host fixture, and match the generated mix. |
+| `tests/spl/dash.sh writes` | Manage's writes work end to end on throwaway collections. |
+| `tests/spl/dash.sh sync` | *DH Sync expected* upserts by `_key`, so rows it doesn't change stay as they were. |
+| `tests/server/hl_server_app_test.sh` | The `server` helper handles `local/inputs.conf` correctly across a token rotation. |
+| `tests/cribl/hl_cribl_config_test.sh` | The `cribl` helper's file swap works. |
 
-`tests/spl/` uses throwaway objects named `dhtest_*` and removes them on exit.
+These suites use throwaway objects named `dhtest_*`. They remove them on exit.
+
+### Run `tests/spl/run.sh` and `dash.sh`
+
+These suites need Splunk. Deploy the `hl_data_health` app first. Either run the role's `server` tag,
+or run `tests/spl/dev-deploy.sh`. That script swaps the app in without restarting splunkd.
+
+The suite reads the admin password from the file that `DH_PASS_FILE` names. It never prints the
+password. In this lab, the default is `splunk-admin-password` in `~/wd2l-splunk/secrets/` on
+HOMEPC. A full `run.sh` run also needs `node`.
+
+On HOMEPC, in Git Bash, in the repo's root folder:
+
+```bash
+tests/spl/run.sh                # everything
+tests/spl/run.sh '1*'           # some cases: a glob on the case folder name
+tests/spl/run.sh --scale 300    # the generated scale case (300 hosts by default)
+tests/spl/dash.sh panels
+tests/spl/dash.sh load 300
+tests/spl/dash.sh writes
+tests/spl/dash.sh sync
+```
+
+Run one `dash.sh` mode at a time.
+
+A full `run.sh` run also checks that:
+- lookup names resolve (`lookup-names`, `lookup-names-static`);
+- no search looks back past the indexes' retention (`retention-windows`);
+- the saved searches' settings match `savedsearches.expect.csv`;
+- the views pass a static check (`dash_check.py`);
+- the committed Manage view equals the output of `tools/gen_dh_manage.js`;
+- every macro, panel and input is documented in `docs/data-health/`, and nothing documented is gone.
+
+Edit the generator, never `dh_manage.xml`. The suite uploads `dhtest_*` lookups and removes them. It
+writes nothing to the KV store or to an index.
+
+### Run `hl_server_app_test.sh`
+
+Run it on Linux. Git Bash's `sha256sum` output breaks it. In the repo's root folder, on a Linux
+host:
+
+```bash
+sh tests/server/hl_server_app_test.sh ansible/roles/homelab_splunk/files/hl_server_app.sh
+```
+
+It checks these things:
+- Stale encrypted token copies are dropped.
+- A retired `splunktcptoken` stanza is removed.
+- Stanzas the role never shipped are left alone.
+- Nothing changes when nothing changed.
+
+### Run `hl_cribl_config_test.sh`
+
+It needs only a POSIX shell, so it runs anywhere. This way runs it inside the Cribl container. On
+HOMEPC, in PowerShell, in the repo's root folder:
+
+```powershell
+docker cp ansible/roles/homelab_splunk/files/hl_cribl_config.sh cribl:/tmp/
+docker cp tests/cribl/hl_cribl_config_test.sh cribl:/tmp/
+docker exec cribl sh /tmp/hl_cribl_config_test.sh /tmp/hl_cribl_config.sh
+```
+
+It uses a throwaway volume folder. It checks that:
+- changes are reported and copied;
+- the pushed-files record stays pending until it is committed;
+- dropped files are deleted;
+- files the role never pushed are kept;
+- a retry after a revert copies the file back.
 
 ## Reading level of the docs
 
-`tools/doc_grade.py` scores the prose of each current doc (target: grade 8 or below, 15 words a
-sentence or fewer; `docs/specs/` and `docs/records/` are exempt). It isn't in CI. On HOMEPC, in
-PowerShell, from the repo root:
+`tools/doc_grade.py` scores the prose of each current doc. The target is grade 8 or below, and 15
+words a sentence or fewer. `docs/specs/` and `docs/records/` are exempt. It isn't in CI. On HOMEPC,
+in PowerShell, in the repo's root folder:
 
 ```powershell
 docker run --rm -v "${PWD}:/w:ro" -w /w python:3.14.10-slim python tools/doc_grade.py --worst 3
