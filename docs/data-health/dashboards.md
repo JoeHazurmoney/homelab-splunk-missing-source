@@ -451,7 +451,7 @@ A source block needs the **exact raw source** name, as listed in the raw sources
 | Sourcetype or raw source | For the lower levels: the sourcetype, or the exact raw source name (listed with its normalized form). Not needed for a whole-host block. |
 | Block for | How long: 5 minutes to 24 hours (the most allowed). |
 
-The form also has its own **Reason (required)** and **Ticket (optional, - for none)**, as above. It has no Confirm: nothing is written from here. The reason goes into the command; the ticket doesn't, and it isn't stored anywhere (the *cribl_block* tag has no ticket).
+The form also has its own **Reason (required)**: 3 to 120 letters, digits, spaces or `_ . : / # ( ) -`, the same rule the role checks, so a preview that says OK also runs on pi5. It has no Ticket box: the *cribl_block* tag stores no ticket. It has no Confirm: nothing is written from here. The reason goes into the command.
 
 #### Test block: preview
 - **What it shows:** the block you are about to add or remove. Columns: **Change**, **Item** (the block key in words), **Now**, **After the change**, **Check** and **Normalized source** (for reference only).

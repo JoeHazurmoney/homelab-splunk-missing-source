@@ -266,7 +266,7 @@ writes() {
   # Test block (task 11b): the block lives in Cribl, so the form writes nothing; it shows the role's
   # cribl_block command. A throwaway block table with one live block on the requested key makes the
   # remove case previewable; it and the admin log stay as they were.
-  bk=("bk_action=add" "bk_host=dhtest-w4" "bk_level=source" "bk_target=linux_secure|/var/log/secure.1" "bk_duration=900" "bk_reason=writes test" "bk_ticket=CHG-B")
+  bk=("bk_action=add" "bk_host=dhtest-w4" "bk_level=source" "bk_target=linux_secure|/var/log/secure.1" "bk_duration=900" "bk_reason=writes test")
   printf 'k,until,reason,set_by
 dhtest-w4|linux_secure|/var/log/secure.1,%s,writes test,admin
 ' "$(($(date +%s) + 3600))" >"$work/dhtest_w_blocks.csv"
@@ -285,7 +285,7 @@ dhtest-w4|linux_secure|/var/log/secure.1,%s,writes test,admin
   bk_sum1=$(dh_docker exec -u root "$DH_CONTAINER" md5sum "$DH_APP_DIR/lookups/dhtest_w_blocks.csv")
   expect "the block form left its table as it was" "$bk_sum1" "^${bk_sum0%% *}"
   # An unknown key cannot be removed: the preview says why and there is no command.
-  bk=("bk_action=remove" "bk_host=dhtest-w4" "bk_level=host" "bk_target=-" "bk_duration=900" "bk_reason=writes test" "bk_ticket=CHG-B")
+  bk=("bk_action=remove" "bk_host=dhtest-w4" "bk_level=host" "bk_target=-" "bk_duration=900" "bk_reason=writes test")
   res=$(w_run ds_bk_command "${bk[@]}" | col Command)
   expect "block command for a key with no active block" "$res" '^Not ready: This has no active test block'
   res=$(kv_get dhtest_kv_admin_log 'stats count')

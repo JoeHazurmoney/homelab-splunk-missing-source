@@ -33,7 +33,7 @@
             },
             "cond_bk_ready": {
                 "name": "Test-block form filled in",
-                "value": "isSet($bk_action$) and isSet($bk_host$) and isSet($bk_level$) and isSet($bk_target$) and isSet($bk_duration$) and isSet($bk_reason$) and isSet($bk_ticket$)"
+                "value": "isSet($bk_action$) and isSet($bk_host$) and isSet($bk_level$) and isSet($bk_target$) and isSet($bk_duration$) and isSet($bk_reason$)"
             }
         }
     },
@@ -658,18 +658,10 @@
         },
         "input_bk_reason": {
             "type": "input.text",
-            "title": "Reason (required)",
+            "title": "Reason (required: 3 to 120 letters, digits, spaces or _ . : / # ( ) -)",
             "options": {
                 "token": "bk_reason",
                 "placeholder": "Why? For example: test that the app sees pi5 go missing"
-            }
-        },
-        "input_bk_ticket": {
-            "type": "input.text",
-            "title": "Ticket (optional, - for none)",
-            "options": {
-                "token": "bk_ticket",
-                "defaultValue": "-"
             }
         },
         "input_lg_text": {
@@ -869,7 +861,7 @@
             "type": "ds.search",
             "name": "Test block: plan",
             "options": {
-                "query": "| makeresults | eval dh_action=$bk_action|s$, level=$bk_level|s$, host=$bk_host|s$, target=$bk_target|s$, dh_secs=$bk_duration|s$, reason=$bk_reason|s$, ticket=$bk_ticket|s$ | `dh_ui_actor` | `dh_ui_block_plan(hl_ingest_block, now())`"
+                "query": "| makeresults | eval dh_action=$bk_action|s$, level=$bk_level|s$, host=$bk_host|s$, target=$bk_target|s$, dh_secs=$bk_duration|s$, reason=$bk_reason|s$ | `dh_ui_actor` | `dh_ui_block_plan(hl_ingest_block, now())`"
             }
         },
         "ds_bk_preview": {
@@ -1833,17 +1825,7 @@
                         "position": {
                             "x": 240,
                             "y": 186,
-                            "w": 720,
-                            "h": 96
-                        }
-                    },
-                    {
-                        "item": "input_bk_ticket",
-                        "type": "input",
-                        "position": {
-                            "x": 960,
-                            "y": 186,
-                            "w": 480,
+                            "w": 1200,
                             "h": 96
                         }
                     },

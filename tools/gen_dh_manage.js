@@ -86,8 +86,7 @@ ddSearch('input_bk_host', 'Host', 'bk_host', 'ds_hosts', { def: '-' });
 dd('input_bk_level', 'Block level', 'bk_level', [it('Whole host (all its data)', 'host'), it('One sourcetype', 'sourcetype'), it('One exact raw source', 'source')], 'host');
 ddSearch('input_bk_target', 'Sourcetype or raw source', 'bk_target', 'ds_bk_targets', { def: '-', cascade: true });
 dd('input_bk_duration', 'Block for', 'bk_duration', [it('5 minutes', '300'), it('15 minutes', '900'), it('1 hour', '3600'), it('4 hours', '14400'), it('24 hours (the most allowed)', '86400')], '900');
-text('input_bk_reason', 'Reason (required)', 'bk_reason', { ph: 'Why? For example: test that the app sees pi5 go missing' });
-text('input_bk_ticket', 'Ticket (optional, - for none)', 'bk_ticket', { def: '-' });
+text('input_bk_reason', 'Reason (required: 3 to 120 letters, digits, spaces or _ . : / # ( ) -)', 'bk_reason', { ph: 'Why? For example: test that the app sees pi5 go missing' });
 
 // ---------- inputs: Admin log
 text('input_lg_text', 'Search the log (words separated by *)', 'lg_text', { def: '*' });
@@ -98,7 +97,7 @@ const R = {
   ov: ['ov_entity', 'ov_action', 'ov_duration', 'ov_threshold', 'ov_reason', 'ov_ticket'],
   ex: ['ex_level', 'ex_index', 'ex_host', 'ex_sourcetype', 'ex_source', 'ex_collection', 'ex_via', 'ex_profile', 'ex_interval', 'ex_crit', 'ex_owner', 'ex_site', 'ex_runbook', 'ex_description', 'ex_reason', 'ex_ticket'],
   ad: ['ad_entity', 'ad_crit', 'ad_reason', 'ad_ticket'],
-  bk: ['bk_action', 'bk_host', 'bk_level', 'bk_target', 'bk_duration', 'bk_reason', 'bk_ticket'],
+  bk: ['bk_action', 'bk_host', 'bk_level', 'bk_target', 'bk_duration', 'bk_reason'],
 };
 const NAMES = { ov: 'Mute form', ex: 'Add-row form', ad: 'Adopt form', bk: 'Test-block form' };
 const conditions = {};
@@ -143,7 +142,7 @@ S('ds_ad_apply', 'Adopt: apply', adReq + ' | eval dh_confirm=$ad_confirm|s$ | `d
 S('ds_bk_sources', 'Raw sources of the host (24 h)', '| tstats count as events max(_indextime) as it where index IN (linux, windows, network) [| makeresults | eval host=$bk_host|s$ | `dh_ui_host_terms`] earliest=-24h latest=+1d by index sourcetype source | eval source_norm=`dh_source_norm(source)`, last_seen=strftime(it, `dh_ui_time_fmt_tz`) | sort 0 sourcetype source | table index sourcetype source source_norm events last_seen');
 C('ds_bk_sources_view', 'Raw sources of the host (24 h) (shown)', 'ds_bk_sources', '| `dh_ui_headers`');
 C('ds_bk_targets', 'Block target choices', 'ds_bk_sources', '| eval lvl=$bk_level|s$ | where lvl!="host" | eval value=if(lvl=="source", sourcetype."|".source, sourcetype."|*"), label=if(lvl=="source", sourcetype." › ".source." (exact raw name; normalized: ".source_norm.")", sourcetype) | stats count by label value | table label value | appendpipe [| stats count | eval label=case($bk_level|s$=="host", "Not needed for a whole-host block", $bk_level|s$=="source", "Choose the raw source", true(), "Choose the sourcetype"), value="-" | table label value] | eval dh_o=if(value=="-", 0, 1) | sort 0 dh_o | table label value');
-const bkReq = '| makeresults | eval dh_action=$bk_action|s$, level=$bk_level|s$, host=$bk_host|s$, target=$bk_target|s$, dh_secs=$bk_duration|s$, reason=$bk_reason|s$, ticket=$bk_ticket|s$ | `dh_ui_actor` | `dh_ui_block_plan(hl_ingest_block, now())`';
+const bkReq = '| makeresults | eval dh_action=$bk_action|s$, level=$bk_level|s$, host=$bk_host|s$, target=$bk_target|s$, dh_secs=$bk_duration|s$, reason=$bk_reason|s$ | `dh_ui_actor` | `dh_ui_block_plan(hl_ingest_block, now())`';
 S('ds_bk_plan', 'Test block: plan', bkReq);
 C('ds_bk_preview', 'Test block: preview', 'ds_bk_plan', '| table ui_change ui_item ui_now ui_after check source_norm | `dh_ui_headers`');
 // The block lives in Cribl (spec 7.7, 7.8; task 11b): the form checks the request and shows the
@@ -240,7 +239,7 @@ const expected = rows([
 const blocks = rows([
   [90, [["viz_bk_intro", 1440]]],
   [IH, [["input_bk_action", 240], ["input_bk_host", 300], ["input_bk_level", 300], ["input_bk_target", 600]]],
-  [IH, [["input_bk_duration", 240], ["input_bk_reason", 720], ["input_bk_ticket", 480]]],
+  [IH, [["input_bk_duration", 240], ["input_bk_reason", 1200]]],
   [180, [["viz_bk_steps", 480], ["viz_bk_preview", 960]]],
   [180, [["viz_bk_command", 1440]]],
   [320, [["viz_bk_sources", 720], ["viz_blocks", 720]]],
