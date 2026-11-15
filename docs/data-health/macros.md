@@ -667,7 +667,7 @@ Writes the override when the confirmation matches the current state, and logs it
 
 ### `dh_ui_expected_plan(expected, admin_log, now)`
 Checks a new or changed expected row. These rules apply:
-- Only the dh_admin role may change it.
+- Only `admin` or `dh_admin` may change it.
 - The index must be one of `dh_indexes`.
 - Ansible-managed rows are refused.
 

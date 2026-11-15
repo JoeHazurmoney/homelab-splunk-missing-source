@@ -39,7 +39,7 @@ The banner at the top of the Overview says whether you can trust the page right 
 | Banner (start of the text) | Colour | What it means | What the page does meanwhile | What to check |
 |---|---|---|---|---|
 | **Up to date: data is arriving and statuses were refreshed at hh:mm** | green | All four checks pass. | It shows real statuses, and alerts work. | Nothing. |
-| **On hold: the arrival tracker (DH Tracker fast) last ran … ago** (or "has never run") | red | The arrival tracker has stopped. The app can't tell whether data arrives. | Every status shows PENDING. No alerts fire. Needs attention lists nothing. | See the first check below. |
+| **On hold: the arrival tracker (DH Tracker fast) last ran … ago** (or "has never run") | red | The arrival tracker has stopped. The app can't tell whether data arrives. | Every status shows PENDING, no alerts fire, and Needs attention lists nothing. | See the first check below. |
 | **On hold: Splunk has indexed nothing new for … s** (or "nothing yet") | red | Splunk itself isn't receiving data. | Same as above. | See the second check below. |
 | **Out of date: the status search (DH Evaluate) last ran … ago** (or "has not run yet") | red | Arrivals are recorded, but statuses aren't refreshed. | It shows the last statuses it has, which may be old. No new alerts fire, because alerts come from status changes. | See the third check below. |
 | **Catching up: Splunk or the PC paused and resumed at hh:mm (sleep or restart)** | amber | The app detected a pause. | Statuses show PENDING for 5 minutes and no alerts fire. So a wake-up raises no false alarms. | Nothing. Wait 5 minutes. |
@@ -254,7 +254,7 @@ The page has four tabs: **Mute & thresholds**, **Expected list**, **Test blocks 
   docker exec -u splunk wd2l-splunk sh -c "/opt/splunk/bin/splunk btool web list settings --debug | grep risky"
   ```
 
-  The line should show `false` from `apps/hl_server_base/default/web.conf`. Suppose it does, and the prompt still appears. Then splunkd hasn't restarted since the deploy, or the page is stale. Restart splunkd, then reload the page. Suppose it doesn't show `false`. Then deploy `hl_server_base` with the role's `server` tag, which restarts splunkd.
+  The `enable_risky_command_check_dashboard` line should show `false` from `apps/hl_server_base/default/web.conf`. Suppose it does, and the prompt still appears. Then splunkd hasn't restarted since the deploy, or the page is stale. Restart splunkd, then reload the page. Suppose it doesn't show `false`. Then deploy `hl_server_base` with the role's `server` tag, which restarts splunkd.
 
 ### Item IDs
 
@@ -309,7 +309,7 @@ Suppose the item is muted when you set or clear its limit. The mute and its reas
 | Action | Mute, Unmute, Set limit or Clear limit. |
 | Mute for | How long a mute lasts, from 1 hour to 30 days (the most allowed). Only Mute uses it. |
 | New limit in seconds (Set limit only) | For Set limit: how long the item may stay silent, in seconds (at least 60). Keep `-` for the other actions. |
-| Reason (required) | Why you make the change. It goes to the admin log. For a mute, it is also shown as the mute reason. |
+| Reason (required) | Why you make the change. It goes to the admin log, and a mute shows it as the mute reason. |
 | Ticket (optional, - for none) | A ticket or change number, or `-`. |
 | Confirm (writes the change) | Choose the Apply line to write the change shown in the preview. |
 | Search the thresholds (words separated by *) | Narrows the Thresholds table to items whose name, description or cause contains every word. `*` shows all. |
@@ -348,7 +348,7 @@ Suppose the item is muted when you set or clear its limit. The mute and its reas
   | Learned before bounds (s) | The learned value before it was kept within those values. |
   | Default limit (s) | The profile's default. |
   | Configured limit (s) | A fixed limit written on the item's expected row, if any. |
-  | Days covered, Days skipped | Days of history the app learned from, and days it skipped. It looks back 14 days at most, because the indexes keep 14 days. It skips a day when Splunk was up too little. |
+  | Days covered, Days skipped | Days of history the app learned from, and days it skipped (a day when Splunk was up too little). It looks back 14 days at most, because the indexes keep 14 days. |
   | Suggested profile | The profile the app would choose from what it saw. |
   | Managed by | ansible (from the inventory) or ui (added on Manage). |
   | Item ID | The item's ID. |
@@ -407,7 +407,7 @@ To bring an item back, choose **Undo a retirement** in the same form.
 | Input | What to enter |
 |---|---|
 | Level | Host, Sourcetype or Source. |
-| Index | Where the data goes. Only the indexes the app watches are listed. Use "None (host row)" for a host row. |
+| Index | Where the data goes, from the indexes the app watches. Use "None (host row)" for a host row. |
 | Host name | The host name, short or full (it is shortened). Required. |
 | Sourcetype (not for a host row) | For sourcetype and source rows. |
 | Source (source rows only) | For source rows: the file or input name. |
@@ -422,7 +422,7 @@ To bring an item back, choose **Undo a retirement** in the same form.
 | Description (optional, - for none) | A short description. |
 | Unregistered item | Adopt form: an item that sends data but isn't expected, from the Unregistered table. |
 | Retire or undo | Retire form: Retire (stop expecting it) or Undo a retirement. |
-| Expected item | Retire form: a whole host (all its rows) or one row. Retire lists the expected items. Undo lists the retired ones. |
+| Expected item | Retire form: a whole host (all its rows) or one row. Retire lists the expected items, and Undo lists the retired ones. |
 | Reason (required) | Why you make the change. Each form has its own. |
 | Ticket (optional, - for none) | A ticket or change number, or `-`. |
 | Confirm (writes the change) | Choose the Apply line to write the change shown in the preview. |
@@ -546,7 +546,7 @@ This tab lists every change made on Manage, newest first.
 
 | Input | What to enter |
 |---|---|
-| Search the log (words separated by *) | Words that must all appear in a row: who, change, item, detail, reason or ticket. `*` separates the words. The search is not case-sensitive, and `*` alone shows all. |
+| Search the log (words separated by *) | Words that must all appear in a row (who, change, item, detail, reason or ticket), separated by `*`. The search is not case-sensitive, and `*` alone shows all. |
 
 #### Admin log (every change made on Manage)
 - **What it shows:** the last 1000 changes that match the search. The columns are:
