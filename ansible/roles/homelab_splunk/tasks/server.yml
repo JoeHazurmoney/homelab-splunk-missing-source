@@ -10,6 +10,13 @@
 - name: Check the previous S2S token
   ansible.builtin.import_tasks: s2s_token_check.yml
 
+- name: Check every app named in hl_apps_only is a server app
+  ansible.builtin.assert:
+    that: hl_apps_only | difference(hl_server_apps | map(attribute='name')) | length == 0
+    fail_msg: "hl_apps_only names no server app: {{ hl_apps_only | difference(hl_server_apps | map(attribute='name')) | join(', ') }}
+      (known: {{ hl_server_apps | map(attribute='name') | join(', ') }})"
+    quiet: true
+
 - name: Select the server apps to deploy
   ansible.builtin.set_fact:
     hl_server_apps_run: "{{ hl_server_apps | selectattr('name', 'in', hl_apps_only) | list
