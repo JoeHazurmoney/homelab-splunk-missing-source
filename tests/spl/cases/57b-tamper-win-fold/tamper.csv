@@ -1,0 +1,5 @@
+finding_id,host,time,code,indicator,detail,events,bucket,suppressed,marker_action,marker_time,marker_by,marker_run_id,fold_keys,fold_events,updated
+h6|win4697|1999996800,h6,NOW-3000,win4697,4697 service installed: GoogleUpdaterInternalService159.0.8140.0,channel=Security; EventID=4697; provider=Microsoft-Windows-Security-Auditing,1,NOW-3200,0,,,,,scc9fcc0cf7d4bc32c9e187372e363512 p7a154175e91f9c0b8e68f2c0c49d8064,,NOW-300
+h8|win4697|1999996800,h8,NOW-3000,win4697,4697 service installed: GoogleUpdaterInternalService159.0.8140.0,channel=Security; EventID=4697; provider=Microsoft-Windows-Security-Auditing,1,NOW-3200,0,,,,,,,NOW-300
+h11|win7045|1999996800,h11,NOW-3000,win7045,7045 service installed: Claude,channel=System; EventID=7045; provider=Service Control Manager,1,NOW-3200,0,,,,,pc3a0f2b0ea56a424ccd92d98b3162115,,NOW-300
+h12|win4697|1999996800,h12,NOW-3000,win4697,7045+4697 service installed: CoworkVMService (Claude),channel=System; EventID=7045; provider=Service Control Manager + channel=Security; EventID=4697; provider=Microsoft-Windows-Security-Auditing,2,NOW-3200,0,,,,,pc3a0f2b0ea56a424ccd92d98b3162115 s384e47e0d575d3180ba17c60f10bff9a,1,NOW-300

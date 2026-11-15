@@ -296,6 +296,9 @@ Cribl's audit log: any create, update, delete, reorder or upload of routes, pipe
 ### `dh_tamper_finish(tamper, now)`
 Groups indicators into findings (one per host, kind and 5-minute bucket) and decides, once, whether each new finding is the role's own work: suppressed when an Ansible marker for its host came at most `dh_tamper_window_secs` before it (or `dh_tamper_marker_slack_secs` after it). A stored finding keeps its suppression on every later run, so a later marker never hides it; if its `dh_tamper` row is gone, the latest `dh:tamper` record (by index time) gives it. Marks which findings of the last 7 days still need writing to the index (an older one never does: the index keeps 14 days, the collection 30). Used by: *DH Tamper*.
 
+### `dh_tamper_fold(now)`
+One service install logs two Windows events: a 7045 (System log) and a 4697 (Security log). This step puts the pair into one finding, "7045+4697 service installed: …", with both event IDs in its detail. The two events match on the service's key name or its program path, at most `dh_tamper_window_secs` apart. Either event can arrive first. If one half is already stored (and alerted), the other joins that finding, so a service install alerts once. Findings stored before this step existed are left as they are. Used by: `dh_tamper_finish`.
+
 ### `dh_tamper_collect_rows`
 Shapes findings for writing to the index. Used by: *DH Tamper*.
 
