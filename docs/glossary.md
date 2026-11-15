@@ -54,14 +54,22 @@ A playbook is the file you run (`site.yml`). A role is a packaged set of tasks. 
 
 ### Inventory, `host_vars`, `group_vars`
 The inventory lists the hosts and their groups. `host_vars` and `group_vars` hold settings for one
-host or one group.
+host or one group. The hosts in this lab are in [architecture](architecture.md#hosts-in-this-lab).
 
 ### Tags, `never`
 A tag picks which part of the role runs, for example `--tags stop`. A task tagged `never` runs only
-when you ask for its tag by name. So a plain run never removes, stops or restarts anything.
+when you ask for its tag by name.
+
+A plain run deploys and never removes anything. It restarts splunkd, Cribl or a UF only when that
+service's config changed ([costs](running-the-role.md#costs-of-a-run)). Removing, stopping, restarting
+on demand and check-only runs each have a `never` tag.
 
 ### `--limit`
 Runs the play on only some hosts, for example `--limit wd2l-recv`.
+
+### venv
+A venv is a private Python folder that holds one tool and its libraries. In this lab, Ansible's venv
+is `~/.venvs/ansible` on pi5. You turn it on with `. ~/.venvs/ansible/bin/activate`.
 
 ### Vault
 An encrypted file of secrets, opened with a password. Here it is
@@ -115,12 +123,29 @@ auditd is the Linux service that records security events, such as a file change 
 in `/var/log/audit/audit.log`. Audit rules say what to record. Each rule can carry a key, such as
 `hl-uf-config`, that names it in the log.
 
+Two record fields matter in the runbook. `auid` is the ID of the user who logged in, so it names the
+person behind an action. `USER_CMD` is the record `sudo` writes for each command it runs.
+
+The `audit-rules` package ships sample rules in `/usr/share/audit-rules/`. The role reads them
+([setup note](running-the-role.md#audit-rules-package)).
+
 ### Hardened audit rules
 A strict set of Linux audit rules, plus rules for privileged commands. The `audit_rules` tag loads
 them from `zz-hl-zz-stig.rules`.
 
 ### rsyslog
 The Linux service that writes system logs to files such as `/var/log/messages`.
+
+### Syslog, UDP syslog
+Syslog is a standard way for devices to send log lines over the network. UDP syslog has no
+acknowledgement. A line sent while the receiver is down is lost, and nobody resends it. In this lab
+the UDM sends UDP syslog to Cribl.
+
+### splunkd
+The Splunk server process. A UF has one too. While it restarts, it takes no data.
+
+### systemd, timer
+systemd is the Linux service manager. A timer is a job it runs on a schedule, like cron.
 
 ### Windows event logs, event ID
 Windows keeps its logs in channels, such as Security and System. Each event has a number, its event
@@ -154,7 +179,10 @@ wd2l's files. The Splunk container, `wd2l-splunk`, was there before this repo.
 
 ### UDM
 In this lab: the UniFi Dream Machine (192.168.1.1), the network's router. It has no agent. It sends
-syslog to Cribl on port 5514 (UDP).
+[UDP syslog](#syslog-udp-syslog) to Cribl on port 5514.
+
+### Lab owner, escalate
+In this lab: Taylor owns the lab. To "escalate" means to tell the lab owner.
 
 ## The data-health app's own words
 
@@ -172,19 +200,34 @@ A source name with its date, time or rotation number replaced by `*`. So `audit-
 and `audit-2026-10-31.jsonl` both count as `audit-*.jsonl`.
 
 ### Status
-What the app says about an item now: OK, LATE, MISSING, NEVER_SEEN, MUTED, PENDING or INFO
-([statuses](data-health-design.md#statuses-and-roll-up)).
+What the app says about an item now. The words are:
+
+- **OK:** data arrived within its limit.
+- **LATE:** silent longer than its limit.
+- **MISSING:** silent more than twice its limit.
+- **NEVER_SEEN:** on the expected list for over an hour, and it never sent anything.
+- **MUTED, PENDING, INFO:** held, on hold or for reference only (see below).
+
+DOWN is not a status. It is a host's [roll-up](#roll-up). The full table is in
+[statuses](data-health-design.md#statuses-and-roll-up).
 
 ### PENDING, the gate
 PENDING means "no trusted status yet". The app holds every status as PENDING when it can't judge,
 for example after the PC sleeps. No alert fires then. This hold is called the gate.
 
 ### Roll-up
-A host's overall state, from its items: DOWN, DEGRADED or OK.
+A host's overall state, from its items: DOWN, DEGRADED, OK, MUTED or PENDING. DOWN means the host
+itself looks dead. DEGRADED means the host is alive but some items are late or missing
+([table](data-health-design.md#statuses-and-roll-up)).
 
 ### Profile
 How an item usually sends data: heartbeat, periodic, continuous, sporadic or info. The profile sets
 its default limit ([profiles](data-health-design.md#the-five-ideas)).
+
+### Sporadic
+A profile for logs that arrive only when something happens, such as the UDM's syslog. Its limit is
+long and learned. `verify` reports a sporadic row that is MISSING or NEVER_SEEN, but doesn't fail on
+it.
 
 ### Limit (threshold)
 How long an item may stay silent before it is LATE. After twice the limit it is MISSING.
@@ -212,8 +255,10 @@ A host that other data passes through. In this lab that is Cribl. An item with `
 
 ### Marker (Ansible marker)
 A short event the role sends to Splunk when it stops, starts or changes a host: what it did, who
-ran it and when.
-The app uses it to tell planned work from a real problem.
+ran it and when. The app uses it to tell planned work from a real problem.
+
+Its fields are `action` (what the role did), `target_host`, `by` (who ran it) and `run_id` (one ID for
+every marker of a run). Search it with `index=data_health source=dh:marker`.
 
 ### Mute
 A pause on an item's alerts, set on Manage with a reason and an end time (30 days at most).
@@ -224,9 +269,13 @@ A test that drops a host's real data in Cribl on purpose, so you can check that 
 
 ### Tamper indicator, tamper finding
 A tamper indicator is an event that may mean someone is hiding activity, such as a cleared log or a
-stopped auditd. A tamper finding is the app's record of one. A finding is "suppressed" when an
-Ansible marker shows it was the role's own work
+stopped auditd. A tamper finding is the app's record of one. A finding is "suppressed"
+(`suppressed=1`) when an Ansible marker shows it was the role's own work
 ([indicators](data-health-design.md#tamper-indicators)).
+
+### Arrival tracker, *DH Evaluate*
+The arrival tracker is the saved search *DH Tracker fast*. Every minute it records when each item
+last sent data. *DH Evaluate* is the saved search that turns those times into statuses.
 
 ### Cause, action
 For each item that is late or missing, the app names a likely cause and the next step
@@ -246,4 +295,4 @@ The app's dashboard for changes: mutes, limits, the expected list and test block
 
 ### `dh_admin`, `dh_analyst`
 The app's two Splunk roles. An analyst can mute items and set limits. An admin can also change the
-expected list and use the test-block form.
+expected list and use the test-block form. Splunk's own `admin` role works as an admin too.
