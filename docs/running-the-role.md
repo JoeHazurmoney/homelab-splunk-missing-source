@@ -445,9 +445,11 @@ The rules:
 
 Timing:
 
-- Cribl applies a set or a clear about 15–17 s after the role writes it.
-- From the start time the play gives the block, allow up to about 45 s. The fault-injection run
-  measured 28–45 s.
+- Cribl applies a set or a clear about 15–17 s after the role writes it to Cribl. That is the
+  role's own figure for the API write alone.
+- The [fault-injection run](records/2026-11-fault-injection-run.md) timed the whole path. The drop
+  began 28–45 s after the play's time stamp, which adds the API write to Cribl's refresh. So allow
+  up to about 45 s.
 - A block ends exactly at its "until" time, because Cribl checks the expiry on each event.
 - Nothing prunes Cribl's table on a schedule. Expired rows leave it at the next `cribl_block` run.
 
@@ -737,12 +739,13 @@ Run the steps in order.
    ansible-playbook site.yml --tags restart --limit <host>
    ```
 
-   **On a Linux UF, this hand edit raises an `hl-uf-config` tamper finding.** No marker covers it:
-   the `restart` marker comes after the edit. *DH Alert tamper* fires for it. That is expected here.
-   Tell the analysts the host and the time of the edit before you make it. The finding is then
-   explained, so they don't escalate it
-   ([how analysts read tamper findings](data-health/dashboards.md#tamper-findings-24-h)). A later
-   marker never hides it ([why](data-health-design.md#tamper-indicators)).
+   **On a Linux UF, this hand edit raises an `hl-uf-config` tamper finding**, unless a marker covers
+   it. A marker covers it only if it came up to 15 min before the edit or up to 60 s after. The
+   `restart` run here comes later, so it doesn't. *DH Alert tamper* fires for the finding. That is
+   expected here. Tell the analysts the host and the time of the edit before you make it. Then they
+   can recognise the finding and don't escalate it
+   ([how analysts read tamper findings](data-health/dashboards.md#tamper-findings-24-h)). A marker
+   posted later never hides it ([why](data-health-design.md#tamper-indicators)).
 
 5. **Contract.** Remove `vault_hl_s2s_token_previous` from the vault. Then run `cribl` first and
    `server` second. Cribl then stops accepting the old token before Splunk does, and it already
