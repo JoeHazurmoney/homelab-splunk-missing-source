@@ -4,27 +4,31 @@ This repo sends a home lab's logs to Splunk and tells you when any of them stop.
 
 - Splunk agents ([UF](docs/glossary.md#universal-forwarder-uf)) and add-ons
   ([TAs](docs/glossary.md#add-on-ta)) on each host.
-- [Hardened audit rules](docs/glossary.md#hardened-audit-rules) on the Linux hosts, and a focused
-  Windows audit policy.
+- [Hardened audit rules](docs/glossary.md#hardened-audit-rules) on the Linux hosts, and a
+  [focused Windows audit policy](docs/running-the-role.md#what-each-deploy-tag-does).
 - [Cribl Stream](docs/glossary.md#cribl-stream) between every collected source and Splunk. It also
-  takes syslog from the network's router.
+  takes [syslog](docs/glossary.md#syslog-udp-syslog) from the network's router.
 - `hl_data_health`, a Splunk app built only from SPL and the [KV store](docs/glossary.md#kv-store).
 
-One [Ansible](docs/glossary.md#ansible) role, run from pi5, deploys it all. In this lab the hosts
-are:
+One [Ansible](docs/glossary.md#ansible) role, run from [pi5](docs/glossary.md#pi5), deploys it all.
+In this lab the hosts are:
 
 - Two AlmaLinux 10 VMs.
 - A Windows 11 PC ([HOMEPC](docs/glossary.md#homepc)).
-- A Raspberry Pi 5 ([pi5](docs/glossary.md#pi5)).
+- A Raspberry Pi 5 (pi5).
 - A UniFi Dream Machine ([the UDM](docs/glossary.md#udm)).
+
+[Hosts in this lab](docs/architecture.md#hosts-in-this-lab) lists their inventory names.
 
 **The question it answers: "Am I blind somewhere?"** The data-health app tells a SOC analyst within
 minutes when a host, sourcetype or source stops sending. It names the likely cause and the next step.
 
-- The [expected list](docs/glossary.md#expected-list) comes from the same inventory that deploys
-  the inputs, so the two can't drift apart.
-- Each input's limit follows how often it sends. The app learns limits where it can.
-- A UF's heartbeat is tracked apart from its data.
+- The [expected list](docs/glossary.md#expected-list) comes from the same
+  [inventory](docs/glossary.md#inventory-host_vars-group_vars) that deploys the inputs, so the two
+  can't drift apart.
+- Each input's [limit](docs/glossary.md#limit-threshold) follows how often it sends. The app learns
+  limits where it can.
+- A UF's [heartbeat](docs/glossary.md#heartbeat-liveness) is tracked apart from its data.
 
 ## What is wd2l?
 
@@ -37,23 +41,38 @@ Splunk, the role checks that wd2l's HEC is healthy and its data still arrives.
 
 ## Quick start
 
-1. **Do the one-time setup first.** Follow
-   [One-time setup](docs/running-the-role.md#1-one-time-setup) in `docs/running-the-role.md`. It
-   needs `wd2l-splunk` already running on HOMEPC.
-2. **Deploy and check.** Log in to pi5 and go to the Ansible folder
+1. **Check first.** `wd2l-splunk` must be running on HOMEPC. On HOMEPC, in PowerShell, any folder:
+
+   ```powershell
+   docker ps --filter name=wd2l-splunk
+   ```
+
+   You should see a line whose status starts with `Up`.
+2. **Do the one-time setup.** Follow
+   [One-time setup](docs/running-the-role.md#1-one-time-setup) in `docs/running-the-role.md`. It has
+   eight steps, and each says what you should see.
+3. **Deploy and check.** Log in to pi5 and go to the Ansible folder
    ([how](docs/running-the-role.md#how-to-run-a-command)).
+
+   **Warning:** a deploy can restart splunkd and lose some UDP syslog, the logs the UDM sends.
+   Nobody resends a line lost in the gap ([costs](docs/running-the-role.md#costs-of-a-run)).
 
    On pi5, any folder:
 
    ```bash
    cd ~/homelab-splunk-missing-source/ansible
-   . ~/.venvs/ansible/bin/activate
-   ansible-playbook site.yml                  # deploy everything (never removes anything)
-   ansible-playbook site.yml --tags verify    # UFs connected, Cribl healthy, every expected row seen
+   . ~/.venvs/ansible/bin/activate            # "No such file"? Your Ansible came from dnf: skip this line
+   ansible-playbook site.yml                  # deploy everything (removes nothing)
+   ansible-playbook site.yml --tags verify    # UFs connected, Cribl healthy, no expected item missing
    ```
 
-3. **Look.** Open the **HL Data Health** app in Splunk Web, then its Overview. In this lab Splunk Web
-   is `http://127.0.0.1:8000` on HOMEPC.
+   Both runs should end with `failed=0`. If `verify` says "Not evaluated", it **failed**: wait 5 min
+   and run it again. [What you should see](docs/running-the-role.md#first-deploy-what-you-should-see)
+   says more.
+4. **Look.** Open the **HL Data Health** app in Splunk Web, then its Overview. In this lab Splunk Web
+   is `http://127.0.0.1:8000` on HOMEPC. Log in as `admin`. Its password is in the file named in
+   [Secrets](docs/running-the-role.md#secrets). A healthy Overview has a green banner that starts "Up
+   to date", and an empty *Needs attention* table.
 
 ## Common tasks
 
@@ -73,6 +92,11 @@ ansible-playbook site.yml --tags cribl_block --limit homepc -e hl_block_key='pi5
 # Remove a forwarder cleanly (the play fails if anything is left)
 ansible-playbook site.yml --tags uninstall --limit wd2l-recv
 ```
+
+- `wd2l-recv` is an inventory name, one of the two VMs.
+- `monitor:///var/log/secure` is an `inputs.conf` stanza ([glossary](docs/glossary.md#inputsconf-propsconf)).
+- `pi5|*|*` is a test-block key. The block drops pi5's real data on purpose, so alerts can fire
+  ([Test blocks](docs/running-the-role.md#test-blocks)).
 
 `uninstall` doesn't stop the app expecting the host's data. To do that, see
 [Retiring a host](docs/running-the-role.md#retiring-a-host). Every tag is in
