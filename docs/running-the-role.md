@@ -12,7 +12,7 @@ These words are in the glossary too:
 - The Overview, Host detail and Manage dashboards: see [the dashboards guide](data-health/dashboards.md).
 
 **Tags pick what the role does.** A plain run deploys and never removes anything. It can restart
-splunkd, Cribl or a UF when that service's config changed ([costs](#costs-of-a-run)). Removing,
+[splunkd](glossary.md#splunkd), Cribl or a UF when that service's config changed ([costs](#costs-of-a-run)). Removing,
 stopping, restarting on demand and check-only runs each have their own tag. Those tags also carry
 `never`, so they run only when you name them.
 
@@ -438,7 +438,8 @@ In the table, "UF hosts" means the groups `uf_linux` and `uf_windows`. "Linux UF
 
 ### `audit-rules` package
 
-The `audit_rules` tag reads the sample rules in `/usr/share/audit-rules/`. The role doesn't install
+The `audit_rules` tag reads the sample rules in `/usr/share/audit-rules/`. They are
+[auditd](glossary.md#auditd-audit-rules) rules. The role doesn't install
 the `audit-rules` package. It must already be on each Linux UF host. To check, run this on pi5, in
 `~/homelab-splunk-missing-source/ansible`, venv on:
 
@@ -767,8 +768,9 @@ was about 17,000 duplicate events on wd2l-recv, 596 of them in `wd2l_uf_audit`.
 
 ### Never run `splunk` as root on a UF
 
-`sudo splunk btool …` makes `splunk` run `chown -R` (a recursive ownership change) over
-`/opt/splunkforwarder`. That fires the `hl-uf-config` audit rule and raises a false tamper finding.
+`sudo splunk` [`btool`](glossary.md#btool) makes `splunk` run `chown -R` (a recursive ownership
+change) over `/opt/splunkforwarder`. That fires the `hl-uf-config` [audit rule](glossary.md#auditd-audit-rules)
+and raises a false tamper finding.
 Run the CLI as the UF's own user, `splunkfwd`.
 
 On a Linux UF host, any folder:

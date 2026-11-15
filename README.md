@@ -66,6 +66,7 @@ Splunk, the role checks that wd2l's HEC is healthy and its data still arrives.
    ansible-playbook site.yml --tags verify    # UFs connected, Cribl healthy, no expected item missing
    ```
 
+   [Tags](docs/glossary.md#tags-never) pick what the role does, so `--tags verify` runs only the check.
    Both runs should end with `failed=0`. If `verify` says "Not evaluated", it **failed**: wait 5 min
    and run it again. [What you should see](docs/running-the-role.md#first-deploy-what-you-should-see)
    says more.
