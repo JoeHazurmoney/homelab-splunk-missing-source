@@ -207,7 +207,7 @@ Everything about one host. Pick the host at the top, or arrive here by clicking 
 
 ### Latest Splunk agent errors and warnings (24 h)
 - **What it shows:** the 25 latest error and warning lines that this host's Splunk agent wrote about itself. Columns: **Time**, **Level**, **Agent component** (the part of the agent that complained, for example the file reader), **Message**.
-- **Where it comes from:** the agent's own log as received by Splunk, for this host only, last 24 hours.
+- **Where it comes from:** the agent's own log as received by Splunk (the `_internal` index), for this host only, last 24 hours. The *dh_analyst* role can read `_internal` for this panel, so analysts can also see Splunk's own logs.
 - **How to read it:** empty is good. Lines about file permissions, a missing file, or a blocked output explain a missing input; read them before changing anything.
 
 ### Tamper findings on this host
