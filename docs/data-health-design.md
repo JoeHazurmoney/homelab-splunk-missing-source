@@ -153,7 +153,7 @@ The volume check flags an hour below 20 % of the same hour's 14-day median (wher
 ## Test block
 
 A test block drops real data in Cribl so you can test the alerting end to end. How it works and how
-to set one: [running-the-role.md](running-the-role.md#3-day-to-day-tags-all-never).
+to set one: [running-the-role.md](running-the-role.md#test-blocks).
 
 ## Porting to production
 

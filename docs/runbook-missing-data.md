@@ -8,7 +8,7 @@ cause: what it means, what to check first, and what to do.
   ([running-the-role.md](running-the-role.md)).
 - Before you search, read [Searching](running-the-role.md#searching): run searches in the HL Data
   Health app, and don't use `punct`.
-- **Never run the `splunk` CLI as root on a UF** ([why](running-the-role.md#5-things-to-know)).
+- **Never run the `splunk` CLI as root on a UF** ([why](running-the-role.md#never-run-splunk-as-root-on-a-uf)).
 
 **Read the banner first.** If it says *On hold*, every status is PENDING on purpose, and no alert
 fires. Fix what the banner names before looking at single rows.
@@ -60,7 +60,7 @@ They are in data-health-design.md:
   mute covers its children.
 - Use the role for stops and starts. Its markers make the Overview say "Stopped with Ansible", and
   they keep the role's own changes from counting as tampering.
-- A host that is gone for good: retire it ([running-the-role.md §4](running-the-role.md#4-removing-things-all-never)).
+- A host that is gone for good: retire it ([running-the-role.md §4](running-the-role.md#retiring-a-host)).
 
 ## After an incident
 

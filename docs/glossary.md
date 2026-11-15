@@ -32,7 +32,7 @@ lookups. The data-health app keeps its expected list, statuses, mutes and findin
 ### `btool`
 A Splunk command that shows the settings Splunk really uses, merged from every app, and which file
 each one came from. On a UF, run it as the UF's own user, never as root
-([why](running-the-role.md#5-things-to-know)).
+([why](running-the-role.md#never-run-splunk-as-root-on-a-uf)).
 
 ### `inputs.conf`, `props.conf`
 Splunk settings files. `inputs.conf` says what to collect. `props.conf` says how to parse it.
@@ -40,7 +40,7 @@ An app's `local/` settings win over its `default/` settings.
 
 ### App deployment and restarts
 Putting an app's files into Splunk. Some changes need splunkd to restart. Others need only a reload.
-The role restarts splunkd only when it must ([costs](running-the-role.md#2-deploy)).
+The role restarts splunkd only when it must ([costs](running-the-role.md#costs-of-a-run)).
 
 ## Words from outside Splunk
 
@@ -65,7 +65,7 @@ Runs the play on only some hosts, for example `--limit wd2l-recv`.
 
 ### Vault
 An encrypted file of secrets, opened with a password. Here it is
-`inventory/group_vars/all/vault.yml` on pi5 ([secrets](running-the-role.md#1-one-time-setup)).
+`inventory/group_vars/all/vault.yml` on pi5 ([secrets](running-the-role.md#secrets)).
 
 ### Cribl Stream
 A program that sits between senders and Splunk. It receives data, can change or drop it, and sends
@@ -220,7 +220,7 @@ A pause on an item's alerts, set on Manage with a reason and an end time (30 day
 
 ### Test block
 A test that drops a host's real data in Cribl on purpose, so you can check that the app notices
-([how](running-the-role.md#3-day-to-day-tags-all-never)).
+([how](running-the-role.md#test-blocks)).
 
 ### Tamper indicator, tamper finding
 A tamper indicator is an event that may mean someone is hiding activity, such as a cleared log or a
@@ -238,7 +238,7 @@ Manage.
 
 ### Retire
 Stop expecting an item that is gone for good. Its row stays on the expected list, turned off
-([how](running-the-role.md#4-removing-things-all-never)).
+([how](running-the-role.md#retiring-a-host)).
 
 ### Manage
 The app's dashboard for changes: mutes, limits, the expected list and test blocks
