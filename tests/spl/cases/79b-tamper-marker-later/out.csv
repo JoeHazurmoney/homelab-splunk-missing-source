@@ -6,3 +6,7 @@ hs,win1102,NOW-1000,1,1,apps,NOW-1600,1
 ht,win1102,NOW-1000,1,1,cribl,NOW-280,0
 hu,win1102,NOW-1000,1,0,,,0
 hv,win1102,NOW-1000,1,0,,,1
+hw,key_hl-uf-config,NOW-1000,1,0,,,1
+hx,key_hl-uf-config,NOW-1000,1,1,apps,NOW-1005,1
+hx,key_hl-uf-config,NOW-200,1,1,apps,NOW-1005,1
+hy,key_hl-uf-config,NOW-1000,1,1,apps,NOW-940,1

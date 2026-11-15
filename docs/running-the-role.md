@@ -220,8 +220,8 @@ own record of what it pushed, not with Cribl's live config, so after a UI edit i
 and restarts nothing. Its load check ("Check Cribl loaded the role's inputs, outputs, routes,
 pipelines and breakers") then fails if the edit changed the route list or removed one of the role's
 objects; an edit inside a pipeline passes it. Undo the edit in Cribl (UI or API) and rerun `--tags
-cribl --limit homepc` until it passes. An unmarked edit is a tamper finding: note its finding ID
-first, because a `cribl` run within 15 min of the edit marks it as Ansible work (see the
+cribl --limit homepc` until it passes. An unmarked edit is a tamper finding, and it stays one: the
+`cribl` run's marker comes after the edit, so it doesn't hide it (see the
 [runbook](runbook-missing-data.md)).
 
 Every role-made change shows up as an **Ansible marker** (`index=data_health source=dh:marker`,

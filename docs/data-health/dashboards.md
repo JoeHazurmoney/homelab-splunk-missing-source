@@ -170,7 +170,7 @@ Three rows of six tiles: one row for hosts, one for sourcetypes, one for sources
 
 ### Tamper findings (first seen in the last 24 h)
 - **What it shows:** each sign of possible tampering first recorded in the last 24 hours. Columns: **First seen** (when the app first recorded it), **Time** (when it happened), **Host**, **What was seen** (for example "1102 security log cleared" or "SERVICE_STOP auditd"), **Events**, **Code**, **Detail**.
-- **Where it comes from:** the findings of the background search *DH Tamper*, keeping the latest state of each and leaving out those that happened within 15 minutes of Ansible work (the role's own stops and changes).
+- **Where it comes from:** the findings of the background search *DH Tamper*, keeping the latest state of each and leaving out the role's own work: findings up to 15 minutes after an Ansible marker for the host (or up to 60 seconds before it, for clock differences). The role posts its marker before each change it makes.
 - **How to read it:** empty is good. A finding means someone may have tried to switch off logging. Check whether planned work explains it (a reboot also stops services); if not, **escalate**. Click the row to see the host.
 
 ## Host detail

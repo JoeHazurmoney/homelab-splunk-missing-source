@@ -55,7 +55,9 @@ The first cause that fits wins. `<…>` marks the parts the app fills in.
   agent stopped reporting".
 - On a `via=cribl` row, a tamper finding within 15 min of a Cribl outage reads as tamper, not
   "Cribl DOWN".
-- A marker for the row's own host within 15 min silences a Cribl tamper finding for that row.
+- A marker never hides a finding that came before it (more than 60 s before). Only a marker up to
+  15 min before a finding marks it as the role's own work, and that is decided once, when DH Tamper
+  first stores the finding.
 - On EL10, `systemctl stop auditd` is refused; `service auditd stop` works and logs `DAEMON_END`
   (with the auid), not `SERVICE_STOP`.
 
