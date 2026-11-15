@@ -737,6 +737,13 @@ Run the steps in order.
    ansible-playbook site.yml --tags restart --limit <host>
    ```
 
+   **On a Linux UF, this hand edit raises an `hl-uf-config` tamper finding.** No marker covers it:
+   the `restart` marker comes after the edit. *DH Alert tamper* fires for it. That is expected here.
+   Tell the analysts the host and the time of the edit before you make it. The finding is then
+   explained, so they don't escalate it
+   ([how analysts read tamper findings](data-health/dashboards.md#tamper-findings-24-h)). A later
+   marker never hides it ([why](data-health-design.md#tamper-indicators)).
+
 5. **Contract.** Remove `vault_hl_s2s_token_previous` from the vault. Then run `cribl` first and
    `server` second. Cribl then stops accepting the old token before Splunk does, and it already
    presents the new one. On pi5, in `~/homelab-splunk-missing-source/ansible`, venv on:
