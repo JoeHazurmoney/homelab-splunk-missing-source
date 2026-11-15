@@ -4,9 +4,17 @@ This repo has one Ansible role, `homelab_splunk`. One playbook, `ansible/site.ym
 host the role manages. New to Ansible? The [glossary](glossary.md#ansible) explains playbook, role,
 inventory, tags and vault.
 
-**Tags pick what the role does.** A plain run deploys, and it never removes anything. Anything that
-removes, stops, restarts or only checks has its own tag. Those tags also carry `never`, so they run
-only when you name them.
+These words are in the glossary too:
+
+- The statuses: [OK, LATE, MISSING and NEVER_SEEN](glossary.md#status),
+  [DOWN](glossary.md#roll-up) and [PENDING](glossary.md#pending-the-gate).
+- A [profile](glossary.md#profile), and the [sporadic](glossary.md#sporadic) profile.
+- The Overview, Host detail and Manage dashboards: see [the dashboards guide](data-health/dashboards.md).
+
+**Tags pick what the role does.** A plain run deploys and never removes anything. It can restart
+splunkd, Cribl or a UF when that service's config changed ([costs](#costs-of-a-run)). Removing,
+stopping, restarting on demand and check-only runs each have their own tag. Those tags also carry
+`never`, so they run only when you name them.
 
 ## How to run a command
 
@@ -21,8 +29,11 @@ You run every `ansible-playbook` command on [pi5](glossary.md#pi5), the Ansible 
    C:\Windows\System32\OpenSSH\ssh.exe pi5
    ```
 
-2. Go to the repo's `ansible` folder and turn on the Ansible venv. A venv is a private Python
-   folder that holds Ansible.
+   In this lab, the `pi5` alias and its key already exist on HOMEPC. You should get a shell on pi5. If
+   the login fails, stop and ask the lab owner (in this lab: Taylor). For another lab, make the alias
+   first ([values to change](#values-to-change-for-another-lab)).
+
+2. Go to the repo's `ansible` folder and turn on the Ansible [venv](glossary.md#venv).
 
    On pi5, any folder:
 
@@ -31,9 +42,11 @@ You run every `ansible-playbook` command on [pi5](glossary.md#pi5), the Ansible 
    . ~/.venvs/ansible/bin/activate
    ```
 
+   If the second line says "No such file", your Ansible came from dnf. Skip that line.
+
 The folder matters: its `ansible.cfg` names the inventory and the SSH key. `bootstrap-pi.sh` builds
-the venv in [setup step 3](#step-3-set-up-ansible-on-pi5); on pi5 in this lab, it does. If your
-ansible-core came from dnf instead, skip the second line.
+the venv in [setup step 3](#step-3-set-up-ansible-on-pi5) only when dnf's ansible-core is too old.
+On pi5 in this lab, the venv exists.
 
 Below, each such block says **"On pi5, in `~/homelab-splunk-missing-source/ansible`, venv on"**. That
 means: run the two lines above first.
@@ -42,20 +55,38 @@ means: run the two lines above first.
 
 ### What must already exist
 
-The role deploys around these. It never creates them.
+The role deploys around these. It never creates them. Check each one before you start.
 
-- **HOMEPC** ([what it is](glossary.md#homepc)):
-  - Windows 11, with Docker Desktop running in a signed-in session.
-  - The `wd2l-splunk` container (Splunk 10.6.0.5). Its admin password is in a file. In this lab:
-    `C:\Users\taylo\wd2l-splunk\secrets\splunk-admin-password`.
-  - Hyper-V with the two AlmaLinux VMs.
-  - An SSH alias `pi5` in `~/.ssh/config`. Use it only through Windows OpenSSH
-    (`C:\Windows\System32\OpenSSH\ssh.exe`). Git Bash's `ssh` can't use the Windows SSH agent, so it
-    can't reach pi5.
-- **The VMs** are running. You start them by hand. HOMEPC's key `~\.ssh\id_ecdsa_wd2l_lab` logs in
-  to them. In this lab the user is `taylorb`.
-- **pi5**: AlmaLinux 10 (aarch64) with `sudo`. It needs internet access for pip and
-  `download.splunk.com`.
+- [ ] **Docker Desktop is running.** "Signed-in session" means you are signed in to Windows on
+  HOMEPC. Test: `docker ps` runs in PowerShell without an error.
+- [ ] **The `wd2l-splunk` container is running** (Splunk 10.6.0.5). Test: `docker ps` shows it with a
+  status that starts with "Up".
+- [ ] **The Splunk admin password is in a file.** In this lab:
+  `C:\Users\taylo\wd2l-splunk\secrets\splunk-admin-password`. Test: `Test-Path` on that file prints
+  `True`.
+- [ ] **A Splunk licence is in place.** Without a valid licence, alerts and roles stop. In this lab it
+  is a Splunk Developer licence that expires on 2027-04-29
+  ([details](architecture.md#indexes-and-retention)). The file is in
+  `C:\Users\taylo\wd2l-splunk\secrets\`. Never commit it. Test: Splunk Web, Settings, Licensing.
+- [ ] **Hyper-V has the two AlmaLinux VMs, and both are running.** You start them by hand, in Hyper-V
+  Manager. Test: Hyper-V Manager shows both as Running.
+- [ ] **`gh` (the GitHub CLI) is installed and signed in, with access to the repo.** Test:
+  `gh auth status` shows you signed in.
+- [ ] **An SSH alias `pi5` is in `~/.ssh/config` on HOMEPC.** Use it only through Windows OpenSSH
+  (`C:\Windows\System32\OpenSSH\ssh.exe`). Git Bash's `ssh` can't use the Windows SSH agent, so it
+  can't reach pi5. Test: [log in to pi5](#how-to-run-a-command).
+- [ ] **HOMEPC's key `~\.ssh\id_ecdsa_wd2l_lab` logs in to the VMs.** In this lab the VM user is
+  `taylorb`. [Step 4](#step-4-give-pi5s-key-to-the-vms-and-homepc) uses this key.
+- [ ] **pi5 runs AlmaLinux 10 (aarch64), has `sudo` and has internet access.** It needs the internet
+  for pip and `download.splunk.com`. Test: on pi5, `sudo -v` succeeds.
+
+On HOMEPC, in PowerShell, any folder, the tests for the first three items are:
+
+```powershell
+docker ps --filter name=wd2l-splunk
+Test-Path C:\Users\taylo\wd2l-splunk\secrets\splunk-admin-password
+gh auth status
+```
 
 ### Values to change for another lab
 
@@ -64,13 +95,17 @@ These files hold this lab's host names, users and addresses. Change them for oth
 - `ansible/inventory/hosts.yml` and `ansible/inventory/host_vars/`: the hosts and their users.
 - `ansible/roles/homelab_splunk/defaults/main.yml`: HOMEPC's address and paths. They are
   `hl_collector`, `hl_marker_hec_url` and `hl_splunk_admin_password_file`.
+- The `pi5` alias in `~/.ssh/config` on HOMEPC. The scripts use that name. Their `-PiHost` option
+  sets another one.
 - pi5's address, which you give `bootstrap-windows-sshd.ps1` in [step 1](#step-1-let-pi5-log-in-to-homepc).
 - HOMEPC's address in the UDM's syslog setting, in [step 8](#step-8-point-the-udms-syslog-at-homepc).
 
 ### Setup steps
 
 Do these once, in this order. The scripts on HOMEPC run in the root folder of a clone of this repo.
-In this lab the repo is private: `JoeHazurmoney/homelab-splunk-missing-source`.
+Clone it into any folder. `sync-to-pi.ps1` finds the repo from its own location. In this lab, the
+clones live in `C:\Users\taylo\Documents\claude-code`. The repo is private here:
+`JoeHazurmoney/homelab-splunk-missing-source`. Use its default branch, `main`.
 
 On HOMEPC, in PowerShell, in the folder that will hold the clone:
 
@@ -90,7 +125,14 @@ powershell -ExecutionPolicy Bypass -File .\scripts\<name>.ps1
 
 #### Step 1: let pi5 log in to HOMEPC
 
-On HOMEPC, in an **elevated** PowerShell (Run as administrator), in the repo folder:
+First, get pi5's IPv4 address. [Log in to pi5](#how-to-run-a-command). Then, on pi5, any folder:
+
+```bash
+hostname -I
+```
+
+Use the LAN address it prints. Then, on HOMEPC, in an **elevated** PowerShell (Run as administrator),
+in the repo folder:
 
 ```powershell
 .\scripts\bootstrap-windows-sshd.ps1 -AllowFrom <pi address>
@@ -102,11 +144,14 @@ default, so here you can leave `-AllowFrom` out.
 The script:
 
 - installs OpenSSH Server and makes PowerShell its shell;
-- opens 22/tcp to pi5 only;
+- opens the SSH port (22/tcp) to pi5 only;
 - turns password logins off.
 
-Keys go in `administrators_authorized_keys`, so pi5's SSH session is elevated. To undo it all, run
-the script again with `-Remove`.
+Admin accounts use the file `administrators_authorized_keys` for their keys. So pi5 logs in with
+admin rights. To undo it all, run the script again with `-Remove`.
+
+The last line it prints starts with `==> Done.` You can test the login after
+[step 4](#step-4-give-pi5s-key-to-the-vms-and-homepc), when pi5 has a key.
 
 #### Step 2: copy the repo to pi5
 
@@ -117,7 +162,8 @@ On HOMEPC, in PowerShell, in the repo folder:
 ```
 
 It copies the repo to `~/homelab-splunk-missing-source` on pi5. Later runs keep pi5's vault and
-packages. Add `-IncludePackages` to send `ansible/files/packages/` too (step 6).
+packages. Add `-IncludePackages` to send `ansible/files/packages/` too (step 6). The last line reads
+`synced into ~/homelab-splunk-missing-source`.
 
 #### Step 3: set up Ansible on pi5
 
@@ -132,9 +178,15 @@ The script sets up:
 - ansible-core 2.18 or newer. It comes from dnf if dnf's version is new enough. If not, the script
   builds the venv `~/.venvs/ansible` and links its commands into `~/.local/bin`.
 - ansible-lint and yamllint.
-- The Ansible collections in `ansible/requirements.yml`.
+- The Ansible collections (bundles of modules) in `ansible/requirements.yml`.
 - The Ansible SSH key `~/.ssh/id_ecdsa_homelab_ansible`.
 - The vault (see [Secrets](#secrets)).
+
+It asks for pi5's sudo password only when it installs ansible-core from dnf. Its progress lines start
+with `==> `. The last lines are `==> done.` and pi5's public key.
+
+If a line says `vault: <key> is missing`, add that key. Use the command in the line, and look at
+`vault.yml.example` for its shape. [Secrets](#secrets) lists the four keys.
 
 Then **log out of pi5 and log in again.** The new login sets `ANSIBLE_VAULT_PASSWORD_FILE` from
 `~/.bashrc.d/hl-ansible.sh`.
@@ -149,7 +201,8 @@ On HOMEPC, in PowerShell, in the repo folder:
 
 It puts pi5's public key on the VMs and on HOMEPC. The VMs must be running. To leave them out, add
 `-SkipVm`. The HOMEPC part needs elevation: run the script elevated, or accept the UAC prompt it
-opens.
+opens. For each VM it prints `added` or `already authorized`. It ends by showing the two checks in
+step 7.
 
 #### Step 5: pull the Cribl image
 
@@ -159,35 +212,51 @@ On HOMEPC, in PowerShell **in the desktop session** (not over SSH), any folder:
 docker pull cribl/cribl@sha256:cb2b2e32933e492f439b5825b0c36f420df2fa986fe36d5f31fce6755190eb71
 ```
 
-Docker Desktop has no credential store over SSH, so the role never pulls images.
+Docker Desktop has no credential store over SSH, so the role never pulls images. To check the pull,
+run this. It prints the image ID.
+
+```powershell
+docker image inspect --format "{{.Id}}" cribl/cribl@sha256:cb2b2e32933e492f439b5825b0c36f420df2fa986fe36d5f31fce6755190eb71
+```
 
 #### Step 6: put the packages on pi5
 
-The packages go in `ansible/files/packages/` on pi5. Git ignores that folder.
+The packages go in `ansible/files/packages/` on pi5. Git ignores that folder, so a fresh clone
+doesn't have it. Sending files never deletes what is already on pi5. A sent file replaces a file with
+the same name. So you can do the two parts below in either order.
 
 **The UF packages.** The `download` tag fetches the Splunk agent ([UF](glossary.md#universal-forwarder-uf))
-packages from `download.splunk.com`.
+packages from `download.splunk.com`. It creates the folder on pi5.
 
 On pi5, in `~/homelab-splunk-missing-source/ansible`, venv on:
 
 ```bash
 ansible-playbook site.yml --tags download --limit pi5
+ls ~/homelab-splunk-missing-source/ansible/files/packages/
 ```
 
 It gets UF 10.6.1.1, build `b2ae2962645c`: the x86_64 and aarch64 rpm and the Windows MSI. It checks
-each one against its sha256 in `hl_uf_packages` in `defaults/main.yml`.
+each one against its sha256 in `hl_uf_packages` in `defaults/main.yml`. You should see `failed=0` in
+the recap, and the three files in the listing.
 
-**The add-ons ([TAs](glossary.md#add-on-ta)).** You copy these by hand. Get them from Splunkbase,
-under these exact names:
+**The add-ons ([TAs](glossary.md#add-on-ta)).** You copy these by hand. Search
+`https://splunkbase.splunk.com/` for each app by name. Save each file under the name given here:
 
-- `splunk-add-on-for-unix-and-linux_1034.spl` (Splunk_TA_nix 10.3.4)
-- `splunk-add-on-for-microsoft-windows_1103.spl` (Splunk_TA_windows 11.0.3)
+- Splunk Add-on for Unix and Linux: `splunk-add-on-for-unix-and-linux_1034.spl` (Splunk_TA_nix 10.3.4)
+- Splunk Add-on for Microsoft Windows: `splunk-add-on-for-microsoft-windows_1103.spl`
+  (Splunk_TA_windows 11.0.3)
+
+If Splunkbase gives a file another name, rename it. The role checks the content by sha256.
 
 In this lab a copy is kept outside the repo, in
-`C:\Users\taylo\Documents\claude-code\splunk-ta-local\`. Put both files in `ansible/files/packages/`
-on HOMEPC. Then send them.
+`C:\Users\taylo\Documents\claude-code\splunk-ta-local\`. Create the folder, then copy both files in. On
+HOMEPC, in PowerShell, in the repo folder:
 
-On HOMEPC, in PowerShell, in the repo folder:
+```powershell
+New-Item -ItemType Directory -Force ansible\files\packages
+```
+
+Then send them. On HOMEPC, in PowerShell, in the repo folder:
 
 ```powershell
 .\scripts\sync-to-pi.ps1 -IncludePackages
@@ -205,21 +274,23 @@ ansible uf_linux -m ansible.builtin.ping
 ansible uf_windows -m ansible.windows.win_ping
 ```
 
-Each host should answer `pong`. If a VM fails, check that it is running.
+Each host should answer `SUCCESS` with `pong`. If a VM fails, check that it is running. The hosts
+are listed in [Hosts in this lab](architecture.md#hosts-in-this-lab).
 
 #### Step 8: point the UDM's syslog at HOMEPC
 
-The role never logs in to the [UDM](glossary.md#udm), so you set this by hand. In the UniFi
-Network UI, turn on remote syslog:
+The role never logs in to the [UDM](glossary.md#udm), so you set this by hand. In the UniFi Network
+UI, turn on remote syslog. The menu path depends on your UniFi version. Use these values:
 
 - Server: HOMEPC's address. In this lab: `192.168.1.27`.
 - Port: `5514`, UDP.
 
 You don't need a new Windows firewall rule. Docker Desktop's existing rule lets the UDM's packets in.
 
-If you skip this step, nothing fails. The `udm` row reads NEVER_SEEN an hour after it is first
-expected. If its logs stop later, it reads MISSING. Its cause is "The device answers the network
-probe but sends no logs". `verify` only reports the row, because its profile is sporadic.
+If you skip this step, nothing fails. The Overview shows the UDM as missing after an hour. That is
+expected ([status words](glossary.md#status)). Its cause reads "The device answers the network probe
+but sends no logs: its logging settings probably changed". `verify` only reports the UDM row,
+because its [profile](glossary.md#profile) is [sporadic](glossary.md#sporadic).
 
 ### Secrets
 
@@ -230,7 +301,8 @@ Secrets are never in the repo.
 | The [vault](glossary.md#vault) | `inventory/group_vars/all/vault.yml` on pi5, encrypted. |
 | The vault's password | `~/.config/hl_splunk/vault-pass`, on pi5 only. |
 | The Splunk admin password | On HOMEPC. In this lab: `C:\Users\taylo\wd2l-splunk\secrets\splunk-admin-password`. |
-| The Splunk Developer licence file | On HOMEPC. In this lab: `C:\Users\taylo\wd2l-splunk\secrets\`. Never commit it. |
+
+The Splunk admin password is also the Splunk Web login for the user `admin`.
 
 About the vault:
 
@@ -238,7 +310,7 @@ About the vault:
   and `vault_hl_cribl_admin_password`.
 - `vault_hl_s2s_token` is the [S2S](glossary.md#s2s-splunktcp) token. The UFs, Cribl and Splunk all
   use it. `vault_hl_markers_token` is the [HEC](glossary.md#hec-http-event-collector) token for
-  markers.
+  [markers](glossary.md#marker-ansible-marker).
 - `bootstrap-pi.sh` creates the vault with random values. It reports any key that is missing.
   `vault.yml.example` shows the vault's shape.
 
@@ -249,6 +321,16 @@ To edit the vault: on pi5, in `~/homelab-splunk-missing-source/ansible`, venv on
 ```bash
 ansible-vault edit inventory/group_vars/all/vault.yml
 ```
+
+**To read one value,** such as the Cribl admin password: on pi5, in
+`~/homelab-splunk-missing-source/ansible`, venv on:
+
+```bash
+ansible-vault view inventory/group_vars/all/vault.yml | grep vault_hl_cribl_admin_password
+```
+
+Ansible opens the vault with the password file named in `ANSIBLE_VAULT_PASSWORD_FILE` (set in
+step 3). Cribl's login is the user `admin` and this password. Never paste the value anywhere.
 
 `vault_hl_s2s_token_previous` exists only during a token rotation. A rotation has a fixed order:
 follow [Rotating the S2S token](#rotating-the-s2s-token).
