@@ -1,7 +1,9 @@
-entity_id,status
-e1,OK
-e2,MISSING
-e4,OK
-e6,NEVER_SEEN
-e7,MUTED
-e9,OK
+entity_id,status,since,host
+e1,OK,,
+e2,MISSING,,
+e4,OK,,
+e6,NEVER_SEEN,,
+e7,MUTED,,
+e9,OK,,
+e10,MISSING,NOW-700000,h10
+e11,LATE,NOW-300000,h11

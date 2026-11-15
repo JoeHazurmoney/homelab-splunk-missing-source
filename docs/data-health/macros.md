@@ -369,7 +369,7 @@ Admin-log rows older than `dh_admin_retention_secs` that have already been copie
 Each section macro turns its input into report rows (`section`, `item`, `value`, plus a few extras).
 
 ### `dh_soh_outages(status, now)`
-From the transitions of the last 7 days: each outage (a stretch of LATE, MISSING or NEVER_SEEN) that ended in the last 24 hours or is still open, with its duration and how it ended (`end_status`), plus the mean time to recover. An outage counts as open only while `dh_status` still shows the entity bad. Used by: *DH Daily SoH report*, `dh_ui_recovered`.
+From the transitions of the last 7 days: each outage (a stretch of LATE, MISSING or NEVER_SEEN) that ended in the last 24 hours or is still open, with its duration and how it ended (`end_status`), plus the mean time to recover. An outage counts as open only while `dh_status` still shows the entity bad. An entity that went bad more than 7 days ago and is still bad is listed too, as open since its `since` time. Used by: *DH Daily SoH report*, `dh_ui_recovered`.
 
 ### `dh_soh_flapping(now)`
 Entities with 3 or more status changes in the last 24 hours. Used by: *DH Daily SoH report*.
