@@ -18,7 +18,7 @@ The `manage-generated` check in `tests/spl/run.sh` fails when the two files diff
 
 - The app keeps an [expected list](../glossary.md#expected-list). It names every host that should send data. It also names every kind of data (sourcetype) and every file (source) on a host.
 - Every minute the app checks when each of them last sent something. It gives each one a **status** ([what each means](../data-health-design.md#statuses-and-roll-up)).
-- The dashboards show those statuses, from the app's own records. Only four panels read the raw events. Each reads one host, and only when you open it. They are the events chart, the Splunk agent errors and the Hyper-V VM events on Host detail, and the list of a host's raw sources on Manage.
+- The dashboards show those statuses, from the app's own records. Only four panels read the raw events. Each reads one host, and only when you open it. Three are on Host detail: the events chart, the Splunk agent errors and the Hyper-V VM events. The fourth is the list of a host's raw sources on Manage.
 - When everything on the expected list is arriving, the Overview says so. When something isn't, it says what, since when, the likely cause and what to do.
 
 ## Statuses, causes and words
@@ -330,7 +330,7 @@ Suppose the item is muted when you set or clear its limit. The mute and its reas
 - **How to read it:** "Done" means it is written. "Nothing written" after a reload or a return to the tab is expected, because the change was applied the first time. To make another change, change the form and choose Apply again.
 
 #### Current mutes and limit overrides
-- **What it shows:** every mute and limit override in force. The columns are **Item**, **Muted until** ("-" if only a limit is set), **Reason**, **Ticket**, **Limit override** (for example "20 minutes (1200 s)"), **Set by**, **Set at** and **Item ID**.
+- **What it shows:** every mute and limit override in force. The columns are **Item**, **Muted until** ("-" if only a limit is set), **Reason** and **Ticket**. The rest are **Limit override** (for example "20 minutes (1200 s)"), **Set by**, **Set at** and **Item ID**.
 - **Where it comes from:** the overrides table (`dh_overrides`).
 - **How to read it:** look for mutes nobody needs any more, because they hide problems. Expired mutes disappear within a minute. Reload the page after a change to see it here.
 
@@ -440,7 +440,7 @@ The adopt form's **Criticality** is the same list as the add form's.
 - **How to read it:** a new row starts as PENDING. It becomes NEVER_SEEN if nothing arrives within an hour.
 
 #### Unregistered: seen in the last 7 d but not expected
-- **What it shows:** hosts and sourcetypes that sent data in the last 7 days but are not on the expected list. The columns are **Item**, **Level**, **Index**, **Host**, **Sourcetype**, **Sources** (how many), **Last seen**, **First seen**, **Suggested profile** (once the app has 3 days of history), **Days covered** and **Item ID**.
+- **What it shows:** hosts and sourcetypes that sent data in the last 7 days but are not on the expected list. The columns are **Item**, **Level**, **Index**, **Host** and **Sourcetype**. The rest are **Sources** (how many), **Last seen**, **First seen**, **Suggested profile** (once the app has 3 days of history), **Days covered** and **Item ID**.
 - **Where it comes from:** the arrival records, compared with the expected list.
 - **How to read it:** each row is either something new that should be watched, or noise to ignore. Adopt the first kind with the form below. The app never alerts on unregistered data.
 

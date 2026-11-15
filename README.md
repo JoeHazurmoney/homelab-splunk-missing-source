@@ -11,8 +11,12 @@ This repo sends a home lab's logs to Splunk and tells you when any of them stop.
 - `hl_data_health`, a Splunk app built only from SPL and the [KV store](docs/glossary.md#kv-store).
 
 One [Ansible](docs/glossary.md#ansible) role, run from pi5, deploys it all. In this lab the hosts
-are two AlmaLinux 10 VMs, a Windows 11 PC ([HOMEPC](docs/glossary.md#homepc)), a Raspberry Pi 5
-([pi5](docs/glossary.md#pi5)) and a UniFi Dream Machine ([the UDM](docs/glossary.md#udm)).
+are:
+
+- Two AlmaLinux 10 VMs.
+- A Windows 11 PC ([HOMEPC](docs/glossary.md#homepc)).
+- A Raspberry Pi 5 ([pi5](docs/glossary.md#pi5)).
+- A UniFi Dream Machine ([the UDM](docs/glossary.md#udm)).
 
 **The question it answers: "Am I blind somewhere?"** The data-health app tells a SOC analyst within
 minutes when a host, sourcetype or source stops sending. It names the likely cause and the next step.

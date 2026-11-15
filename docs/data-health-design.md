@@ -158,8 +158,8 @@ Splunk sees only Cribl's connection. So a UF's version, OS and last connect come
 ## Tamper indicators
 
 A tamper finding within 15 min of a silence turns the cause into "Possible deliberate blinding". One
-exception: DH Tamper marks a finding as the role's own work when an Ansible marker for its host came
-up to 15 min before it, or up to 60 s after it (clock skew). The role posts its marker before each
+exception: DH Tamper marks a finding as the role's own work. That needs an Ansible marker for the
+host from up to 15 min before the finding, or up to 60 s after it (clock skew). The role posts its marker before each
 change it makes.
 
 DH Tamper decides this once, when it first stores the finding. A marker posted later never hides a

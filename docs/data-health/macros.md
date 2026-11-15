@@ -621,7 +621,7 @@ The outages that ended with a return to OK in the last 24 hours. A mute or an IN
 One host's expected rows. A row shows the status, the age against its limit, the profile, and where the limit comes from (in words, `dh_ui_origin_words`). It shows any mute or test block, with its time zone. It also shows last hour's volume. Used by: Host detail, Expected data from this host.
 
 ### `dh_ui_fwd(now)`
-One host's Splunk agent facts as readable lines. The lines are the version (flagged if it isn't the expected one), the OS, the last heartbeat, the last connection, the last Ansible marker, the last VM event and the last probe. Used by: Host detail, Forwarder.
+One host's Splunk agent facts as readable lines. The lines are the version (flagged if it isn't the expected one), the OS, the last heartbeat and the last connection. The rest are the last Ansible marker, the last VM event and the last probe. Used by: Host detail, Forwarder.
 
 ### `dh_ui_hyperv`
 Hyper-V Worker-Admin events, with the VM name and what each event ID means. Used by: Host detail, Hyper-V VM events.
