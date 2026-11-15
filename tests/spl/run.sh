@@ -255,13 +255,21 @@ conf_check() {
 # _audit and the jobs' search.log, 10.6.0.5), so a text that itself starts with the search command
 # runs as "search search index=...", and the second "search" becomes a required term: the Windows
 # stage of DH Tamper matched no event on a schedule (task 14 row 13), while the same text run by
-# hand matched. This dispatches each deployed scheduled search's first stage the scheduler's way
-# and fails if its base lispy (search.log) requires the bare term "search".
+# hand matched. This dispatches each deployed scheduled search's first stage (its text up to the
+# first "|") the scheduler's way and fails if its base lispy (search.log) requires the bare term
+# "search". A first stage that names a writing command is refused, never run (final review M9).
 scheduled_lispy_check() {
   local bad=0 n=0 title base sid log
   while IFS=$'\t' read -r title base; do
     [ -n "$title" ] || continue
     n=$((n + 1))
+    # Only the first stage ever runs here, as admin on the shared live server: a stage that could
+    # write is refused, never dispatched (final review M9).
+    if printf '%s\n' "$base" | grep -qiE '(^|[^a-z_])(outputlookup|outputcsv|collect|mcollect|map|sendemail|delete|sendalert|tscollect)([^a-z_]|$)'; then
+      echo "  '$title': its first stage names a command that writes; not dispatched"
+      bad=1
+      continue
+    fi
     sid=$(dh_curl "$DH_MGMT/servicesNS/admin/$DH_APP/search/jobs" -d "tz=$DH_TZ" -d exec_mode=blocking -d output_mode=json \
       --data-urlencode "search=search $base | head 1" | grep -o '"sid":"[^"]*"' | cut -d'"' -f4)
     if [ -z "$sid" ]; then echo "  '$title': the first stage did not dispatch"; bad=1; continue; fi
@@ -274,7 +282,7 @@ scheduled_lispy_check() {
     fi
   done < <(dh_search "| rest splunk_server=local count=0 /servicesNS/nobody/$DH_APP/saved/searches
     | search eai:acl.app=$DH_APP is_scheduled=1 | where NOT match(search, \"^\\s*\\|\")
-    | eval base=replace(replace(search, \"(?s)\\n\\s*\\|.*\$\", \"\"), \"\\s+\", \" \")
+    | eval base=replace(replace(search, \"(?s)\\|.*\$\", \"\"), \"\\s+\", \" \")
     | eval _raw=title.urldecode(\"%09\").base | fields _raw" raw | tr -d '\r')
   if [ "$n" -eq 0 ]; then echo "  no scheduled search to check (none, or the rest call failed)"; bad=1; fi
   if [ "$bad" -eq 0 ]; then echo "PASS scheduled-lispy ($n searches)"; return 0; fi
