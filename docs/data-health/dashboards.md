@@ -228,7 +228,7 @@ Everything about one host. Pick the host at the top, or arrive here by clicking 
 
 ### Runbooks (click to open)
 - **What it shows:** the how-to pages linked to this host's expected items. Columns: **Runbook**, **Items** (how many use it).
-- **Where it comes from:** the runbook column of the expected list.
+- **Where it comes from:** the runbook column of the expected list. Only web links (`http://` or `https://`) are listed, so a click never opens anything else.
 - **How to read it:** click a row to open the page in a new tab. Empty means no runbook was set.
 
 ## Manage

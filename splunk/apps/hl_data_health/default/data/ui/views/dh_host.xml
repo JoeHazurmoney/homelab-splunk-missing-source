@@ -107,7 +107,7 @@
             "type": "ds.search",
             "name": "Runbooks",
             "options": {
-                "query": "| `dh_ui_status(dh_status)` | where host==$host|s$ AND isnotnull(runbook) AND runbook!=\"\" | stats count as entities by runbook | `dh_ui_headers`"
+                "query": "| `dh_ui_status(dh_status)` | where host==$host|s$ AND isnotnull(runbook) AND match(runbook, \"^https?://\") | stats count as entities by runbook | `dh_ui_headers`"
             }
         }
     },
