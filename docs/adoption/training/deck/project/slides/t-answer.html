@@ -1,0 +1,11 @@
+<section id="t-answer">
+<p class="eyebrow">EXERCISE · ANSWERS</p>
+<h2>One cause, many rows</h2>
+<div class="cards">
+<div class="card"><h3>Is homepc down?</h3><p>Unknown. Its data passes through Cribl, and Cribl is not reporting. The host may be fine.</p></div>
+<div class="card"><h3>Fix first?</h3><p>Cribl. Check its container or service, as the Action says. The rows behind it clear when it is back.</p></div>
+<div class="card"><h3>Tell whom?</h3><p>The Cribl or platform owner. One ticket for the whole outage, not one per host.</p></div>
+</div>
+<p>Rule of thumb: when many rows share one cause, fix that cause first.</p>
+<aside>This was staged for training by stopping the Cribl container. Cribl’s own row went DOWN about 5 to 6 minutes after the stop; the host rows behind it first show their own cause, then switch to Cribl DOWN once Cribl itself is DOWN.</aside>
+</section>
