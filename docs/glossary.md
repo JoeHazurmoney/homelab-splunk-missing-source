@@ -273,6 +273,20 @@ stopped auditd. A tamper finding is the app's record of one. A finding is "suppr
 (`suppressed=1`) when an Ansible marker shows it was the role's own work
 ([indicators](data-health-design.md#tamper-indicators)).
 
+### Explained
+A tamper finding is explained when planned work or a known event accounts for it. Two things explain
+a Splunk agent stop. One is an Ansible marker (reason "role work"). The other is a record that the
+whole host shut down or restarted (reason "host shutdown"). An explained finding is stored with its
+reason and doesn't alert. It still shows on the *Restarts and agent stops* panel
+([how it works](data-health-design.md#the-splunk-agent-stop)).
+
+### Pending
+A Splunk agent stop is pending while the app waits for the host to report back. The evidence that
+explains a stop often arrives later, for example when a VM boots again. A pending finding doesn't
+alert and explains nothing. It is judged once the host has reported again and a settle time has
+passed. If the host never comes back, the finding stays pending. DOWN alerts for that host on its
+own. Don't confuse this with the status [PENDING](#pending-the-gate).
+
 ### Arrival tracker, *DH Evaluate*
 The arrival tracker is the saved search *DH Tracker fast*. Every minute it records when each item
 last sent data. *DH Evaluate* is the saved search that turns those times into statuses.

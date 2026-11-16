@@ -241,6 +241,39 @@ Someone may be hiding activity. Do these in order:
    The [fault-injection run](records/2026-11-fault-injection-run.md) saw that run fail on an added
    route.
 
+### Splunk agent stopped (not explained)
+
+The Splunk agent on a host stopped, and nothing planned explains it. It is also a tamper finding,
+and *DH Alert tamper* fired once. Someone may have stopped the agent to hide activity.
+
+**How to read the *Restarts and agent stops* panel.** It is on the Overview (24 h) and Host detail
+(7 d). One row is one stop. The **Explained by** column says what to do:
+- **A sentence** (for example "Ansible restart by …" or a host shutdown note): planned work or a
+  host shutdown explains it. No action.
+- **Waiting for the host to report back:** the app has not judged it yet. Wait. It becomes one of
+  the other two once the host sends data again. If the host never comes back, it stays here, and the
+  host's DOWN cause is the one to follow.
+- **Not explained** (amber): follow the steps below.
+
+1. **Escalate.** Tell the lab owner (in this lab: Taylor). Save the evidence first, as in
+   [Possible deliberate blinding](#possible-deliberate-blinding).
+2. **Read the finding.** In Splunk Web, in the HL Data Health app:
+
+   ```
+   | inputlookup dh_tamper | search host=<host> | table time code indicator detail state explained_by explanation
+   ```
+
+   `state` is `judged` for an alert. `indicator` names every source that saw the stop, for example
+   "Splunk agent stopped (SERVICE_STOP + shutdown line)".
+3. **Find out who and why.** On a Linux host, the audit log names the user. Look for a `USER_CMD`
+   near the stop time. On Windows, look at the System log for events 1074 and 7036 near the time.
+4. **Check that the agent is running.** If it is not, start it
+   ([steps](#the-splunk-agent-is-late-or-stopped)).
+5. **Don't expect a later role run to hide it.** The finding is judged once and never changes.
+
+A stop that the whole host explains doesn't alert, but it stays on the panel. A reboot that comes
+more than 2 min after the stop does not explain it.
+
 ### Cribl is down
 
 Check the container. On HOMEPC, in PowerShell, any folder:
