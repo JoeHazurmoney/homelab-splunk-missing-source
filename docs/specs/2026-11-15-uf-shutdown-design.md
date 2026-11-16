@@ -1,6 +1,6 @@
 # Design: a tamper finding when the Splunk agent stops, and a panel of restarts (#52)
 
-Status: draft for Taylor's approval, 2026-11-15. Issue #52. Base: `main` at `433b3bd`. A builder check (a fresh reviewer) read it; its six questions are answered in place, marked "Builder check Qn".
+Status: approved (2026-11-15). Issue #52. Base: `main` at `433b3bd`. A builder check (a fresh reviewer) read it; its six questions are answered in place, marked "Builder check Qn".
 
 ## 1. Why
 
@@ -91,8 +91,8 @@ The same codes on a host whose agent kept running (auditd stopped, the agent sti
 **How a held finding is judged.**
 - **Explained, at once,** when:
   - a marker matches, by today's rule (900 s before, 60 s after) → reason `role work`; or
-  - host-shutdown evidence for the same host is **from 600 s before the stop to 120 s after it** (5.4) → reason `host shutdown`. Measured on 11-08/09: Windows 1074 came 21 s before the agent's stop line and 6006 in the same second; Linux `SYSTEM_SHUTDOWN` came 2–12 s after it. The window is lopsided on purpose: an attacker who stops the agent, works, and then reboots to cover it is explained only if the reboot is within 2 minutes. *(Builder check Q4; controller's call.)*
-- **Otherwise it stays pending** until the host's agent has been heard from again after the stop, plus a settle time for the backlog. The builder picks the "heard from" source (the arrival tracker's last heartbeat, or any `_internal` event) and the settle time (about 10 min). Then check once more. If nothing explains it, it is judged **unexplained** and it alerts.
+  - host-shutdown evidence for the same host is **from 120 s before the stop to 120 s after it** (5.4) → reason `host shutdown`. Changed from 600 s at the final review: a stop made after a reboot must not be explained by that reboot. Measured on 11-08/09: Windows 1074 came 21 s before the agent's stop line and 6006 in the same second; Linux `SYSTEM_SHUTDOWN` came 2–12 s after it. The window is lopsided on purpose: an attacker who stops the agent, works, and then reboots to cover it is explained only if the reboot is within 2 minutes. *(Builder check Q4; controller's call.)*
+- **Otherwise it stays pending** until the host's agent has been heard from again (a heartbeat more than `dh_tamper_back_margin_secs`, 120 s, after the stop), plus a settle time for the backlog. The builder picks the "heard from" source (the arrival tracker's last heartbeat, or any `_internal` event) and the settle time (about 10 min). Then check once more. If nothing explains it, it is judged **unexplained** and it alerts.
 - **If the agent never comes back, the finding stays pending and never alerts.** A host that stays down is DOWN, which alerts on its own (#52: the shutdown line is reliable for a stop and then a start, not for one that stays down). This keeps a VM shut down for days from alerting at some cutoff. The panel shows it as "Waiting for the host to report back". It ages out with the 30-day `dh_tamper` retention. *(Builder check Q1; controller's call, from Taylor's anti-goal "a planned VM or PC shutdown sends a tamper alert". There is no cap, so no re-judging is needed.)*
 - Once judged, a finding never changes (#49 still holds; it now applies at judging time, not at first store).
 - A pending finding doesn't alert, and **the evaluator ignores it** for the cause. Otherwise a VM shut down overnight would read "Possible deliberate blinding" all night. A stop that is still pending when a row goes silent gives no tamper cause yet. The host's own cause (DOWN, agent stopped) still shows.
@@ -140,7 +140,7 @@ The same codes on a host whose agent kept running (auditd stopped, the agent sti
 - **Live proofs**, against the lab:
   - Linux role work (a `restart` run → explained).
   - A Linux unexplained stop-and-start on one VM (`systemctl stop` then `start` without a marker, via Ansible from pi5 → one alert).
-  - A Linux VM reboot (→ host shutdown, no alert).
+  - A Linux VM reboot (→ host shutdown, no alert for the stop). A Linux reboot without a marker still gives one `audit_config_change` alert from the boot's rule load. That is outside #52; follow-up issue #59.
   - Windows needs **Taylor's OK** before stopping the service on HOMEPC. Its proofs are a role restart, an unexplained stop-and-start, and (when Taylor next restarts the PC) a host restart.
 - **Performance:** DH Tamper stays a 5-minute search; the new branches use index time and narrow terms.
 - **Compatibility:** stored findings without `state` read as judged. No KV migration that rewrites old rows.
@@ -148,7 +148,7 @@ The same codes on a host whose agent kept running (auditd stopped, the agent sti
 
 ## 7. Left to the builder
 
-- Which source says "this host has a UF" (`dh_fwd` or the expected rows) and which says "heard from again".
+- Which source says "this host has a UF" (`dh_fwd` or the expected rows) and which says "heard from again" (a heartbeat more than 120 s after the stop, so events indexed just after the stop do not count).
 - The settle time (about 10 min), as a macro with a comment.
 - The exact indicator and explanation wording, within the style guide.
 - Whether the Linux `SERVICE_STOP`-burst fallback is needed (5.4).

@@ -126,13 +126,19 @@ Raise it to link findings that are further apart, which gives more false links. 
 **60 seconds.** A marker up to this long *after* a finding still suppresses it. Markers carry pi5's clock, and findings carry the host's clock. A marker posted later, such as one from a restore run, never hides a finding. Raise it only if the hosts' clocks drift further apart. Used by: `dh_tamper_finish`.
 
 ### `dh_tamper_hostdown_before_secs`
-**600 seconds.** A held Splunk agent stop is explained by a host-shutdown record that is at most this long *before* the stop. Raise it to accept older shutdown records. Lower it if a record from an earlier, unrelated shutdown is ever matched. Used by: `dh_tamper_finish`.
+**120 seconds.** (It was 600 until the final review: a stop made after a reboot must not be explained by that reboot.) A held Splunk agent stop is explained by a host-shutdown record that is at most this long *before* the stop. Raise it to accept older shutdown records. Lower it if a record from an earlier, unrelated shutdown is ever matched. A Windows 1074 comes about 21 s before the stop. Used by: `dh_tamper_finish`.
 
 ### `dh_tamper_hostdown_after_secs`
 **120 seconds.** The same window, after the stop. A Windows 6006 record comes just after the agent stops. Raise it and a later reboot may explain an agent stop that was not part of it. Lower it and a slow shutdown may not be matched. Used by: `dh_tamper_finish`.
 
 ### `dh_tamper_settle_secs`
-**600 seconds.** A held Splunk agent stop waits this long after the agent is heard from again. Then, if nothing explains it, it becomes a finding and alerts once. The wait lets late evidence arrive: a Linux shutdown record is only sent when the VM boots. Raise it to wait longer before alerting. Lower it to alert sooner. Used by: `dh_tamper_finish`.
+**600 seconds.** A held Splunk agent stop waits this long after the agent is heard from again (see `dh_tamper_back_margin_secs`). Then, if nothing explains it, it becomes a finding and alerts once. The wait lets late evidence arrive: a Linux shutdown record is only sent when the VM boots. Raise it to wait longer before alerting. Lower it to alert sooner. Used by: `dh_tamper_finish`.
+
+### `dh_tamper_back_margin_secs`
+**120 seconds.** The Splunk agent counts as "heard from again" only when its last heartbeat is more than this long *after* the stop. The agent's last events before a stop can be indexed just after it, so a heartbeat a few seconds later does not mean the host is back. Raise it to wait longer before the settle time starts. Lower it and late-indexed events may be read as a return. Used by: `dh_tamper_finish`.
+
+### `dh_tamper_is_agentstop`
+Not a number: a test that says whether a finding is a Splunk agent stop. It is true for `uf_shutdown`, `svcstop_splunkforwarder`, a `win7036` whose text names SplunkForwarder (any case), and a folded agent-stop finding ("Splunk agent stopped (…)"). One definition, so the hold, the fold and the panel always agree. Used by: `dh_tamper_finish`, `dh_tamper_fold`, `dh_ui_restarts`.
 
 ## Profiles and thresholds
 
@@ -426,7 +432,7 @@ Groups indicators into findings. There is one finding per host, kind and 5-minut
 - A finding is suppressed when an Ansible marker for its host came at most `dh_tamper_window_secs` before it. A marker that came at most `dh_tamper_marker_slack_secs` after it also counts.
 - A stored finding keeps its suppression on every later run. So a later marker never hides it.
 - If the finding's `dh_tamper` row is gone, the latest `dh:tamper` record (by index time) gives the stored state.
-- A Splunk agent stop, and the host-shutdown records that come with it, is held as pending. A marker, a host-shutdown record, or the agent coming back and settling then judges it. A pending finding never alerts. A judged one never changes.
+- A Splunk agent stop, and the host-shutdown records that come with it, is held as pending. A marker, a host-shutdown record, or the agent coming back and settling then judges it. "Coming back" means a heartbeat more than `dh_tamper_back_margin_secs` after the stop. A pending finding never alerts. A judged one never changes.
 - It also marks which findings of the last 7 days still need writing to the index. An older finding never does, because the index keeps 14 days and the collection keeps 30.
 
 Used by: *DH Tamper*.
@@ -630,7 +636,7 @@ The banner text and colour: Up to date, On hold, Out of date or Catching up. See
 The unsuppressed tamper findings first seen in the last 24 hours. "First seen" is when the app recorded the finding, so late findings count. It gives one row per finding, with the host's filter attributes. Used by: Overview, Tamper findings.
 
 ### `dh_ui_restarts(status, now, secs)`
-The Splunk agent stops of the last `secs` seconds. It reads `| inputlookup dh_tamper`. It keeps the held rows, joins rows of one host that are at most `dh_tamper_window_secs` apart into one episode, and keeps the episodes that contain an agent stop. It gives one row per episode, newest first. **What stopped** lists the parts in time order. **Explained by** is "Waiting for the host to report back" when any part is still pending, else the agent stop's explanation, else "Not explained". It adds the host's filter attributes. Used by: Overview and Host detail, Restarts and agent stops.
+The Splunk agent stops of the last `secs` seconds. It reads `| inputlookup dh_tamper`. It keeps the held rows, joins rows of one host that are at most `dh_tamper_window_secs` apart into one episode, and keeps the episodes that contain an agent stop. It gives one row per episode, newest first. **What stopped** lists the parts in time order. **Explained by** is "Waiting for the host to report back" when any part is still pending. Else it is "Not explained" when any judged part alerted or would have. Else it is the newest agent stop's explanation, or "Role work" or "Host shutdown" when that is empty. It adds the host's filter attributes. Used by: Overview and Host detail, Restarts and agent stops.
 
 ### `dh_ui_status_attrs(status)`
 Adds the filter attributes of each row's item, taken from the current `dh_status` rows. The attributes are site, owner, criticality, status, roll-up and description. So the Overview filters also apply to recoveries and tamper findings. Used by: `dh_ui_tamper_24h`, `dh_ui_recovered`.

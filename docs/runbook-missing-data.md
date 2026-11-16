@@ -248,12 +248,13 @@ and *DH Alert tamper* fired once. Someone may have stopped the agent to hide act
 
 **How to read the *Restarts and agent stops* panel.** It is on the Overview (24 h) and Host detail
 (7 d). One row is one stop. The **Explained by** column says what to do:
-- **A sentence** (for example "Ansible restart by …" or a host shutdown note): planned work or a
+- **A sentence** (for example "Ansible restart by …" or "host shutdown: …"): planned work or a
   host shutdown explains it. No action.
 - **Waiting for the host to report back:** the app has not judged it yet. Wait. It becomes one of
   the other two once the host sends data again. If the host never comes back, it stays here, and the
   host's DOWN cause is the one to follow.
-- **Not explained** (amber): follow the steps below.
+- **Not explained** (amber): nothing explains the stop, or one stop of the episode is not explained.
+  Follow the steps below.
 
 1. **Escalate.** Tell the lab owner (in this lab: Taylor). Save the evidence first, as in
    [Possible deliberate blinding](#possible-deliberate-blinding).

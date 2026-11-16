@@ -283,7 +283,8 @@ reason and doesn't alert. It still shows on the *Restarts and agent stops* panel
 ### Pending
 A Splunk agent stop is pending while the app waits for the host to report back. The evidence that
 explains a stop often arrives later, for example when a VM boots again. A pending finding doesn't
-alert and explains nothing. It is judged once the host has reported again and a settle time has
+alert and explains nothing. It is judged once the host has reported again (a few minutes after the
+stop, so late-indexed events do not count) and a settle time has
 passed. If the host never comes back, the finding stays pending. DOWN alerts for that host on its
 own. Don't confuse this with the status [PENDING](#pending-the-gate).
 

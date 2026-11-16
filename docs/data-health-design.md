@@ -204,11 +204,12 @@ So an agent stop is a tamper finding, unless something explains it. Four rules:
   within 15 min, because a host shutdown also writes those. The same codes on a host whose agent
   kept running are judged at once, as before.
 - **Explained at once** when a marker covers the stop (the rule above), reason *role work*, or when
-  the host's own shutdown record is from 10 min before the stop to 2 min after it, reason *host
+  the host's own shutdown record is from 2 min before the stop to 2 min after it, reason *host
   shutdown*. A 1074 ranks first because it names the user and the reason. The window is lopsided on
   purpose: if someone stops the agent, works, and then reboots, the reboot explains the stop only
   when it comes within 2 min.
-- **Otherwise it waits** until the host's Splunk agent is heard from again, plus 10 min
+- **Otherwise it waits** until the host's Splunk agent is heard from again (a heartbeat more than 2 min
+  after the stop, `dh_tamper_back_margin_secs`), plus 10 min
   (`dh_tamper_settle_secs`) for late records. Then, if nothing explains it, the finding is judged
   *unexplained* and *DH Alert tamper* fires once. If the agent never comes back, the finding stays
   pending and never alerts. The host is DOWN then, and DOWN alerts on its own.
