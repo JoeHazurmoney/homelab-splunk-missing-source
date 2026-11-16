@@ -6,6 +6,10 @@ customer's SOC and security leads. It covers Splunk Enterprise only.
 - **The deck itself** is a Slides artifact on claude.ai:
   <https://claude.ai/artifact/1rL9tHSg9gqCb3AyxnGwr2>. It is private until its owner shares it.
   From there it downloads as PowerPoint (.pptx) or PDF.
+- **Copies to hand out** are in this folder. They were exported on 2026-11-15:
+  [PDF](hl-data-health-adoption-pitch.pdf) (21 pages, no notes) and
+  [PowerPoint](hl-data-health-adoption-pitch.pptx) (editable, with speaker notes). After a change
+  to the deck, export both again.
 - **This folder** keeps its source, so changes can be reviewed. `project/deck.json` lists the
   slides in order. `project/deck.css` holds the shared look. `project/slides/` has one HTML file per
   slide. Each slide's speaker notes are in its `<aside>`.

@@ -2,3 +2,5 @@
 *.spl binary
 *.tgz binary
 *.png binary
+*.pdf binary
+*.pptx binary

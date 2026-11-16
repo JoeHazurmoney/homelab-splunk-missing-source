@@ -7,6 +7,9 @@ one exercise. The exercise uses the Cribl DOWN rows.
 - **The deck** is a Slides artifact on claude.ai:
   <https://claude.ai/artifact/XJE1Aa7VSD2P6ZoyyMU8ZY>. It is private until its owner shares it. It
   downloads as PowerPoint (.pptx) or PDF.
+- **Copies to hand out** were exported on 2026-11-15:
+  [PDF](hl-data-health-analyst-training-example.pdf) and
+  [PowerPoint](hl-data-health-analyst-training-example.pptx) (editable, with speaker notes).
 - **This folder** keeps its source: `project/deck.json`, `project/deck.css` and one HTML file per
   slide in `project/slides/`. The speaker notes are in each slide's `<aside>`.
 - **The written guide** that goes with it is
