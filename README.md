@@ -117,3 +117,7 @@ ansible-playbook site.yml --tags uninstall --limit wd2l-recv
 | [docs/glossary.md](docs/glossary.md) | The words the docs use, for a reader new to this lab. |
 | [docs/specs/](docs/specs/) | The approved design and its Cribl addendum. They record every decision. |
 | [docs/records/](docs/records/) | Records of test runs on the real hosts, such as the fault-injection run. |
+
+## Licence
+
+MIT. See [LICENSE](LICENSE).
