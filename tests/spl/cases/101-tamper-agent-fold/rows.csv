@@ -1,0 +1,13 @@
+kind,time,host,code,indicator,detail,target_host,action,by,run_id,finding_id,suppressed,it
+finding,NOW-1000,ha,svcstop_splunkforwarder,SERVICE_STOP splunkforwarder,,,,,,,,
+finding,NOW-1003,ha,uf_shutdown,Splunk agent stopped (shutdown line),index=_internal; component=Shutdown,,,,,,,
+finding,NOW-995,hb,uf_shutdown,Splunk agent stopped (shutdown line),index=_internal; component=Shutdown,,,,,,,
+index,NOW-1000,,,,,,,,,hb|svcstop_splunkforwarder|1999998900,0,NOW-900
+finding,NOW-1000,hc,win7036,7036 SplunkForwarder Service stopped,,,,,,,,
+finding,NOW-980,hc,uf_shutdown,Splunk agent stopped (shutdown line),index=_internal; component=Shutdown,,,,,,,
+finding,NOW-1000,hd,win7036,7036 Windows Event Log stopped,,,,,,,,
+finding,NOW-990,hd,uf_shutdown,Splunk agent stopped (shutdown line),index=_internal; component=Shutdown,,,,,,,
+finding,NOW-1000,he,uf_shutdown,Splunk agent stopped (shutdown line),index=_internal; component=Shutdown,,,,,,,
+finding,NOW-600,he,uf_shutdown,Splunk agent stopped (shutdown line),index=_internal; component=Shutdown,,,,,,,
+finding,NOW-2000,hf,svcstop_splunkforwarder,SERVICE_STOP splunkforwarder,,,,,,,,
+finding,NOW-1000,hf,uf_shutdown,Splunk agent stopped (shutdown line),index=_internal; component=Shutdown,,,,,,,

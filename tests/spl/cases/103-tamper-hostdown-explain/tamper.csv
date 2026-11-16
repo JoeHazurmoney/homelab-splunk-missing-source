@@ -1,0 +1,4 @@
+finding_id,host,time,code,indicator,detail,events,bucket,suppressed,marker_action,marker_time,marker_by,marker_run_id,updated,state,held,explained_by,explanation,back_at
+ha|svcstop_splunkforwarder|1999998900,ha,NOW-1000,svcstop_splunkforwarder,Splunk agent stopped (SERVICE_STOP + shutdown line),index=_internal; component=Shutdown,2,NOW-1100,0,,,,,NOW-800,pending,1,,,
+hc|uf_shutdown|1999998900,hc,NOW-1000,uf_shutdown,Splunk agent stopped (shutdown line),index=_internal; component=Shutdown,1,NOW-1100,0,,,,,NOW-800,pending,1,,,NOW-700
+hd|uf_shutdown|1999998900,hd,NOW-1000,uf_shutdown,Splunk agent stopped (shutdown line),index=_internal; component=Shutdown,1,NOW-1100,0,,,,,NOW-800,pending,1,,,NOW-700

@@ -54,7 +54,7 @@ The expected list, `dh_expected`: every item that should send data. Used by: the
 `hl_ingest_block`: Splunk's copy of Cribl's test-block table. It is a lookup of the `hl_server_base` app. Only the role's *cribl_block* tag adds or removes blocks in it, and nothing in this app writes it. The *cribl* and *cribl_remove* tags only reset it to its header ([who writes it](../running-the-role.md#test-blocks)). Until that app is installed, the table doesn't exist and reads as empty. Used by: the `lookup-names` check in `tests/spl/run.sh`, which keeps it equal to the name `dh_evaluate` uses. `dh_evaluate` and the Manage Test blocks tab name `hl_ingest_block` directly. A macro argument can't hold a macro, so `dh_evaluate` can't call this one.
 
 ### `dh_lookup_tamper`
-`dh_tamper`: the tamper findings, with their suppression. Used by: *DH Tamper*.
+`dh_tamper`: the tamper findings, with their suppression and, for a Splunk agent stop, its state (pending or judged), what explains it and when the agent came back. Used by: *DH Tamper*.
 
 ### `dh_lookup_status`
 `dh_status`: the evaluator's output, one row per expected item. Used by: *DH Evaluate*, *DH Daily SoH report*.
@@ -124,6 +124,21 @@ Raise it to link findings that are further apart, which gives more false links. 
 
 ### `dh_tamper_marker_slack_secs`
 **60 seconds.** A marker up to this long *after* a finding still suppresses it. Markers carry pi5's clock, and findings carry the host's clock. A marker posted later, such as one from a restore run, never hides a finding. Raise it only if the hosts' clocks drift further apart. Used by: `dh_tamper_finish`.
+
+### `dh_tamper_hostdown_before_secs`
+**120 seconds.** (It was 600 until the final review: a stop made after a reboot must not be explained by that reboot.) A held Splunk agent stop is explained by a host-shutdown record that is at most this long *before* the stop. Raise it to accept older shutdown records. Lower it if a record from an earlier, unrelated shutdown is ever matched. A Windows 1074 comes about 21 s before the stop. Used by: `dh_tamper_finish`.
+
+### `dh_tamper_hostdown_after_secs`
+**120 seconds.** The same window, after the stop. A Windows 6006 record comes just after the agent stops. Raise it and a later reboot may explain an agent stop that was not part of it. Lower it and a slow shutdown may not be matched. Used by: `dh_tamper_finish`.
+
+### `dh_tamper_settle_secs`
+**600 seconds.** A held Splunk agent stop waits this long after the agent is heard from again (see `dh_tamper_back_margin_secs`). Then, if nothing explains it, it becomes a finding and alerts once. The wait lets late evidence arrive: a Linux shutdown record is only sent when the VM boots. Raise it to wait longer before alerting. Lower it to alert sooner. Used by: `dh_tamper_finish`.
+
+### `dh_tamper_back_margin_secs`
+**120 seconds.** The Splunk agent counts as "heard from again" only when its last heartbeat is more than this long *after* the stop. The agent's last events before a stop can be indexed just after it, so a heartbeat a few seconds later does not mean the host is back. Raise it to wait longer before the settle time starts. Lower it and late-indexed events may be read as a return. Used by: `dh_tamper_finish`.
+
+### `dh_tamper_is_agentstop`
+Not a number: a test that says whether a finding is a Splunk agent stop. It is true for `uf_shutdown`, `svcstop_splunkforwarder`, a `win7036` whose text names SplunkForwarder (any case), and a folded agent-stop finding ("Splunk agent stopped (…)"). One definition, so the hold, the fold and the panel always agree. Used by: `dh_tamper_finish`, `dh_tamper_fold`, `dh_ui_restarts`.
 
 ## Profiles and thresholds
 
@@ -218,7 +233,7 @@ Adds the facts each row needs:
 - The Splunk agent heartbeat, the last Ansible marker, and the last Hyper-V event and device probe, by host.
 - The item's own override and its host's override.
 - The learned baseline.
-- The tamper findings on the host. A row that arrives through Cribl also gets the findings on host *cribl*, with those that a marker suppresses marked as such.
+- The tamper findings on the host. A row that arrives through Cribl also gets the findings on host *cribl*, with those that a marker suppresses marked as such. A finding that is still pending (a Splunk agent stop that waits for its evidence) is marked the same way, on the host and on *cribl*, so it explains nothing. A finding with an empty or missing state counts as judged.
 - The previous status.
 
 Used by: `dh_eval`.
@@ -403,6 +418,12 @@ Finds Linux tamper indicators:
 
 Used by: *DH Tamper*.
 
+### `dh_tamper_ufstop(fwd)`
+Reads the Splunk agent's own log in `_internal`. The line "Shutting down splunkd" is the agent's own record that it stopped, and it becomes a finding with the code *uf_shutdown*. Only hosts that `fwd` (the *dh_fwd* lookup) lists as a universal forwarder count. A full Splunk server restarts for ordinary reasons, so it never raises a finding. Used by: *DH Tamper*.
+
+### `dh_tamper_hostdown`
+Reads evidence that the whole host shut down, not only the Splunk agent. On Windows that is event 1074 (names the user and the reason) and event 6006 (the event log service stopped). On Linux it is the audit record SYSTEM_SHUTDOWN. A 1074 or SYSTEM_SHUTDOWN ranks first, so it wins over a 6006 when both are close. Used by: *DH Tamper*.
+
 ### `dh_tamper_cribl`
 Reads Cribl's audit log. Any create, update, delete, reorder or upload of routes, pipelines, outputs, inputs or lookups is a finding on the host *cribl*. The log can't tell a Drop function from any other pipeline edit, so every such change counts. The role's own changes fall inside its *cribl* and *cribl_block* marker windows, so they are suppressed. Used by: *DH Tamper*.
 
@@ -411,12 +432,15 @@ Groups indicators into findings. There is one finding per host, kind and 5-minut
 - A finding is suppressed when an Ansible marker for its host came at most `dh_tamper_window_secs` before it. A marker that came at most `dh_tamper_marker_slack_secs` after it also counts.
 - A stored finding keeps its suppression on every later run. So a later marker never hides it.
 - If the finding's `dh_tamper` row is gone, the latest `dh:tamper` record (by index time) gives the stored state.
+- A Splunk agent stop, and the host-shutdown records that come with it, is held as pending. A marker, a host-shutdown record, or the agent coming back and settling then judges it. "Coming back" means a heartbeat more than `dh_tamper_back_margin_secs` after the stop. A pending finding never alerts. A judged one never changes.
 - It also marks which findings of the last 7 days still need writing to the index. An older finding never does, because the index keeps 14 days and the collection keeps 30.
 
 Used by: *DH Tamper*.
 
 ### `dh_tamper_fold(now)`
 One service install logs two Windows events: a 7045 (System log) and a 4697 (Security log). This step puts the pair into one finding, "7045+4697 service installed: …". Its detail holds both event IDs. The two events match on the service's key name or its program path. They must be at most `dh_tamper_window_secs` apart. Either event can arrive first. If one half is already stored and alerted, the other half joins that finding. So a service install alerts once. Findings stored before this step existed stay as they are. Used by: `dh_tamper_finish`.
+
+It also folds the Splunk agent stop. The agent can log a shutdown line, a SERVICE_STOP and a 7036 stop for the same stop. If two of those different codes are on one host within `dh_tamper_window_secs`, they make one finding, "Splunk agent stopped (SERVICE_STOP + shutdown line)". The parts are in time order. A 7036 for another service (such as the event log) never folds, and two lines of the same code never fold with each other.
 
 ### `dh_tamper_collect_rows`
 Shapes findings for writing to the index. Used by: *DH Tamper*.
@@ -610,6 +634,9 @@ The banner text and colour: Up to date, On hold, Out of date or Catching up. See
 
 ### `dh_ui_tamper_24h(status, now)`
 The unsuppressed tamper findings first seen in the last 24 hours. "First seen" is when the app recorded the finding, so late findings count. It gives one row per finding, with the host's filter attributes. Used by: Overview, Tamper findings.
+
+### `dh_ui_restarts(status, now, secs)`
+The Splunk agent stops of the last `secs` seconds. It reads `| inputlookup dh_tamper`. It keeps the held rows, joins rows of one host that are at most `dh_tamper_window_secs` apart into one episode, and keeps the episodes that contain an agent stop. It gives one row per episode, newest first. **What stopped** lists the parts in time order. **Explained by** is "Waiting for the host to report back" when any part is still pending. Else it is "Not explained" when any judged part alerted or would have. Else it is the newest agent stop's explanation, or "Role work" or "Host shutdown" when that is empty. It adds the host's filter attributes. Used by: Overview and Host detail, Restarts and agent stops.
 
 ### `dh_ui_status_attrs(status)`
 Adds the filter attributes of each row's item, taken from the current `dh_status` rows. The attributes are site, owner, criticality, status, roll-up and description. So the Overview filters also apply to recoveries and tamper findings. Used by: `dh_ui_tamper_24h`, `dh_ui_recovered`.

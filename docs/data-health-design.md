@@ -162,24 +162,64 @@ exception: DH Tamper marks a finding as the role's own work. That needs an Ansib
 host from up to 15 min before the finding, or up to 60 s after it (clock skew). The role posts its marker before each
 change it makes.
 
-DH Tamper decides this once, when it first stores the finding. A marker posted later never hides a
-finding that already alerted. An example is a marker from a restore run.
+DH Tamper decides this once, when it first stores the finding. (A Splunk agent stop is judged a
+little later, then never changes: see [The Splunk agent stop](#the-splunk-agent-stop).) A marker
+posted later never hides a finding that already alerted. An example is a marker from a restore run.
 
 The indicators:
 - **Windows:** event IDs 1102 (log cleared), 104, 1100, 4719 (audit policy changed) and 4697 or 7045
   (service installed). Also 7036 and 7040 (SplunkForwarder or EventLog stopped, or its start type
   changed). Windows Server logs 7036 by default. Desktop Windows (8 and later) doesn't. In this lab:
-  HOMEPC runs Windows 11 Pro and logs no 7036. So a stopped UF there shows only as LATE, then
-  MISSING, then DOWN.
+  HOMEPC runs Windows 11 Pro and logs no 7036. The Splunk agent's own shutdown line (below) now
+  covers desktop Windows. `win7036` stays for Windows Server. A host shutdown shows as event 1074
+  (names the user and the reason) or 6006.
 - **Linux:** auditd `DAEMON_END` or `DAEMON_ABORT`, `CONFIG_CHANGE`, and `SERVICE_STOP` of
   SplunkForwarder, auditd or rsyslog. Also audit keys `hl-*` and `wd2l-*`, which cover writes to the
   UF's config, to rsyslog and to `/etc/audit`. On EL10, `systemctl stop auditd` is refused.
-  `service auditd stop` works. It writes `DAEMON_END` (with the auid), not `SERVICE_STOP`.
+  `service auditd stop` works. It writes `DAEMON_END` (with the auid), not `SERVICE_STOP`. A host
+  shutdown writes the audit record `SYSTEM_SHUTDOWN`.
+- **The Splunk agent's own log:** the line "Shutting down splunkd" in `_internal`, on Windows and
+  Linux. It gives the code `uf_shutdown`. Only hosts with a universal forwarder count. A full
+  Splunk server restarts for ordinary reasons, so it never gives a finding.
 - **Cribl:** any create, update, delete, reorder or upload of routes, pipelines, outputs, inputs or
   lookups in Cribl's audit log (`sourcetype=cribl:audit`). The log can't tell a Drop route from any
   other edit. So every change outside a `cribl` marker window counts. Cribl's free licence has no
   RBAC, so the user is always `admin`.
 - **Clock steps** of 5 min or more.
+
+### The Splunk agent stop
+
+Stopping the Splunk agent for a few minutes hides activity without the host ever reaching DOWN.
+So an agent stop is a tamper finding, unless something explains it. Four rules:
+
+- **One stop, one finding (the fold).** The shutdown line (`uf_shutdown`), the Linux
+  `svcstop_splunkforwarder` and the Windows `win7036` for the Splunk agent can all describe one
+  stop. Different codes on one host within 15 min (`dh_tamper_window_secs`) make one finding, for
+  example "Splunk agent stopped (SERVICE_STOP + shutdown line)". Two lines of the same code never
+  fold, so a role `restart` that stops the agent twice gives two findings and one row on the panel.
+- **The hold.** The evidence for a stop often arrives after the stop. A Linux shutdown record is
+  only sent when the VM boots again. So the app doesn't judge an agent stop when it first sees it.
+  The finding is *pending*. The same hold applies to `svcstop_auditd`, `svcstop_rsyslog`,
+  `audit_daemon_end`, `audit_daemon_abort` and `win1100` when an agent stop is on the same host
+  within 15 min, because a host shutdown also writes those. The same codes on a host whose agent
+  kept running are judged at once, as before.
+- **Explained at once** when a marker covers the stop (the rule above), reason *role work*, or when
+  the host's own shutdown record is from 2 min before the stop to 2 min after it, reason *host
+  shutdown*. A 1074 ranks first because it names the user and the reason. The window is lopsided on
+  purpose: if someone stops the agent, works, and then reboots, the reboot explains the stop only
+  when it comes within 2 min.
+- **Otherwise it waits** until the host's Splunk agent is heard from again (a heartbeat more than 2 min
+  after the stop, `dh_tamper_back_margin_secs`), plus 10 min
+  (`dh_tamper_settle_secs`) for late records. Then, if nothing explains it, the finding is judged
+  *unexplained* and *DH Alert tamper* fires once. If the agent never comes back, the finding stays
+  pending and never alerts. The host is DOWN then, and DOWN alerts on its own.
+
+A pending finding explains nothing: the cause "Possible deliberate blinding" ignores it. Once judged,
+a finding never changes. Findings stored before this feature have no state and read as judged.
+
+The *Restarts and agent stops* panel on the Overview (24 h) and Host detail (7 d) shows every
+episode, explained or not, with what explained it. So a planned shutdown doesn't alert, and it
+doesn't vanish either.
 
 The volume check flags an hour below 20 % of the same hour's 14-day median. It needs a median of at
 least 100 events and at least 3 covered days. It catches partial blinding.

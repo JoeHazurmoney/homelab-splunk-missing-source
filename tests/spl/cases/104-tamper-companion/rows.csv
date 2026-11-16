@@ -1,0 +1,11 @@
+kind,time,host,code,indicator,detail,target_host,action,by,run_id,reason,finding_id,suppressed,it,hd_rank,hd_text,fwd_type,last_heartbeat
+finding,NOW-1000,ha,svcstop_rsyslog,rsyslog service stopped,,,,,,,,,,,,,
+finding,NOW-1000,ha,audit_daemon_end,audit daemon end,,,,,,,,,,,,,
+finding,NOW-999,ha,svcstop_auditd,auditd service stopped,,,,,,,,,,,,,
+finding,NOW-995,ha,uf_shutdown,Splunk agent stopped (shutdown line),index=_internal; component=Shutdown,,,,,,,,,,,,
+hostdown,NOW-998,ha,,,,,,,,,,,,0,host shutdown: SYSTEM_SHUTDOWN,,
+finding,NOW-1000,hb,svcstop_auditd,auditd service stopped,,,,,,,,,,,,,
+fwd,,hb,,,,,,,,,,,,,,uf,NOW-60
+finding,NOW-995,hc,uf_shutdown,Splunk agent stopped (shutdown line),index=_internal; component=Shutdown,,,,,,,,,,,,
+hostdown,NOW-993,hc,,,,,,,,,,,,0,host shutdown: SYSTEM_SHUTDOWN,,
+index,NOW-1000,,,,,,,,,,hc|svcstop_rsyslog|1999998900,0,NOW-800,,,,

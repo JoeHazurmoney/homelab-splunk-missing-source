@@ -1,0 +1,18 @@
+c,pos,time,host,what,explained_by,site
+all,1,2033-05-18 03:03,hC,Splunk agent stopped,Waiting for the host to report back,home
+all,2,2033-05-18 02:33,hA,Splunk agent stopped; auditd stopped; rsyslog stopped; host shut down or restarted,host shutdown: SYSTEM_SHUTDOWN,lab
+all,3,2033-05-18 01:33,hB,Splunk agent stopped,Ansible restart by taylorb (run 20261116T001248Z-taylorb),lab
+all,4,2033-05-18 00:33,hD,Splunk agent stopped,Not explained,home
+all,5,2033-05-17 23:40,hG,Splunk agent stopped,Ansible restart by taylorb (run 20261116T002248Z-taylorb),
+all,6,2033-05-17 22:00,hH,Splunk agent stopped; event logging stopped; host shut down or restarted,host shutdown: power off by homepc\taylo (Other (Unplanned)),
+all,7,2033-05-17 19:16,hJ,Splunk agent stopped,Not explained,
+all,8,2033-05-17 16:26,hK,Splunk agent stopped; rsyslog stopped,Not explained,
+all,9,2033-05-17 13:40,hL,Splunk agent stopped; host shut down or restarted,Host shutdown,
+all,10,2033-05-17 11:26,hM,Splunk agent stopped,Ansible restart by taylorb (run 20261116T002248Z-taylorb),
+all,11,2033-05-17 10:53,hM,Splunk agent stopped,Ansible restart by taylorb (run 20261116T001248Z-taylorb),
+all,12,2033-05-17 08:08,hO,Splunk agent stopped,Ansible restart by taylorb (run 20261116T001248Z-taylorb),
+all,13,2033-05-17 08:06,hN,Splunk agent stopped,Ansible restart by taylorb (run 20261116T001248Z-taylorb),
+all,14,2033-05-17 05:20,hP,Splunk agent stopped,Role work,
+site,,2033-05-18 02:33,hA,Splunk agent stopped; auditd stopped; rsyslog stopped; host shut down or restarted,host shutdown: SYSTEM_SHUTDOWN,lab
+site,,2033-05-18 01:33,hB,Splunk agent stopped,Ansible restart by taylorb (run 20261116T001248Z-taylorb),lab
+text,,2033-05-18 03:03,hC,Splunk agent stopped,Waiting for the host to report back,home

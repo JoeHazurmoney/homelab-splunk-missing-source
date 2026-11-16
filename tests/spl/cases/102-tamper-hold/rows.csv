@@ -1,0 +1,21 @@
+kind,time,host,code,indicator,detail,target_host,action,by,run_id,reason,finding_id,suppressed,it,hd_rank,hd_text,fwd_type,last_heartbeat
+finding,NOW-900,ha,uf_shutdown,Splunk agent stopped (shutdown line),index=_internal; component=Shutdown,,,,,,,,,,,,
+fwd,,ha,,,,,,,,,,,,,,uf,NOW-60
+finding,NOW-900,hb,uf_shutdown,Splunk agent stopped (shutdown line),index=_internal; component=Shutdown,,,,,,,,,,,,
+fwd,,hb,,,,,,,,,,,,,,uf,NOW-60
+fwd,,hc,,,,,,,,,,,,,,uf,NOW-60
+finding,NOW-900,hd,uf_shutdown,Splunk agent stopped (shutdown line),index=_internal; component=Shutdown,,,,,,,,,,,,
+fwd,,hd,,,,,,,,,,,,,,uf,NOW-1000
+fwd,,he,,,,,,,,,,,,,,uf,NOW-700500
+finding,NOW-900,hf,uf_shutdown,Splunk agent stopped (shutdown line),index=_internal; component=Shutdown,,,,,,,,,,,,
+marker,NOW-930,,,,,hf,restart,taylorb,r1,,,,,,,,
+finding,NOW-900,hg,uf_shutdown,Splunk agent stopped (shutdown line),index=_internal; component=Shutdown,,,,,,,,,,,,
+marker,NOW-930,,,,,hg,restart,taylorb,r1,patching,,,,,,,
+fwd,,hh,,,,,,,,,,,,,,uf,NOW-60
+index,NOW-1000,,,,,,,,,,hh|uf_shutdown|1999998900,0,NOW-800,,,,
+fwd,,hi,,,,,,,,,,,,,,uf,NOW-60
+fwd,,hj,,,,,,,,,,,,,,uf,NOW-60
+fwd,,hk,,,,,,,,,,,,,,uf,NOW-60
+fwd,,hl,,,,,,,,,,,,,,uf,NOW-60
+finding,NOW-900,hm,uf_shutdown,Splunk agent stopped (shutdown line),index=_internal; component=Shutdown,,,,,,,,,,,,
+fwd,,hm,,,,,,,,,,,,,,uf,NOW-895

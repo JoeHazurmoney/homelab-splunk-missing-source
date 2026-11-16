@@ -1,0 +1,3 @@
+| inputlookup @tp@ | `dh_ui_restarts(@status@, @NOW@, 86400)` | streamstats count as pos | eval c="all"
+| append [| inputlookup @tp@ | `dh_ui_restarts(@status@, @NOW@, 86400)` | eval f_site="lab", f_owner="*", f_index="*", f_crit="*", f_status="*", f_text="*" | `dh_ui_filter` | eval c="site"]
+| append [| inputlookup @tp@ | `dh_ui_restarts(@status@, @NOW@, 86400)` | eval f_site="*", f_owner="*", f_index="*", f_crit="*", f_status="*", f_text="one" | `dh_ui_filter` | eval c="text"]

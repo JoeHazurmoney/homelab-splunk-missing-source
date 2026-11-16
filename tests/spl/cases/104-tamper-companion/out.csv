@@ -1,0 +1,8 @@
+finding_id,code,state,held,suppressed,explained_by,explanation,back_at,dh_new
+ha|svcstop_rsyslog|1999998900,svcstop_rsyslog,judged,1,1,host shutdown,host shutdown: SYSTEM_SHUTDOWN,,1
+ha|audit_daemon_end|1999998900,audit_daemon_end,judged,1,1,host shutdown,host shutdown: SYSTEM_SHUTDOWN,,1
+ha|svcstop_auditd|1999998900,svcstop_auditd,judged,1,1,host shutdown,host shutdown: SYSTEM_SHUTDOWN,,1
+ha|uf_shutdown|1999998900,uf_shutdown,judged,1,1,host shutdown,host shutdown: SYSTEM_SHUTDOWN,,1
+hb|svcstop_auditd|1999998900,svcstop_auditd,judged,0,0,,,,1
+hc|svcstop_rsyslog|1999998900,svcstop_rsyslog,,,0,,,,0
+hc|uf_shutdown|1999998900,uf_shutdown,judged,1,1,host shutdown,host shutdown: SYSTEM_SHUTDOWN,,1

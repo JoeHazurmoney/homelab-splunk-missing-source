@@ -285,6 +285,21 @@
                 "query": "| eval f_site=$f_site|s$, f_owner=$f_owner|s$, f_index=$f_index|s$, f_crit=$f_crit|s$, f_status=$f_status|s$, f_text=$f_text|s$ | `dh_ui_filter` | stats count"
             }
         },
+        "ds_restarts": {
+            "type": "ds.search",
+            "name": "Restarts and agent stops (24 h)",
+            "options": {
+                "query": "| inputlookup dh_tamper | `dh_ui_restarts(dh_status, now(), 86400)`"
+            }
+        },
+        "ds_restarts_f": {
+            "type": "ds.chain",
+            "name": "Restarts and agent stops (filtered)",
+            "options": {
+                "extend": "ds_restarts",
+                "query": "| eval f_site=$f_site|s$, f_owner=$f_owner|s$, f_index=$f_index|s$, f_crit=$f_crit|s$, f_status=$f_status|s$, f_text=$f_text|s$ | `dh_ui_filter` | table time host what explained_by | `dh_ui_headers`"
+            }
+        },
         "ds_recovered": {
             "type": "ds.search",
             "name": "Recently recovered (24 h)",
@@ -458,6 +473,46 @@
                 }
             ],
             "description": "Signs that someone may have switched off logging. Findings that Ansible work explains are left out. Click a row for Host detail. Guide (project repo): docs/data-health/dashboards.md > Overview > Tamper findings (first seen in the last 24 h)"
+        },
+        "viz_restarts": {
+            "type": "splunk.table",
+            "title": "Restarts and agent stops (24 h)",
+            "dataSources": {
+                "primary": "ds_restarts_f"
+            },
+            "options": {
+                "count": 25,
+                "columnFormat": {
+                    "Explained by": {
+                        "rowBackgroundColors": "> table | seriesByName(\"Explained by\") | matchValue(notExplainedColors)"
+                    }
+                }
+            },
+            "context": {
+                "notExplainedColors": [
+                    {
+                        "match": "Not explained",
+                        "value": "#7A5D00"
+                    }
+                ]
+            },
+            "eventHandlers": [
+                {
+                    "type": "drilldown.linkToDashboard",
+                    "options": {
+                        "app": "hl_data_health",
+                        "dashboard": "dh_host",
+                        "tokens": [
+                            {
+                                "token": "host",
+                                "value": "row.Host.value"
+                            }
+                        ],
+                        "newTab": false
+                    }
+                }
+            ],
+            "description": "Every time the Splunk agent on a host stopped, with what explained it. A stop that nothing explains is also a tamper finding. Click a row for Host detail. Guide (project repo): docs/data-health/dashboards.md > Overview > Restarts and agent stops (24 h)"
         },
         "viz_k_host_expected": {
             "type": "splunk.singlevalue",
@@ -710,7 +765,7 @@
         "type": "grid",
         "options": {
             "width": 1440,
-            "height": 1330
+            "height": 1670
         },
         "globalInputs": [
             "input_site",
@@ -959,6 +1014,16 @@
                     "y": 890,
                     "w": 720,
                     "h": 440
+                }
+            },
+            {
+                "item": "viz_restarts",
+                "type": "block",
+                "position": {
+                    "x": 0,
+                    "y": 1330,
+                    "w": 1440,
+                    "h": 340
                 }
             }
         ]

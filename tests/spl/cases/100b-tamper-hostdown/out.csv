@@ -1,0 +1,4 @@
+host,dh_kind,hd_rank,hd_text
+homepc,hostdown,0,host shutdown: power off by homepc\taylo (Other (Unplanned))
+homepc,hostdown,1,host shutdown: the event log service stopped (6006)
+wd2l-logsrv,hostdown,0,host shutdown: SYSTEM_SHUTDOWN

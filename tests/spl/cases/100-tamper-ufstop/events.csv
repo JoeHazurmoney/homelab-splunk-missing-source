@@ -1,0 +1,5 @@
+time,host,raw
+NOW-300,homepc,"11-14-2026 18:37:19.550 -0700 INFO  Shutdown [15544 Shutdown] - Shutting down splunkd"
+NOW-200,WD2L-RECV.mshome.net,"11-11-2026 04:49:27.820 +0000 INFO  Shutdown [923181 Shutdown] - Shutting down splunkd"
+NOW-100,wd2l-splunk,"11-11-2026 04:31:40.295 +0000 INFO  Shutdown [1014819 Shutdown] - Shutting down splunkd"
+NOW-50,homepc,"11-15-2026 02:11:15.859 +0000 INFO  Shutdown [2071601 Shutdown] - Shutdown complete in 2213.2 milliseconds"

@@ -1,0 +1,25 @@
+host,time,code,indicator,held,state,suppressed,explained_by,explanation,finding_id
+hA,NOW-3600,uf_shutdown,Splunk agent shutdown line,1,judged,1,host shutdown,host shutdown: SYSTEM_SHUTDOWN,fA1
+hA,NOW-3599,svcstop_auditd,SERVICE_STOP auditd,1,judged,1,host shutdown,host shutdown: SYSTEM_SHUTDOWN,fA2
+hA,NOW-3598,svcstop_rsyslog,SERVICE_STOP rsyslog,1,judged,1,host shutdown,host shutdown: SYSTEM_SHUTDOWN,fA3
+hA,NOW-3597,audit_daemon_end,audit daemon end,1,judged,1,host shutdown,host shutdown: SYSTEM_SHUTDOWN,fA4
+hB,NOW-7200,svcstop_splunkforwarder,SERVICE_STOP SplunkForwarder,1,judged,1,role work,Ansible restart by taylorb (run 20261116T001248Z-taylorb),fB1
+hC,NOW-1800,uf_shutdown,Splunk agent shutdown line,1,pending,0,,,fC1
+hD,NOW-10800,uf_shutdown,Splunk agent shutdown line,1,judged,0,,,fD1
+hE,NOW-900,svcstop_auditd,SERVICE_STOP auditd,0,judged,0,,,fE1
+hF,NOW-90000,uf_shutdown,Splunk agent shutdown line,1,judged,0,,,fF1
+hG,NOW-14400,svcstop_splunkforwarder,SERVICE_STOP SplunkForwarder,1,,1,role work,Ansible restart by taylorb (run 20261116T001248Z-taylorb),fG1
+hG,NOW-14000,svcstop_splunkforwarder,SERVICE_STOP SplunkForwarder,1,,1,role work,Ansible restart by taylorb (run 20261116T002248Z-taylorb),fG2
+hH,NOW-20000,win7036,Splunk agent stopped (7036 + SERVICE_STOP),1,judged,1,host shutdown,host shutdown: power off by homepc\taylo (Other (Unplanned)),fH1
+hH,NOW-19990,win1100,1100 event logging service shut down,1,judged,1,host shutdown,host shutdown: power off by homepc\taylo (Other (Unplanned)),fH2
+hI,NOW-5000,win7036,7036 Spooler stopped,1,judged,0,,,fI1
+hJ,NOW-30000,uf_shutdown,Splunk agent shutdown line,1,judged,1,role work,Ansible restart by taylorb (run 20261116T001248Z-taylorb),fJ1
+hJ,NOW-29800,svcstop_splunkforwarder,SERVICE_STOP SplunkForwarder,1,judged,0,,,fJ2
+hK,NOW-40000,uf_shutdown,Splunk agent shutdown line,1,judged,1,role work,Ansible restart by taylorb (run 20261116T001248Z-taylorb),fK1
+hK,NOW-39900,svcstop_rsyslog,SERVICE_STOP rsyslog,1,judged,0,,,fK2
+hL,NOW-50000,uf_shutdown,Splunk agent shutdown line,1,judged,1,host shutdown,,fL1
+hM,NOW-60000,uf_shutdown,Splunk agent shutdown line,1,judged,1,role work,Ansible restart by taylorb (run 20261116T001248Z-taylorb),fM1
+hM,NOW-58000,uf_shutdown,Splunk agent shutdown line,1,judged,1,role work,Ansible restart by taylorb (run 20261116T002248Z-taylorb),fM2
+hN,NOW-70000,uf_shutdown,Splunk agent shutdown line,1,judged,1,role work,Ansible restart by taylorb (run 20261116T001248Z-taylorb),fN1
+hO,NOW-69900,uf_shutdown,Splunk agent shutdown line,1,judged,1,role work,Ansible restart by taylorb (run 20261116T001248Z-taylorb),fO1
+hP,NOW-80000,uf_shutdown,Splunk agent shutdown line,1,judged,1,role work,,fP1
