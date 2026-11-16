@@ -1,0 +1,16 @@
+<section id="b-prereq" class="alt">
+<p class="eyebrow">BACKUP · PREREQUISITES</p>
+<h2>The homework, in eight parts</h2>
+<div class="grid4">
+<div class="point"><h3>1 · Splunk Enterprise</h3><p>The data_health index, retention, KV store, scheduler room for the 1-minute searches.</p></div>
+<div class="point"><h3>2 · Roles</h3><p>dh_analyst and dh_admin, and who may set test blocks.</p></div>
+<div class="point"><h3>3 · Splunk agents</h3><p>_internal forwarded from every agent; a version policy; the inputs per OS.</p></div>
+<div class="point"><h3>4 · Cribl Stream</h3><p>Its own logs in Splunk, its config-change audit, one expected row per worker group.</p></div>
+<div class="point"><h3>5 · Hosts</h3><p>auditd and its rules; Windows Security and System logs; device syslog plus a probe.</p></div>
+<div class="point"><h3>6 · Inventory feed</h3><p>One source of truth for both the inputs and the expected list.</p></div>
+<div class="point"><h3>7 · Change process</h3><p>A marker before each planned change; mutes for maintenance.</p></div>
+<div class="point"><h3>8 · Security settings</h3><p>Keep Splunk’s dashboard risky-command check on.</p></div>
+</div>
+<div class="footer"><span>Checklist with checks and owners: docs/adoption/prerequisites.md</span><span></span></div>
+<aside>Each item in the full checklist says what it is, why the app needs it, how to check it, and what breaks without it. Two things a customer must change from the lab: the list of watched indexes, and the lab’s host names that ship as macro defaults (the relay name and the probe host).</aside>
+</section>

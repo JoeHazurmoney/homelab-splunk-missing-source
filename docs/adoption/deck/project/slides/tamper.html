@@ -1,0 +1,11 @@
+<section id="tamper">
+<p class="eyebrow">TAMPER DETECTION</p>
+<h2>A stopped agent is a finding, unless something explains it</h2>
+<div class="wide" style="flex:none;"><img src="/_blob/ee40d77d58e38601b0bfbb4e4b53aa68" alt="Restarts and agent stops: a reboot of wd2l-recv explained by host shutdown; two agent stops marked Not explained in amber; an agent restart explained as Ansible restart by the operator." style="width:1600px;height:310px;object-fit:contain;"></div>
+<div class="cards">
+<div class="point"><h3>Explained</h3><p>Planned Ansible work, or a host shutdown or reboot. No alert.</p></div>
+<div class="point"><h3>Not explained</h3><p>One tamper alert, once the agent is back and nothing explains it.</p></div>
+<div class="point"><h3>Also watched</h3><p>Log clears, auditd and rule changes, service installs, Cribl config edits.</p></div>
+</div>
+<aside>Stopping the agent is the quickest way to blind a SIEM. The app pairs every stop with what could explain it: a maintenance marker posted by the automation before the change, or a host shutdown. The two amber rows are real stops made by hand in the lab, so they alerted once. When a tamper sign comes within 15 minutes of data going silent, the cause becomes “Possible deliberate blinding”.</aside>
+</section>

@@ -1,0 +1,15 @@
+<section id="b-timing" class="alt">
+<p class="eyebrow">BACKUP · TIMINGS</p>
+<h2>How long until it shows</h2>
+<table>
+<tr><th style="width:30%;">What stops</th><th style="width:14%;">Its limit</th><th style="width:22%;">LATE after about</th><th style="width:34%;">MISSING or DOWN after about</th></tr>
+<tr><td>A Splunk agent (its host)</td><td>90 s</td><td>2.5–3.5 min</td><td>DOWN: 4–5 min</td></tr>
+<tr><td>Cribl (the relay)</td><td>120 s</td><td>3–4 min</td><td>DOWN: 5–6 min</td></tr>
+<tr><td>Any other item</td><td>t</td><td>t + 2 min</td><td>MISSING: 2 × t + 2 min</td></tr>
+<tr><td>An item that never arrives</td><td>—</td><td>—</td><td>NEVER_SEEN: 1 h after it was added</td></tr>
+<tr><td>A tamper sign</td><td>—</td><td>—</td><td>Finding about 4–5 min; alert about 1 min later</td></tr>
+<tr><td>An agent stop nothing explains</td><td>—</td><td>—</td><td>Alert about 10–17 min after the agent is back</td></tr>
+</table>
+<p class="small">Two searches run every minute, so a status shows up to about 2 min after its limit is crossed. Limits come from the profile, a learned value or an override.</p>
+<aside>Measured in the lab’s fault-injection run: a stopped agent read DOWN in 4 min 4 s to 4 min 28 s; Cribl DOWN in 5 min 6 s; a 120-second item read MISSING in 5 min 4 s. An agent stop is held until the agent comes back, so a planned restart or reboot can explain it first. That is why its alert comes later.</aside>
+</section>

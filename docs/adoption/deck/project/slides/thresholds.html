@@ -1,0 +1,11 @@
+<section id="thresholds">
+<p class="eyebrow">FEWER FALSE ALARMS</p>
+<h2>Each item has its own limit</h2>
+<div class="wide"><img src="/_blob/ccdb1bf7bee44fa59b212ed098e9a1a2" alt="Manage, Thresholds: one row per expected item with its profile, the limit in force, where the limit comes from, the learned limit, the days of history and who manages the row." style="width:1600px;height:400px;object-fit:contain;"></div>
+<div class="cards">
+<div class="point"><h3>Cadence profiles</h3><p>Heartbeat, periodic, continuous, sporadic or info: not one threshold for all.</p></div>
+<div class="point"><h3>Learned limits</h3><p>From 14 days of real gaps, after at least 3 days of history.</p></div>
+<div class="point"><h3>Holds, not pages</h3><p>After a Splunk restart or a pause, statuses wait 5 min. No false alert.</p></div>
+</div>
+<aside>A busy log and a nightly script cannot share one threshold. Each item has a profile, and for continuous and sporadic items the app learns the limit: 1.5 times the 90th percentile of its daily longest gaps, plus two minutes, inside the profile’s range. Heartbeat and periodic items use fixed limits from their profile; the rows on screen are mostly those. The table always says where each limit came from, so an analyst can trust it or override it on Manage. We have not measured a false-alarm rate at customer scale: the pilot does that, with a goal of 7 days without a false alert (roadmap F4).</aside>
+</section>
