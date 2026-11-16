@@ -1,0 +1,10 @@
+c,pos,time,host,what,explained_by,site
+all,1,2033-05-18 03:03,hC,Splunk agent stopped,Waiting for the host to report back,home
+all,2,2033-05-18 02:33,hA,Splunk agent stopped; auditd stopped; rsyslog stopped; host shut down or restarted,Hyper-V reported the VM turned off,lab
+all,3,2033-05-18 01:33,hB,Splunk agent stopped,Ansible restart by taylo (run r1),lab
+all,4,2033-05-18 00:33,hD,Splunk agent stopped,Not explained,home
+all,5,2033-05-17 23:40,hG,Splunk agent stopped,Ansible restart by taylo (run r2),
+all,6,2033-05-17 22:00,hH,Splunk agent stopped; event logging stopped; host shut down or restarted,Windows logged event 1074 (restart),
+site,,2033-05-18 02:33,hA,Splunk agent stopped; auditd stopped; rsyslog stopped; host shut down or restarted,Hyper-V reported the VM turned off,lab
+site,,2033-05-18 01:33,hB,Splunk agent stopped,Ansible restart by taylo (run r1),lab
+text,,2033-05-18 03:03,hC,Splunk agent stopped,Waiting for the host to report back,home

@@ -143,6 +143,16 @@ There are three rows of six tiles: one row for hosts, one for sourcetypes and on
 - **One install, one finding.** Installing a Windows service logs two events, a 7045 and a 4697. The app folds them into one finding named "7045+4697 service installed: …". It alerts once.
 - **How to read it:** empty is good. A finding means someone may have tried to switch off logging. Check whether planned work explains it. A reboot also stops services. If nothing explains it, **escalate**. Click the row to see the host.
 
+### Restarts and agent stops (24 h)
+- **What it shows:** every time the [Splunk agent](../glossary.md#universal-forwarder-uf) on a host stopped in the last 24 hours, newest first. One row is one stop episode. Stops of one host that are less than 15 minutes apart count as one. The columns are **Time**, **Host**, **What stopped** and **Explained by**.
+- **What stopped:** the parts of the episode, in time order. "Splunk agent stopped" is always there. "auditd stopped", "rsyslog stopped" and "event logging stopped" are other services that went down with it. "host shut down or restarted" is added when the app found that the whole host went down.
+- **Explained by:**
+  - **Waiting for the host to report back:** the app has not judged the stop yet. It waits for the host to send data again. Then it waits a few more minutes for an explanation to arrive. This is normal for a restart that is still going on.
+  - **A sentence** (for example "Ansible restart by …" or a Hyper-V or Windows shutdown note): something planned or known explains the stop. No action.
+  - **Not explained** (amber): nothing explains the stop. It is also a tamper finding. See below.
+- **Where it comes from:** the findings of *DH Tamper*. The filters apply.
+- **How to read it:** a stop that is explained is routine. For **Not explained**, open [Splunk agent stopped (not explained)](../runbook-missing-data.md#splunk-agent-stopped-not-explained) in the runbook and follow it. Click the row to see the host.
+
 ## Host detail
 
 Everything about one host. Pick the host at the top, or arrive here by clicking a row on the Overview.
@@ -199,6 +209,13 @@ Everything about one host. Pick the host at the top, or arrive here by clicking 
 - **What it shows:** every tamper finding on this host that the app still holds (30 days), newest first. It leaves out findings that Ansible work explains and findings that are still pending, which means a Splunk agent stop that has not been judged yet. The columns are **Time**, **What was seen**, **Events**, **Code**, **Detail** and **Finding ID**.
 - **Where it comes from:** the findings of *DH Tamper* for this host.
 - **How to read it:** empty is good. The Overview's Tamper findings entries say what to do.
+
+### Restarts and agent stops (7 d)
+- **What it shows:** every time the [Splunk agent](../glossary.md#universal-forwarder-uf) on this host stopped in the last 7 days, newest first. One row is one stop episode: stops less than 15 minutes apart count as one. The columns are **Time**, **What stopped** and **Explained by**.
+- **What stopped:** the parts of the episode, in time order. See the Overview entry *Restarts and agent stops (24 h)* for each part.
+- **Explained by:** "Waiting for the host to report back" means the stop is not judged yet. A sentence means something planned or known explains it. **Not explained** (amber) means nothing does, and it is also a tamper finding.
+- **Where it comes from:** the findings of *DH Tamper* for this host.
+- **How to read it:** an explained stop is routine. For **Not explained**, follow [Splunk agent stopped (not explained)](../runbook-missing-data.md#splunk-agent-stopped-not-explained) in the runbook.
 
 ### Status changes (7 d)
 - **What it shows:** the latest 200 status changes of this host's items in the last 7 days. The columns are **Time**, **Item ID**, **From status**, **Status** (the new one) and the **Cause** at the time.

@@ -103,6 +103,13 @@
                 "query": "search index=windows sourcetype=XmlWinEventLog source=\"XmlWinEventLog:Microsoft-Windows-Hyper-V-Worker-Admin\" $host|s$ earliest=-7d latest=now | `dh_ui_hyperv` | where host==$host|s$ | head 50 | `dh_ui_headers`"
             }
         },
+        "ds_restarts": {
+            "type": "ds.search",
+            "name": "Restarts and agent stops (7 d)",
+            "options": {
+                "query": "| inputlookup dh_tamper where host=$host|s$ | `dh_ui_restarts(dh_status, now(), 604800)` | table time what explained_by | `dh_ui_headers`"
+            }
+        },
         "ds_runbooks": {
             "type": "ds.search",
             "name": "Runbooks",
@@ -189,6 +196,30 @@
             },
             "description": "When this VM was started or stopped on the Hyper-V host. Guide (project repo): docs/data-health/dashboards.md > Host detail > Hyper-V VM events (7 d)"
         },
+        "viz_restarts": {
+            "type": "splunk.table",
+            "title": "Restarts and agent stops (7 d)",
+            "dataSources": {
+                "primary": "ds_restarts"
+            },
+            "options": {
+                "count": 25,
+                "columnFormat": {
+                    "Explained by": {
+                        "rowBackgroundColors": "> table | seriesByName(\"Explained by\") | matchValue(notExplainedColors)"
+                    }
+                }
+            },
+            "context": {
+                "notExplainedColors": [
+                    {
+                        "match": "Not explained",
+                        "value": "#7A5D00"
+                    }
+                ]
+            },
+            "description": "Every time the Splunk agent on this host stopped, with what explained it. A stop that nothing explains is also a tamper finding. Guide (project repo): docs/data-health/dashboards.md > Host detail > Restarts and agent stops (7 d)"
+        },
         "viz_runbooks": {
             "type": "splunk.table",
             "title": "Runbooks (click to open)",
@@ -214,7 +245,7 @@
         "type": "grid",
         "options": {
             "width": 1440,
-            "height": 1700
+            "height": 2040
         },
         "globalInputs": [
             "input_host"
@@ -297,6 +328,16 @@
                     "x": 720,
                     "y": 1360,
                     "w": 720,
+                    "h": 340
+                }
+            },
+            {
+                "item": "viz_restarts",
+                "type": "block",
+                "position": {
+                    "x": 0,
+                    "y": 1700,
+                    "w": 1440,
                     "h": 340
                 }
             }

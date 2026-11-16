@@ -629,6 +629,9 @@ The banner text and colour: Up to date, On hold, Out of date or Catching up. See
 ### `dh_ui_tamper_24h(status, now)`
 The unsuppressed tamper findings first seen in the last 24 hours. "First seen" is when the app recorded the finding, so late findings count. It gives one row per finding, with the host's filter attributes. Used by: Overview, Tamper findings.
 
+### `dh_ui_restarts(status, now, secs)`
+The Splunk agent stops of the last `secs` seconds. It reads `| inputlookup dh_tamper`. It keeps the held rows, joins rows of one host that are at most `dh_tamper_window_secs` apart into one episode, and keeps the episodes that contain an agent stop. It gives one row per episode, newest first. **What stopped** lists the parts in time order. **Explained by** is "Waiting for the host to report back" when any part is still pending, else the agent stop's explanation, else "Not explained". It adds the host's filter attributes. Used by: Overview and Host detail, Restarts and agent stops.
+
 ### `dh_ui_status_attrs(status)`
 Adds the filter attributes of each row's item, taken from the current `dh_status` rows. The attributes are site, owner, criticality, status, roll-up and description. So the Overview filters also apply to recoveries and tamper findings. Used by: `dh_ui_tamper_24h`, `dh_ui_recovered`.
 

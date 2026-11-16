@@ -1,0 +1,5 @@
+entity_id,site,owner,index,criticality,status,host_rollup,description,cause,evaluated_at
+host|*|hA|*|*,lab,ops,*,1,OK,OK,pc,,NOW
+host|*|hB|*|*,lab,ops,*,1,OK,OK,pc two,,NOW
+host|*|hC|*|*,home,ops,*,2,MISSING,DOWN,vm one,,NOW
+host|*|hD|*|*,home,ops,*,2,OK,OK,vm,,NOW
