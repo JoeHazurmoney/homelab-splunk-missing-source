@@ -1,0 +1,15 @@
+<section id="b-port" class="alt">
+<p class="eyebrow">BACKUP · LAB TO PRODUCTION</p>
+<h2>What changes in production</h2>
+<table style="font-size:24px;">
+<tr><th style="width:34%;">In the lab</th><th style="width:66%;">In production</th></tr>
+<tr><td>Expected list from Ansible’s inventory</td><td>From your pipeline the same way: CMDB, deployment-server serverclasses or Terraform. One source for inputs and expectations.</td></tr>
+<tr><td>One search head</td><td>A search-head cluster replicates the KV store. Each collection keeps its known writers; run the scheduled writer on one member.</td></tr>
+<tr><td>One Cribl instance</td><td>One expected row and relay per worker group: a macro change, not yet tested.</td></tr>
+<tr><td>Index-time parsing</td><td>Cribl-delivered data gets no index-time rules: do line breaking and rewrites in Cribl or on the agent.</td></tr>
+<tr><td>Test block in Cribl</td><td>Treat it as a privileged change: a block control can blind monitoring too.</td></tr>
+<tr><td>Dashboard risky-command check off</td><td>Keep it on, and accept one “Run Query” click on Manage’s writes.</td></tr>
+<tr><td>14-day retention</td><td>Every lookback must stay inside your shortest retention; a test checks it.</td></tr>
+</table>
+<aside>None of these is a redesign, but two are not yet proven: the search-head cluster and more than one Cribl worker group were never tested in the lab. The app is search-time SPL plus the KV store, with no scripts and no index-time config, so it moves with Splunk Enterprise. The biggest piece of work is the inventory feed, which is roadmap feature F3.</aside>
+</section>

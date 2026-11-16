@@ -1,0 +1,19 @@
+<section id="b-arch" class="alt">
+<p class="eyebrow">BACKUP · ARCHITECTURE</p>
+<h2>How the data and the expectations flow</h2>
+<div style="display:flex;align-items:center;gap:24px;">
+<div class="card" style="width:330px;"><h3 style="font-size:32px;">Hosts and devices</h3><p>Splunk agents on Linux and Windows; device syslog and a ping probe</p></div>
+<x-shape kind="arrow-right" style="background:var(--amber);width:64px;height:32px;"></x-shape>
+<div class="card" style="width:300px;"><h3 style="font-size:32px;">Cribl Stream</h3><p>Relay, parsing, and the test-block switch</p></div>
+<x-shape kind="arrow-right" style="background:var(--amber);width:64px;height:32px;"></x-shape>
+<div class="card" style="width:300px;"><h3 style="font-size:32px;">Splunk Enterprise</h3><p>Indexes, plus each agent’s own _internal heartbeat</p></div>
+<x-shape kind="arrow-right" style="background:var(--amber);width:64px;height:32px;"></x-shape>
+<div class="card" style="width:400px;border:2px solid var(--amber);"><h3 style="font-size:32px;">HL Data Health</h3><p>Trackers every minute → status per item in the KV store → dashboards and alerts</p></div>
+</div>
+<div style="display:flex;gap:24px;">
+<div class="callout" style="flex:1;"><p><b>Expected list:</b> the inventory that deploys the inputs also writes the list of what should arrive.</p></div>
+<div class="callout" style="flex:1;"><p><b>Markers:</b> automation posts a marker before planned work, straight to Splunk, not through Cribl.</p></div>
+</div>
+<p class="small">Search-time SPL and the KV store only: no scripts, no custom commands, no index-time configuration.</p>
+<aside>Everything collected flows through Cribl, so the app treats Cribl as a relay: if Cribl stops, every row behind it says so, instead of each host alerting on its own. Agent identity and version come from the agent’s own internal logs, because behind a relay Splunk only sees Cribl’s connection. Markers go straight to Splunk’s HTTP Event Collector, so a Cribl outage cannot hide them.</aside>
+</section>

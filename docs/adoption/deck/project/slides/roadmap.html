@@ -1,0 +1,18 @@
+<section id="roadmap">
+<p class="eyebrow">THE PATH TO PRODUCTION</p>
+<h2>Nine steps, from homework to daily use</h2>
+<table>
+<tr><th style="width:30%;">Feature</th><th style="width:48%;">Goal</th><th style="width:8%;">Size</th><th style="width:14%;">After</th></tr>
+<tr><td>F1 Homework</td><td>Every source and setting in place</td><td>M</td><td>—</td></tr>
+<tr><td>F2 Pilot install</td><td>The app runs on a test search head for one site</td><td>M</td><td>F1</td></tr>
+<tr><td>F3 Inventory integration</td><td>The expected list is fed from your source of truth</td><td>L</td><td>F2</td></tr>
+<tr><td>F4 Tuning</td><td>Quiet, true alerts</td><td>M</td><td>F2</td></tr>
+<tr><td>F5 Alert routing</td><td>Alerts reach tickets and on-call once</td><td>M</td><td>F2</td></tr>
+<tr><td>F6 Tamper coverage</td><td>Tampering is seen; planned work is not</td><td>M</td><td>F2</td></tr>
+<tr><td>F7 Training</td><td>Everyone knows what to do</td><td>L</td><td>F2</td></tr>
+<tr><td>F8 Staged rollout</td><td>Every host live, wave by wave</td><td>L</td><td>F3–F7</td></tr>
+<tr><td>F9 Sign-off and operate</td><td>Part of daily SOC work</td><td>S</td><td>F8</td></tr>
+</table>
+<div class="footer"><span>S = a few days · M = 1–2 weeks · L = over 2 weeks. Full roadmap: docs/adoption/roadmap.md</span><span></span></div>
+<aside>F3 to F7 can run in parallel once the pilot is up. Each rollout wave in F8 ends with the same fault-injection test we ran in the lab, so every wave proves itself before the next one starts. Two open lab defects must be fixed before production: issue 58 can hide a stalled sporadic input, and issue 56 causes false tamper alerts on hand edits. Until 58 is fixed, set fixed limits on important sporadic items.</aside>
+</section>

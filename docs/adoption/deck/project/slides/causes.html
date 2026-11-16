@@ -1,0 +1,12 @@
+<section id="causes" class="alt">
+<p class="eyebrow">THE CAUSE CHAIN</p>
+<h2>It tells a broken relay from a broken host</h2>
+<div class="wide"><img src="/_blob/3441ba031723e751bddc0de931b68e51" alt="Needs attention after Cribl was stopped: cribl is DOWN with the cause Cribl DOWN, nothing from Cribl itself; homepc’s relayed data reads Cribl DOWN: the real state is unknown; each row says to check the cribl container." style="width:1600px;height:400px;object-fit:contain;"></div>
+<div class="cards" style="grid-template-columns:1fr 1fr 1fr 1fr;">
+<div class="point"><p style="color:var(--paper);">Cribl or a relay down</p></div>
+<div class="point"><p style="color:var(--paper);">VM turned off (Hyper-V)</p></div>
+<div class="point"><p style="color:var(--paper);">Planned work by Ansible</p></div>
+<div class="point"><p style="color:var(--paper);">Agent up, one input stopped</p></div>
+</div>
+<aside>Captured after we stopped the Cribl container. Every relayed row stopped at once. Instead of blaming each host, the rows behind Cribl say “Cribl DOWN: the real state is unknown”, so the analyst fixes one thing. Alerts are still one per item, so route them into one ticket (roadmap F5). The same chain tells a VM that was turned off (from Hyper-V events; another hypervisor needs a macro change), planned Ansible work, a device that answers ping but sends no logs, and one input that stopped while the agent still runs.</aside>
+</section>

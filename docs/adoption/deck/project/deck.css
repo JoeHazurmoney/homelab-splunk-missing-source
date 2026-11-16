@@ -1,0 +1,42 @@
+:root {
+  --ink: #0E1621;
+  --ink-2: #16202D;
+  --panel: #1E2A38;
+  --paper: #EEF1F4;
+  --soft: #B7C3CF;
+  --dim: #8A98A8;
+  --amber: #F2A33A;
+  --sky: #6CB4EE;
+}
+section { counter-increment: page; background: var(--ink); color: var(--paper); font-family: 'Inter', Arial, sans-serif; padding: 128px 128px 160px; display: flex; flex-direction: column; gap: 40px; }
+h1, h2, h3 { font-family: 'Space Grotesk', Arial, sans-serif; color: var(--paper); }
+h1 { font-size: 96px; font-weight: 700; line-height: 1.05; }
+h2 { font-size: 64px; font-weight: 600; line-height: 1.1; }
+h3 { font-size: 40px; font-weight: 600; line-height: 1.15; }
+p { font-size: 32px; line-height: 1.4; color: var(--soft); }
+.eyebrow { font-family: 'Space Grotesk', Arial, sans-serif; font-size: 24px; font-weight: 600; letter-spacing: 3px; color: var(--amber); }
+.small { font-size: 24px; color: var(--dim); }
+.alt { background: var(--ink-2); }
+.statement { background: var(--amber); justify-content: center; }
+.statement h1, .statement h2 { color: var(--ink); }
+.statement p { color: #2A2A22; }
+.statement .eyebrow { color: var(--ink); }
+.footer { position: absolute; left: 128px; bottom: 64px; width: 1664px; font-size: 24px; color: var(--dim); display: flex; justify-content: space-between; }
+.statement .footer { color: #3A3528; }
+.split { display: flex; gap: 64px; flex: 1; align-items: stretch; }
+.split .text { width: 560px; display: flex; flex-direction: column; gap: 28px; }
+.split .shot { flex: 1; background: #000000; border-radius: 12px; display: flex; align-items: center; justify-content: center; padding: 16px; }
+.shot img { width: 100%; height: 100%; object-fit: contain; }
+.wide { flex: 1; background: #000000; border-radius: 12px; display: flex; align-items: center; justify-content: center; padding: 16px; }
+.points { display: flex; flex-direction: column; gap: 24px; }
+.point { border-left: 4px solid var(--amber); padding-left: 24px; }
+.point h3 { font-size: 32px; }
+.point p { font-size: 26px; }
+.cards { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 32px; }
+.card { background: var(--panel); border-radius: 16px; padding: 36px; display: flex; flex-direction: column; gap: 16px; }
+.card .num { font-family: 'Space Grotesk', Arial, sans-serif; font-size: 72px; font-weight: 700; color: var(--amber); line-height: 1; }
+.card p { font-size: 26px; }
+.grid4 { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; }
+table { font-size: 26px; color: var(--soft); width: 100%; }
+.callout { background: var(--panel); border-radius: 12px; padding: 24px 32px; }
+.callout p { font-size: 28px; color: var(--paper); }

@@ -1,0 +1,18 @@
+<section id="b-matrix" class="alt">
+<p class="eyebrow">BACKUP · TEST RESULTS</p>
+<h2>Broken on purpose, on real hosts</h2>
+<table style="font-size:24px;">
+<tr><th style="width:44%;">What we broke</th><th style="width:56%;">What the app said</th></tr>
+<tr><td>Stopped an agent with Ansible</td><td>DOWN: “Stopped with Ansible … and not started again”</td></tr>
+<tr><td>Stopped an agent by hand</td><td>DOWN, then one tamper finding after it came back</td></tr>
+<tr><td>Turned a VM off</td><td>DOWN: “The VM is off: Hyper-V event 18502”</td></tr>
+<tr><td>Disabled one input</td><td>That input MISSING: “The Splunk agent works but this input stopped”</td></tr>
+<tr><td>Stopped auditd</td><td>“Possible deliberate blinding: auditd stopped” and a tamper alert</td></tr>
+<tr><td>Stopped Cribl</td><td>“Cribl DOWN: the real state is unknown” on every relayed row</td></tr>
+<tr><td>Added a Drop route in Cribl</td><td>“Possible deliberate blinding: Cribl routes create … by admin”</td></tr>
+<tr><td>Turned off a device’s syslog</td><td>“The device answers the network probe but sends no logs”</td></tr>
+<tr><td>Cleared a test event log</td><td>Tamper finding “event log HLTest cleared by …”</td></tr>
+</table>
+<p class="small">16 fault injections in a 19-row record, 10–14 Nov 2026. All passed, after 6 defects were fixed; PC sleep not run. Some rows used short test limits. Record: docs/records/2026-11-fault-injection-run.md</p>
+<aside>This is a selection of the 19 rows. Every row was run on the real lab hosts, not in a simulator. Row 13 cleared a throwaway test log, HLTest, not the Security log; it failed first and passed after a fix. The device-syslog row used a temporary 900-second limit, and a few input rows used 300-second limits, to keep the run short. Row 16b, sleep and wake of the PC, could not be run because the PC would not stay asleep. The same matrix becomes the acceptance test for each rollout wave.</aside>
+</section>

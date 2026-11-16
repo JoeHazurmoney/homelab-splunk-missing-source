@@ -1,0 +1,14 @@
+<section id="proof" class="alt">
+<p class="eyebrow">THE PROOF</p>
+<h2>Tested by breaking it on real hosts</h2>
+<div class="split">
+<div style="width:820px;display:grid;grid-template-columns:1fr 1fr;gap:28px;">
+<div class="card"><p class="num">16</p><p>faults injected on real hosts: all passed, after 6 defects were found and fixed</p></div>
+<div class="card"><p class="num">4–5 min</p><p>from a stopped agent to DOWN, with its cause</p></div>
+<div class="card"><p class="num">0.55 s</p><p>to judge 6,000 items in a synthetic scale test</p></div>
+<div class="card"><p class="num">0.94 s</p><p>to load the Overview in the same test</p></div>
+</div>
+<div class="shot"><img src="/_blob/732056b09af3db5f8c6e808a7faf2952" alt="Recently recovered: items back to OK in the last 24 hours, with when they went down and for how long." style="width:780px;height:478px;"></div>
+</div>
+<aside>All numbers come from the lab’s fault-injection record and test suite, 10 to 14 November 2026. The record has 19 rows: 16 fault injections plus deploy, reinstall and soak checks. Six defects were found and fixed during the run. One part, putting the PC to sleep, could not be run. The 6,000-item figures come from a generated 300-host fixture, not live data: the status search judged them in 0.545 seconds, and the Overview loaded in 0.94 seconds. Scale with real ingest is something the pilot measures. The screenshot shows recoveries from the tests staged for this deck.</aside>
+</section>

@@ -1,0 +1,11 @@
+<section id="attention">
+<p class="eyebrow">EVERY FINDING, READ ALOUD</p>
+<h2>What, why, and what to do next</h2>
+<div class="wide"><img src="/_blob/cfacf6cebb881b1b3eef3d3ea58aa22a" alt="Needs attention: wd2l-logsrv is DEGRADED; its cpu data is MISSING; the cause says a test block is dropping the data on purpose until 02:53; the action says to remove the test block." style="width:1600px;height:270px;object-fit:contain;"></div>
+<div class="cards">
+<div class="card"><p class="eyebrow">WHAT</p><p style="color:var(--paper);">wd2l-logsrv is degraded: its <b>cpu</b> data is MISSING, criticality 3.</p></div>
+<div class="card"><p class="eyebrow">LIKELY CAUSE</p><p style="color:var(--paper);">A test block drops it in Cribl, on purpose, until 02:53.</p></div>
+<div class="card"><p class="eyebrow">NEXT STEP</p><p style="color:var(--paper);">Remove the test block. Manage gives the exact command.</p></div>
+</div>
+<aside>Read the row left to right. The analyst does not have to search: the app has already checked the agent’s heartbeat, planned work, the VM, the relay and tamper signs, in a fixed order, and the first cause that fits wins. There are more than 20 causes, each with its own action and a runbook entry. This one was staged for the screenshots with the app’s own test-block feature. It is criticality 3, so it shows on the page but does not page anyone; criticality 1 and 2 items alert when they go MISSING.</aside>
+</section>

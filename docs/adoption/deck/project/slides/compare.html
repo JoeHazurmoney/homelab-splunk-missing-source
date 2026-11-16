@@ -1,0 +1,23 @@
+<section id="compare" class="alt">
+<p class="eyebrow">WHY THIS, NOT THE ALTERNATIVES</p>
+<h2>What sets it apart</h2>
+<div class="cards">
+<div class="card">
+<h3>Splunk’s Monitoring Console</h3>
+<p>Built in, and it flags missing forwarders.</p>
+<p>It judges forwarders by the connections the indexers see. Behind Cribl, it sees Cribl, not the agents. It covers forwarders only.</p>
+</div>
+<div class="card">
+<h3>TrackMe</h3>
+<p>A third-party Splunkbase app for data-source monitoring.</p>
+<p>Splunkbase says its free Community Edition was discontinued, and that after a trial it goes read-only.</p>
+</div>
+<div class="card" style="border:2px solid var(--amber);">
+<h3>HL Data Health</h3>
+<p>Expectations come from your inventory, so it knows what <i>should</i> arrive.</p>
+<p>Names the likely cause, Cribl included, and the next step. Ties tamper signs to the silence. Plain SPL and the KV store: no scripts, no licence fee. A proof of concept: you own and support it.</p>
+</div>
+</div>
+<div class="footer"><span>Sources: Splunk Monitoring Console docs (Forwarders: Deployment); TrackMe Splunkbase listing 4621</span><span></span></div>
+<aside>Be fair here: TrackMe is an established product, and some customers will prefer a vendor-supported app. This one is a proof of concept the customer would own. Our edge is narrower and sharper: the expected list comes from the deployment pipeline, the cause chain understands Cribl and planned work, and tamper findings are tied to silences. The Monitoring Console point is important for a Cribl customer: it sees only the relay, so it cannot tell you which agent behind Cribl went quiet.</aside>
+</section>
