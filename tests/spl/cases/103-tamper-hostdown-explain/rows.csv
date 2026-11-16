@@ -7,3 +7,6 @@ fwd,,hc,,,,,,,,,,,,,,uf,NOW-600
 hostdown,NOW-700,hc,,,,,,,,,,,,0,host shutdown: SYSTEM_SHUTDOWN,,
 fwd,,hd,,,,,,,,,,,,,,uf,NOW-600
 hostdown,NOW-1700,hd,,,,,,,,,,,,0,host shutdown: SYSTEM_SHUTDOWN,,
+finding,NOW-1000,he,uf_shutdown,Splunk agent stopped (shutdown line),index=_internal; component=Shutdown,,,,,,,,,,,,
+fwd,,he,,,,,,,,,,,,,,uf,NOW-600
+hostdown,NOW-1300,he,,,,,,,,,,,,0,host shutdown: SYSTEM_SHUTDOWN,,

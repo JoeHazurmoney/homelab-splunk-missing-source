@@ -17,3 +17,5 @@ fwd,,hi,,,,,,,,,,,,,,uf,NOW-60
 fwd,,hj,,,,,,,,,,,,,,uf,NOW-60
 fwd,,hk,,,,,,,,,,,,,,uf,NOW-60
 fwd,,hl,,,,,,,,,,,,,,uf,NOW-60
+finding,NOW-900,hm,uf_shutdown,Splunk agent stopped (shutdown line),index=_internal; component=Shutdown,,,,,,,,,,,,
+fwd,,hm,,,,,,,,,,,,,,uf,NOW-895

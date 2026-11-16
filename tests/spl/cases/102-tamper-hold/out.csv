@@ -11,3 +11,4 @@ hi|svcstop_splunkforwarder|1999998900,svcstop_splunkforwarder,pending,1,0,,,NOW-
 hj|uf_shutdown|1999299900,uf_shutdown,pending,1,0,,,NOW-700,0,Splunk agent stopped (shutdown line)
 hk|uf_shutdown|1999299900,uf_shutdown,pending,1,0,,,NOW,0,Splunk agent stopped (shutdown line)
 hl|uf_shutdown|1999998900,uf_shutdown,,,0,,,,1,Splunk agent stopped (shutdown line)
+hm|uf_shutdown|1999998900,uf_shutdown,pending,1,0,,,,0,Splunk agent stopped (shutdown line)

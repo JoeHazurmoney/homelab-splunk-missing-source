@@ -3,3 +3,4 @@ ha|svcstop_splunkforwarder|1999998900,svcstop_splunkforwarder,judged,1,1,host sh
 hb|win7036|1999998900,win7036,judged,1,1,host shutdown,host shutdown: restart by taylorb (Operating System: Upgrade (Planned)),,1
 hc|uf_shutdown|1999998900,uf_shutdown,judged,1,0,,,NOW-700,1
 hd|uf_shutdown|1999998900,uf_shutdown,judged,1,0,,,NOW-700,1
+he|uf_shutdown|1999998900,uf_shutdown,pending,1,0,,,NOW,0
